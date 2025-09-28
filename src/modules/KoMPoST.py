@@ -126,7 +126,13 @@ class KoMPoST(BaseModule):
         cwd = os.getcwd()
         try:
             os.chdir(kompost_dir)
-            subprocess.run([f"./{kompost_exe}", ini_file], check=True)
+
+            run_kwargs = {"check": True}
+            if not self.full_config.general.module_terminal_output:
+                run_kwargs["stdout"] = subprocess.DEVNULL
+                run_kwargs["stderr"] = subprocess.DEVNULL
+                logging.debug("[KoMPoST] Running with suppressed output...")
+            subprocess.run([f"./{kompost_exe}", ini_file], **run_kwargs)
         except subprocess.CalledProcessError as e:
             logging.error(f"[KoMPoST] Execution failed: {e}")
         finally:

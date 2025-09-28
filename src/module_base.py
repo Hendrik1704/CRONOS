@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import time
 import logging
 from functools import wraps
+from .colors import Colors
 
 
 def time_execution(func):
@@ -13,7 +14,11 @@ def time_execution(func):
         end_time = time.time()
         execution_time = end_time - start_time
         module_name = self.__class__.__name__
-        logging.info(f"[{module_name}] {func.__name__} completed in {execution_time:.3f} seconds")
+        
+        # Use Colors class for yellow bold formatting
+        message = f"[{module_name}] {func.__name__} completed in {execution_time:.3f} seconds"
+        colored_message = Colors.green(message, bold=True)
+        logging.info(colored_message)
         return result
     return wrapper
 

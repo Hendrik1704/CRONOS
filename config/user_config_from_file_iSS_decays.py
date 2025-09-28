@@ -7,7 +7,8 @@ general ={
     #   "INFO"  - Show key runtime messages
     #   "DEBUG" - Show all debug messages (verbose)
     #   "NONE"  - Suppress all log output
-    "log_level": "DEBUG",
+    "log_level": "INFO",
+    "module_terminal_output": False,
 
     # List of modules to connect/load.
     "modules": ["from_file_IC",

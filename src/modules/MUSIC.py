@@ -229,7 +229,13 @@ class MUSIC(BaseModule):
         cwd = os.getcwd()
         try:
             os.chdir(MUSIC_dir)
-            subprocess.run([f"./{MUSIC_exe}", ini_file], check=True)
+
+            kwargs = {"check": True}
+            if not self.full_config.general.module_terminal_output:
+                kwargs["stdout"] = subprocess.DEVNULL
+                kwargs["stderr"] = subprocess.DEVNULL
+                logging.debug("[MUSIC] Running with suppressed output...")
+            subprocess.run([f"./{MUSIC_exe}", ini_file], **kwargs)
         except subprocess.CalledProcessError as e:
             logging.error(f"[MUSIC] Execution failed: {e}")
         finally:

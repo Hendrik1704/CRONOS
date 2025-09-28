@@ -167,7 +167,12 @@ class SMASH(BaseModule):
         cwd = os.getcwd()
         try:
             os.chdir(smash_dir)
-            subprocess.run([f"./{smash_exe}", "-i", ini_file], check=True)
+            kwargs = {"check": True}
+            if not self.full_config.general.module_terminal_output:
+                kwargs["stdout"] = subprocess.DEVNULL
+                kwargs["stderr"] = subprocess.DEVNULL
+                logging.debug("[SMASH] Running with suppressed output...")
+            subprocess.run([f"./{smash_exe}", "-i", ini_file], **kwargs)
         except subprocess.CalledProcessError as e:
             logging.error(f"[SMASH] Execution failed: {e}")
         finally:

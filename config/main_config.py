@@ -8,6 +8,8 @@ general ={
     #   "DEBUG" - Show all debug messages (verbose)
     #   "NONE"  - Suppress all log output
     "log_level": "INFO",
+    "module_terminal_output": True,  # If True, show terminal output of each module
+                                      # If False, suppress terminal output of each module
 
     # List of modules to connect/load.
     # Possible modules: from_file_IC, KoMPoST, entropy_matching, MUSIC, iSS, SMASH, afterburner_toolkit

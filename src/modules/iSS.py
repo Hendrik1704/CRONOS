@@ -210,7 +210,12 @@ class iSS(BaseModule):
         cwd = os.getcwd()
         try:
             os.chdir(iSS_dir)
-            subprocess.run([f"./{iSS_exe}", ini_file], check=True)
+            kwargs = {"check": True}
+            if not self.full_config.general.module_terminal_output:
+                kwargs["stdout"] = subprocess.DEVNULL
+                kwargs["stderr"] = subprocess.DEVNULL
+                logging.debug("[iSS] Running with suppressed output...")
+            subprocess.run([f"./{iSS_exe}", ini_file], **kwargs)
         except subprocess.CalledProcessError as e:
             logging.error(f"[iSS] Execution failed: {e}")
         finally:

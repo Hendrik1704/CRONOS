@@ -8,6 +8,8 @@ from .modules.entropy_matching import EntropyMatching
 from .modules.MUSIC import MUSIC
 from .modules.iSS import iSS
 from .modules.SMASH import SMASH
+from .modules.afterburner_toolkit import afterburner_toolkit
+from .colors import Colors
 
 __all__ = [
     "Configuration",
@@ -21,4 +23,6 @@ __all__ = [
     "MUSIC",
     "iSS",
     "SMASH",
+    "afterburner_toolkit",
+    "colors",
 ]
