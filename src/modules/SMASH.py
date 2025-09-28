@@ -88,6 +88,7 @@ class SMASH(BaseModule):
                     "./iSS_tables/pdg-SMASH.dat",
                     self.config.input_filename,
                     "OSCAR0",
+                    "--seed", str(self.config.Randomseed),
                 ],
                 check=True,
                 capture_output=True,

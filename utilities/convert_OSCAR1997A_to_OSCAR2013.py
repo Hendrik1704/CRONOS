@@ -3,6 +3,7 @@ import argparse
 from pathlib import Path
 import numpy as np
 import pandas as pd
+import time
 
 def load_pdg_table(pdg_path: Path) -> pd.DataFrame:
     """Load PDG table from SMASH file."""
@@ -84,8 +85,14 @@ def write_oscar2013(df: pd.DataFrame, pdg_df: pd.DataFrame, output_path: Path):
             for line in range(event_idx[ev] + 1, event_idx[ev + 1]):
                 row = df.loc[line]
                 charge = get_PDG_ID_charge(int(row["PDG_ID"]), pdg_df)
+                
+                # Add small random wiggle to prevent particles at same position
+                wiggle_x = row['x'] + np.random.uniform(-1e-5, 1e-5)
+                wiggle_y = row['y'] + np.random.uniform(-1e-5, 1e-5)
+                wiggle_z = row['z'] + np.random.uniform(-1e-5, 1e-5)
+                
                 f.write(
-                    f"{row['t']:.6f} {row['x']:.6f} {row['y']:.6f} {row['z']:.6f} "
+                    f"{row['t']:.6f} {wiggle_x:.6f} {wiggle_y:.6f} {wiggle_z:.6f} "
                     f"{row['m']:.6f} {row['E']:.6f} {row['px']:.6f} {row['py']:.6f} {row['pz']:.6f} "
                     f"{int(row['PDG_ID'])} {int(row['sample_idx'])} {charge}\n"
                 )
@@ -98,7 +105,16 @@ def main():
     parser.add_argument("pdgPath", type=Path, help="Path to pdg-SMASH.dat file")
     parser.add_argument("inputFilePath", type=Path, help="Path to OSCAR1999A input file")
     parser.add_argument("outputFilePath", type=Path, help="Directory to save OSCAR2013 file")
+    parser.add_argument("--seed", type=int, default=-1, 
+                       help="Random seed for position wiggle. Use -1 for time-based seed (default: -1)")
     args = parser.parse_args()
+
+    # Set random seed for position wiggle
+    if args.seed == -1:
+        seed = int(time.time())
+    else:
+        seed = args.seed
+    np.random.seed(seed)
 
     pdg_df = load_pdg_table(args.pdgPath)
     oscar_df = load_oscar1999a(args.inputFilePath)
