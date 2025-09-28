@@ -125,7 +125,7 @@ class SMASH(BaseModule):
 
             if self.config.No_Collisions == 1:
                 f.write(f"Collision_Term:\n")
-                f.write(f"    No_Collisions: 1\n")
+                f.write(f"    No_Collisions: true\n")
 
             f.write(f"Output:\n")
             f.write(f"    Output_Interval: 100.0\n")
