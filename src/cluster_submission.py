@@ -66,7 +66,7 @@ def submission_script_cluster(args, config):
         pass
     elif cluster_name == "noctua1":
         create_noctua1_submission_script(args)
-        message 
+        message
     else:
         message = f"Cluster '{cluster_name}' is not supported."
         colored_message = Colors.red(message, bold=True)
