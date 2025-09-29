@@ -5,6 +5,7 @@ import os
 
 def create_noctua1_submission_script(args):
     run_dir = args.run_dir
+    slurm_logging_dir = "log"
 
     # open a file in the run_dir
     script_path = f"{run_dir}/submit_job.sh"
@@ -21,8 +22,8 @@ def create_noctua1_submission_script(args):
         script_file.write("#!/bin/bash\n")
         script_file.write(f"#SBATCH -J CRONOS\n")
         script_file.write(f"#SBATCH -A hpc-prf-flucurhi\n")
-        script_file.write(f"#SBATCH -o {run_dir}/output.log\n")
-        script_file.write(f"#SBATCH -e {run_dir}/error.log\n")
+        script_file.write(f"#SBATCH -o {slurm_logging_dir}/output.log\n")
+        script_file.write(f"#SBATCH -e {slurm_logging_dir}/error.log\n")
         script_file.write(f"#SBATCH -t 40:00:00\n")
         script_file.write(f"#SBATCH -p normal\n")
         script_file.write(f"#SBATCH -N 1\n")
@@ -39,6 +40,8 @@ def create_noctua1_submission_script(args):
         script_file.write("module load devel/CMake/3.23.1-GCCcore-11.3.0\n")
         script_file.write("module load lang/Python/3.10.4-GCCcore-11.3.0\n\n")
 
+        script_file.write("pip install h5py\n")
+
         # Implement that each array task runs one of the job_ directories in the run_dir
         script_file.write("export OMP_NUM_THREADS=1\n")
         script_file.write("cd $SLURM_SUBMIT_DIR\n")
@@ -47,7 +50,7 @@ def create_noctua1_submission_script(args):
         )
 
         script_file.write(
-            f"python ../run_simulations.py --main_config_path {args.main_config_path} --user_config_path {args.user_config_path} --job_dir {run_dir}/job_$SLURM_ARRAY_TASK_ID/\n"
+            f"python ../run_simulations.py --main_config_path ../{args.main_config_path} --user_config_path ../{args.user_config_path} --job_dir job_$SLURM_ARRAY_TASK_ID/\n"
         )
 
 
@@ -63,6 +66,7 @@ def submission_script_cluster(args, config):
         pass
     elif cluster_name == "noctua1":
         create_noctua1_submission_script(args)
+        message 
     else:
         message = f"Cluster '{cluster_name}' is not supported."
         colored_message = Colors.red(message, bold=True)
