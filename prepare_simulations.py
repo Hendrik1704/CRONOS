@@ -22,6 +22,10 @@ MODULE_REGISTRY = {
     "afterburner_toolkit": afterburner_toolkit,
 }
 
+CLUSTER_OPTIONS = ["local",
+                   "noctua1",
+]
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the iEBE framework")
     parser.add_argument(
@@ -42,6 +46,12 @@ if __name__ == "__main__":
         default="run/",
         help="Path to the run directory",
     )
+    parser.add_argument(
+        "--cluster",
+        nargs="?",
+        default="local",
+        help="Cluster name for environment setup (default: local)",
+    )
     args = parser.parse_args()
 
     config = load_config(args.main_config_path, args.user_config_path)
@@ -49,6 +59,12 @@ if __name__ == "__main__":
         logging.error("Failed to load configuration.")
         exit(1)
     logging.basicConfig(level=config.general.log_level)
+
+    if args.cluster not in CLUSTER_OPTIONS:
+        logging.error(
+            f"Cluster '{args.cluster}' is not supported. Supported clusters: {CLUSTER_OPTIONS}"
+        )
+        exit(1)
 
     project_root = Path(__file__).resolve().parent
     print(f"Project root is: {project_root}")

@@ -10,6 +10,7 @@ from .modules.iSS import iSS
 from .modules.SMASH import SMASH
 from .modules.afterburner_toolkit import afterburner_toolkit
 from .colors import Colors
+from .cluster_submission import submission_script_cluster
 
 __all__ = [
     "Configuration",
@@ -25,4 +26,5 @@ __all__ = [
     "SMASH",
     "afterburner_toolkit",
     "colors",
+    "submission_script_cluster",
 ]

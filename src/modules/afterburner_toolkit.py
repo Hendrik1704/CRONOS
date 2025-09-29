@@ -260,13 +260,15 @@ class afterburner_toolkit(BaseModule):
                 if not self.full_config.general.module_terminal_output:
                     kwargs["stdout"] = subprocess.DEVNULL
                     kwargs["stderr"] = subprocess.DEVNULL
-                    logging.debug("[afterburner_toolkit] Converter running with suppressed output...")
+                    logging.debug(
+                        "[afterburner_toolkit] Converter running with suppressed output..."
+                    )
                 subprocess.run(
                     [
                         f"./{afterburner_toolkit_converter}",
                         self.config.input_filename,
                     ],
-                    **kwargs
+                    **kwargs,
                 )
                 # Create results directory in current directory if not exists
                 results_dir = os.path.join(afterburner_toolkit_dir, "results")
@@ -320,7 +322,9 @@ class afterburner_toolkit(BaseModule):
             if not self.full_config.general.module_terminal_output:
                 kwargs["stdout"] = subprocess.DEVNULL
                 kwargs["stderr"] = subprocess.DEVNULL
-                logging.debug("[afterburner_toolkit] Running with suppressed output...")
+                logging.debug(
+                    "[afterburner_toolkit] Running with suppressed output..."
+                )
             subprocess.run([f"./{afterburner_toolkit_exe}"], **kwargs)
         except subprocess.CalledProcessError as e:
             logging.error(f"[afterburner_toolkit] Execution failed: {e}")

@@ -18,7 +18,7 @@ general ={
                 "iSS",
                 "afterburner_toolkit"],
 
-    "keep_particle_files": True,
+    "keep_particle_files": False,
 }
 
 from_file_IC = {

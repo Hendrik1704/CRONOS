@@ -1,5 +1,7 @@
 from src.module_base import BaseModule
 from src.handle_results import handle_results
+from src.colors import Colors
+from src.cluster_submission import submission_script_cluster
 import logging
 import os
 import shutil
@@ -72,6 +74,12 @@ def prepare_modules(args, config, module_registry, project_root):
             # Create a result directory
             result_dir = os.path.join(event_dir, "results")
             os.makedirs(result_dir, exist_ok=True)
+
+    submission_script_cluster(args, config)
+
+    colored_message = f"Prepared {config.number_of_jobs} jobs with {config.number_events_per_job} events each in '{args.run_dir}'"
+    colored_message = Colors.green(colored_message, bold=True)
+    logging.info(colored_message)
 
 
 def run_modules(config, module_registry, job_dir, project_root):

@@ -7,6 +7,7 @@ from .colors import Colors
 
 def time_execution(func):
     """Decorator to measure and log execution time of a method."""
+
     @wraps(func)
     def wrapper(self, *args, **kwargs):
         start_time = time.time()
@@ -14,12 +15,13 @@ def time_execution(func):
         end_time = time.time()
         execution_time = end_time - start_time
         module_name = self.__class__.__name__
-        
+
         # Use Colors class for yellow bold formatting
         message = f"[{module_name}] {func.__name__} completed in {execution_time:.3f} seconds"
         colored_message = Colors.green(message, bold=True)
         logging.info(colored_message)
         return result
+
     return wrapper
 
 
