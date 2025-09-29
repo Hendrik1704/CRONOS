@@ -100,7 +100,7 @@ MUSIC = {
     "Include_Shear_Visc_Yes_1_No_0": 1,  # include shear viscous effect
     "Shear_to_S_ratio": 0.16,  # value of \eta/s
     "T_dependent_Shear_to_S_ratio": 0,  # flag to use temperature dep. \eta/s(T)
-    "muB_dependent_Shear_to_S_ratio": 1,  # flag to use temperature dep. \eta/s(T, muB)
+    "muB_dependent_Shear_to_S_ratio": 0,  # flag to use temperature dep. \eta/s(T, muB)
     "shear_muBf0p2": 1.,  # piece-wise eta/s(muB) for muB_dependent_Shear_to_S_ratio == 7
     "shear_muBf0p4": 1.,  # piece-wise eta/s(muB) for muB_dependent_Shear_to_S_ratio == 7
     "Include_Bulk_Visc_Yes_1_No_0": 0,  # include bulk viscous effect
