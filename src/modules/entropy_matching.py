@@ -1,4 +1,4 @@
-from src.module_base import BaseModule, time_execution
+from src.module_base import BaseModule, time_execution, run_external_command
 import logging
 import os
 import subprocess
@@ -76,7 +76,7 @@ class EntropyMatching(BaseModule):
         cwd = os.getcwd()
         try:
             os.chdir(s_matching_dir)
-            subprocess.run(
+            run_external_command(
                 [
                     "python3",
                     s_matching_script,
@@ -87,6 +87,8 @@ class EntropyMatching(BaseModule):
                     f"output_{current_module_index}.dat",
                 ],
                 check=True,
+                memory_threshold_mb=self.full_config.general.memory_threshold_mb,
+                module_name="entropy_matching",
             )
         except subprocess.CalledProcessError as e:
             logging.error(f"[EntropyMatching] Execution failed: {e}")

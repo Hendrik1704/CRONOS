@@ -157,6 +157,44 @@ python run_simulations.py --job_dir run/job_0/  # Automatic resume
 python run_simulations.py --job_dir run/job_0/ --force-restart
 ```
 
+## Memory Monitoring
+
+CRONOS includes comprehensive real-time memory monitoring for all physics modules:
+
+### Features
+- **Real-time Memory Tracking**: Monitors memory usage of external physics codes during execution
+- **Configurable Thresholds**: Set custom memory alerts via `memory_threshold_mb` in configuration
+- **Process Identification**: Distinguishes between Python wrapper and actual physics code memory usage
+- **Performance Insights**: Detailed peak memory reporting for optimization guidance
+
+### Configuration
+
+```python
+general = {
+    'memory_threshold_mb': 4096,  # Alert threshold in MB
+    ...
+}
+```
+
+### Memory Monitoring Utility
+
+```bash
+# Real-time monitoring of CRONOS processes
+python utilities/memory_monitor.py
+
+# Options:
+# --check-interval: How often to check memory (seconds, default: 5)
+# --threshold: Memory threshold for alerts (MB, default: 8192)
+# --log: Log file for memory usage (default: memory_usage.log)
+```
+
+### Memory Alerts
+
+The system generates warnings when:
+- External physics codes exceed the configured memory threshold
+- System memory usage becomes critically high
+- Subprocess memory consumption patterns suggest optimization opportunities
+
 ## Output Management
 
 ### File Structure
@@ -192,7 +230,15 @@ run/
 
 2. **Memory issues on cluster**
    - Adjust SLURM memory requests in `cluster_submission.py`
+   - Reduce `memory_threshold_mb` in configuration for early warnings
+   - Monitor with `python utilities/memory_monitor.py` during testing
    - Enable output suppression: `suppress_output: True`
+
+3. **High memory usage warnings**
+   - Check peak memory reports in logs to identify memory-intensive modules
+   - Consider reducing grid sizes in MUSIC (`Grid_size_in_x/y/eta`)
+   - Adjust physics parameters to reduce computational load
+   - Monitor real-time usage with memory monitoring utility
 
 ### Getting Help
 

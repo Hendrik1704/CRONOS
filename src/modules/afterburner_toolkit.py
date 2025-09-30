@@ -1,4 +1,4 @@
-from src.module_base import BaseModule, time_execution
+from src.module_base import BaseModule, time_execution, run_external_command
 import logging
 import os
 import subprocess
@@ -263,11 +263,13 @@ class afterburner_toolkit(BaseModule):
                     logging.debug(
                         "[afterburner_toolkit] Converter running with suppressed output..."
                     )
-                subprocess.run(
+                run_external_command(
                     [
                         f"./{afterburner_toolkit_converter}",
                         self.config.input_filename,
                     ],
+                    memory_threshold_mb=self.full_config.general.memory_threshold_mb,
+                    module_name="afterburner_toolkit-converter",
                     **kwargs,
                 )
                 # Create results directory in current directory if not exists
@@ -325,7 +327,12 @@ class afterburner_toolkit(BaseModule):
                 logging.debug(
                     "[afterburner_toolkit] Running with suppressed output..."
                 )
-            subprocess.run([f"./{afterburner_toolkit_exe}"], **kwargs)
+            run_external_command(
+                [f"./{afterburner_toolkit_exe}"],
+                memory_threshold_mb=self.full_config.general.memory_threshold_mb,
+                module_name="afterburner_toolkit",
+                **kwargs,
+            )
         except subprocess.CalledProcessError as e:
             logging.error(f"[afterburner_toolkit] Execution failed: {e}")
         finally:

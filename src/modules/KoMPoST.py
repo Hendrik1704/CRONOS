@@ -1,4 +1,4 @@
-from src.module_base import BaseModule, time_execution
+from src.module_base import BaseModule, time_execution, run_external_command
 import logging
 import os
 import subprocess
@@ -132,7 +132,12 @@ class KoMPoST(BaseModule):
                 run_kwargs["stdout"] = subprocess.DEVNULL
                 run_kwargs["stderr"] = subprocess.DEVNULL
                 logging.debug("[KoMPoST] Running with suppressed output...")
-            subprocess.run([f"./{kompost_exe}", ini_file], **run_kwargs)
+            run_external_command(
+                [f"./{kompost_exe}", ini_file],
+                memory_threshold_mb=self.full_config.general.memory_threshold_mb,
+                module_name="KoMPoST",
+                **run_kwargs,
+            )
         except subprocess.CalledProcessError as e:
             logging.error(f"[KoMPoST] Execution failed: {e}")
         finally:

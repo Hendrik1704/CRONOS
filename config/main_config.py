@@ -12,6 +12,9 @@ general ={
                                       # If False, suppress terminal output of each module
     "cleanup_checkpoints": True,  # If True, delete checkpoint file after successful completion
 
+    # Memory monitoring settings
+    "memory_threshold_mb": 4096,  # Memory threshold in MB for warnings (default: 4GB)
+
     # List of modules to connect/load.
     # Possible modules: from_file_IC, KoMPoST, entropy_matching, MUSIC, iSS, SMASH, afterburner_toolkit
     "modules": [],

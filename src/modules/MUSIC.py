@@ -1,4 +1,4 @@
-from src.module_base import BaseModule, time_execution
+from src.module_base import BaseModule, time_execution, run_external_command
 import logging
 import os
 import subprocess
@@ -235,7 +235,12 @@ class MUSIC(BaseModule):
                 kwargs["stdout"] = subprocess.DEVNULL
                 kwargs["stderr"] = subprocess.DEVNULL
                 logging.debug("[MUSIC] Running with suppressed output...")
-            subprocess.run([f"./{MUSIC_exe}", ini_file], **kwargs)
+            run_external_command(
+                [f"./{MUSIC_exe}", ini_file],
+                memory_threshold_mb=self.full_config.general.memory_threshold_mb,
+                module_name="MUSIC",
+                **kwargs,
+            )
         except subprocess.CalledProcessError as e:
             logging.error(f"[MUSIC] Execution failed: {e}")
         finally:

@@ -1,4 +1,4 @@
-from src.module_base import BaseModule, time_execution
+from src.module_base import BaseModule, time_execution, run_external_command
 import logging
 import os
 import subprocess
@@ -215,7 +215,12 @@ class iSS(BaseModule):
                 kwargs["stdout"] = subprocess.DEVNULL
                 kwargs["stderr"] = subprocess.DEVNULL
                 logging.debug("[iSS] Running with suppressed output...")
-            subprocess.run([f"./{iSS_exe}", ini_file], **kwargs)
+            run_external_command(
+                [f"./{iSS_exe}", ini_file],
+                memory_threshold_mb=self.full_config.general.memory_threshold_mb,
+                module_name="iSS",
+                **kwargs,
+            )
         except subprocess.CalledProcessError as e:
             logging.error(f"[iSS] Execution failed: {e}")
         finally:

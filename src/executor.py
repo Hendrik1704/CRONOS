@@ -1,4 +1,4 @@
-from src.module_base import BaseModule
+from src.module_base import BaseModule, get_memory_info
 from src.handle_results import handle_results
 from src.colors import Colors
 from src.cluster_submission import submission_script_cluster
@@ -8,6 +8,124 @@ import os
 import shutil
 import pprint
 import traceback
+import psutil
+
+
+def analyze_error(exception, module_name):
+    """Analyze an exception to determine if it's memory-related and provide enhanced messaging."""
+    error_str = str(exception).lower()
+    error_type = type(exception).__name__
+
+    # Memory-related error patterns
+    memory_patterns = [
+        "memory",
+        "malloc",
+        "out of memory",
+        "cannot allocate",
+        "memoryerror",
+        "bad_alloc",
+        "enomem",
+        "resource temporarily unavailable",
+    ]
+
+    # Process/system resource patterns
+    resource_patterns = [
+        "too many open files",
+        "resource unavailable",
+        "no space left",
+        "disk full",
+        "quota exceeded",
+    ]
+
+    is_memory_related = (
+        isinstance(exception, MemoryError)
+        or error_type in ["MemoryError", "OSError"]
+        or any(pattern in error_str for pattern in memory_patterns)
+    )
+
+    is_resource_related = any(
+        pattern in error_str for pattern in resource_patterns
+    )
+
+    # Get current memory state
+    memory_info = get_memory_info()
+
+    # Create enhanced error message
+    if isinstance(exception, MemoryError):
+        enhanced_msg = f"MEMORY ERROR in module '{module_name}': Python MemoryError - process ran out of memory"
+    elif is_memory_related:
+        enhanced_msg = (
+            f"MEMORY-RELATED ERROR in module '{module_name}': {exception}"
+        )
+    elif is_resource_related:
+        enhanced_msg = f"RESOURCE ERROR in module '{module_name}': {exception}"
+    elif memory_info and memory_info["system_percent"] > 90:
+        enhanced_msg = f"ERROR in module '{module_name}' (system memory {memory_info['system_percent']:.1f}% - possible memory issue): {exception}"
+    else:
+        enhanced_msg = f"Module '{module_name}' failed: {exception}"
+
+    return {
+        "enhanced_message": enhanced_msg,
+        "is_memory_related": is_memory_related
+        or (memory_info and memory_info["system_percent"] > 90),
+        "is_resource_related": is_resource_related,
+        "memory_info": memory_info,
+        "original_exception": exception,
+    }
+
+
+def get_memory_suggestions(memory_info, module_name):
+    """Provide memory optimization suggestions based on current usage and module."""
+    suggestions = []
+
+    if memory_info["system_percent"] > 95:
+        suggestions.append(
+            "Critical memory shortage - consider using a node with more RAM"
+        )
+        suggestions.append(
+            "Try reducing the number of grid points or lattice size in configuration"
+        )
+
+    elif memory_info["system_percent"] > 85:
+        suggestions.append(
+            "High memory usage detected - monitor for memory leaks"
+        )
+
+    # Module-specific suggestions
+    if module_name.lower() in ["music", "kompost"]:
+        suggestions.extend(
+            [
+                f"For {module_name}: Try reducing grid size (Ns parameter) or evolution time",
+                f"For {module_name}: Consider using smaller lattice spacing (afm parameter)",
+            ]
+        )
+
+    elif module_name.lower() in ["iss"]:
+        suggestions.extend(
+            [
+                "For iSS: Try reducing particle_diff_reso or using fewer sample particles",
+                "For iSS: Consider using binary output format to reduce memory usage",
+            ]
+        )
+
+    elif module_name.lower() in ["smash"]:
+        suggestions.extend(
+            [
+                "For SMASH: Reduce number of test particles or collision criteria",
+                "For SMASH: Enable particle output compression",
+            ]
+        )
+
+    # General suggestions
+    suggestions.extend(
+        [
+            "Enable 'suppress_output: True' for modules to reduce memory usage",
+            "Consider running fewer events per job (reduce number_events_per_job)",
+            "Check if external codes have memory leak issues",
+        ]
+    )
+
+    return suggestions
 
 
 def prepare_modules(args, config, module_registry, project_root):
@@ -192,13 +310,38 @@ def run_modules(config, module_registry, job_dir, project_root):
                     current_module = module_name
                     break
 
+            # Enhanced error analysis
+            error_analysis = analyze_error(e, current_module)
+
             checkpoint_manager.mark_module_failed(
-                event_dir, current_module, str(e)
+                event_dir, current_module, error_analysis["enhanced_message"]
             )
+
+            # Display enhanced error message
             colored_msg = Colors.red(
-                f"[ERROR] Module '{current_module}' failed for {event_dir}: {e}"
+                f"[ERROR] {error_analysis['enhanced_message']}"
             )
             logging.error(colored_msg)
+
+            # Show memory info if memory-related
+            if error_analysis["is_memory_related"]:
+                memory_info = error_analysis["memory_info"]
+                if memory_info:
+                    memory_msg = (
+                        f"Memory usage at failure: Process={memory_info['process_rss_mb']:.1f}MB, "
+                        f"System={memory_info['system_percent']:.1f}% "
+                        f"({memory_info['system_available_gb']:.1f}GB available)"
+                    )
+                    logging.error(Colors.red(f"[MEMORY] {memory_msg}"))
+
+                    # Provide memory optimization suggestions
+                    suggestions = get_memory_suggestions(
+                        memory_info, current_module
+                    )
+                    for suggestion in suggestions:
+                        logging.info(
+                            Colors.yellow(f"[SUGGESTION] {suggestion}")
+                        )
 
             # Log more detailed error information
             logging.error(f"Full traceback:\n{traceback.format_exc()}")

@@ -1,4 +1,4 @@
-from src.module_base import BaseModule, time_execution
+from src.module_base import BaseModule, time_execution, run_external_command
 import logging
 import os
 import subprocess
@@ -81,7 +81,7 @@ class SMASH(BaseModule):
         cwd = os.getcwd()
         try:
             os.chdir(smash_dir)
-            result = subprocess.run(
+            result = run_external_command(
                 [
                     "python3",
                     convert_script,
@@ -94,6 +94,8 @@ class SMASH(BaseModule):
                 check=True,
                 capture_output=True,
                 text=True,
+                memory_threshold_mb=self.full_config.general.memory_threshold_mb,
+                module_name="SMASH-convert",
             )
             num_events = int(result.stdout.strip())
             self.config.Nevents = num_events
@@ -174,7 +176,12 @@ class SMASH(BaseModule):
                 kwargs["stdout"] = subprocess.DEVNULL
                 kwargs["stderr"] = subprocess.DEVNULL
                 logging.debug("[SMASH] Running with suppressed output...")
-            subprocess.run([f"./{smash_exe}", "-i", ini_file], **kwargs)
+            run_external_command(
+                [f"./{smash_exe}", "-i", ini_file],
+                memory_threshold_mb=self.full_config.general.memory_threshold_mb,
+                module_name="SMASH",
+                **kwargs,
+            )
         except subprocess.CalledProcessError as e:
             logging.error(f"[SMASH] Execution failed: {e}")
         finally:
