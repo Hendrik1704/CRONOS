@@ -6,7 +6,71 @@ import shutil
 
 
 class afterburner_toolkit(BaseModule):
+    """Analysis toolkit module for flow and correlation measurements.
+    
+    Implements comprehensive analysis of particle distributions using the
+    hadronic afterburner toolkit. Calculates flow coefficients, HBT
+    correlations, balance functions, and other observables from final
+    hadron momentum distributions.
+    
+    Key analysis features:
+    - Anisotropic flow coefficients (v2, v3, v4, etc.) with event plane methods
+    - HBT (Hanbury Brown-Twiss) correlations for source size measurements
+    - Balance function analysis for charge correlations
+    - Event-by-event yield fluctuation analysis
+    - Multi-particle correlations and cumulants
+    - Resonance feed-down corrections
+    
+    Module workflow:
+    1. Links analysis executable and equation of state tables
+    2. Converts input format (SMASH→binary or iSS→binary) if needed
+    3. Generates comprehensive analysis parameter file
+    4. Executes analysis calculations with memory monitoring
+    5. Organizes output files with flow, HBT, and correlation results
+    
+    Configuration includes analysis selections (particles, pT ranges, rapidity),
+    correlation settings, and output preferences. Results are preserved in
+    organized directory structure for subsequent analysis.
+    
+    Example:
+        >>> toolkit = afterburner_toolkit(config.afterburner_toolkit, full_config, project_root, event_id)
+        >>> toolkit.prepare_environment(event_dir)
+        >>> toolkit.prepare_input(event_dir)
+        >>> toolkit.run(event_dir)  # Flow and correlation analysis
+        >>> toolkit.fetch_output(event_dir)  # Organized analysis results
+    """
     def prepare_environment(self, event_dir):
+        """Set up afterburner_toolkit execution environment with executables and data tables.
+        
+        Creates afterburner_toolkit directory structure and establishes symbolic links to:
+        - Flow analysis executable (hadronic_afterburner_tools.e)
+        - Equation of state tables (EOS directory) 
+        - SMASH format converter (convert_to_binary_SMASH.e, if SMASH is used)
+        
+        The environment setup adapts based on the simulation chain configuration,
+        linking the SMASH converter only when SMASH hadronic transport is included
+        in the module sequence.
+        
+        Analysis Components:
+            - EOS tables: Required for thermodynamic calculations in flow analysis
+            - Flow executable: Core analysis engine for coefficient extraction
+            - Format converter: Handles OSCAR→binary conversion for SMASH output
+        
+        Args:
+            event_dir (str): Path to event-specific directory where afterburner_toolkit will execute.
+                
+        Raises:
+            SystemExit: If any required afterburner_toolkit components are missing.
+            
+        Side Effects:
+            - Creates symbolic links to analysis executables and data
+            - Configures environment based on active physics modules
+            - Validates availability of all required analysis components
+            
+        Example:
+            >>> toolkit.prepare_environment("/path/to/run/job_0/event_0/")
+            # Creates /path/to/run/job_0/event_0/afterburner_toolkit/ with proper links
+        """
         logging.info(
             f"[afterburner_toolkit] Preparing environment in {event_dir}..."
         )
@@ -78,6 +142,39 @@ class afterburner_toolkit(BaseModule):
             exit(1)
 
     def prepare_input(self, event_dir):
+        """Generate afterburner_toolkit configuration and establish particle input links.
+        
+        Creates comprehensive configuration file for flow analysis tools and
+        establishes links to final particle data from hadronic transport.
+        The toolkit performs detailed flow coefficient extraction and particle
+        correlation analysis on the complete heavy-ion collision event.
+        
+        Configuration Components:
+            - Analysis mode: Single event vs. event ensemble
+            - Particle selection: Species, kinematic cuts, rapidity windows
+            - Flow analysis: Harmonic orders, reference flow methods
+            - Binning: Transverse momentum, rapidity, centrality
+            - Output format: Flow coefficients and correlation functions
+        
+        Flow Analysis Physics:
+            Extracts azimuthal flow coefficients (v1, v2, v3, ...) that encode
+            information about initial collision geometry, equation of state,
+            and transport properties of the quark-gluon plasma.
+        
+        Args:
+            event_dir (str): Event directory containing afterburner_toolkit/ subdirectory
+                and final particle data from SMASH transport
+        
+        Side Effects:
+            - Creates parameters_afterburner_toolkit.dat configuration file
+            - Links particle input from previous simulation module
+            - Sets up analysis binning and particle selection criteria
+            - Configures output directories for flow analysis results
+        
+        Notes:
+            The toolkit can analyze both SMASH OSCAR format and binary
+            particle formats, adapting automatically to the input type.
+        """
         logging.info(f"[afterburner_toolkit] Create input file...")
         current_module_index = self.full_config.general.modules.index(
             "afterburner_toolkit"
@@ -244,6 +341,45 @@ class afterburner_toolkit(BaseModule):
 
     @time_execution
     def run(self, event_dir):
+        """Execute afterburner_toolkit flow analysis on final particle data.
+        
+        Runs comprehensive flow analysis tools to extract azimuthal flow
+        coefficients and particle correlations from the complete heavy-ion
+        collision simulation. Handles format conversion and multi-step analysis.
+        
+        Analysis Workflow:
+            1. Format conversion (if SMASH OSCAR input detected)
+            2. Particle selection and kinematic filtering
+            3. Flow coefficient calculation using multiple methods
+            4. Differential flow analysis (pT, y, species dependent)
+            5. Correlation function extraction
+            6. Statistical analysis and error estimation
+        
+        Physics Observables:
+            - Integrated and differential flow coefficients (v1, v2, v3, ...)
+            - Species-dependent flow for pions, kaons, protons
+            - Two-particle correlations and cumulants
+            - Event plane resolution and fluctuation analysis
+        
+        Args:
+            event_dir (str): Event directory containing configured afterburner_toolkit/
+                subdirectory with particle input and analysis parameters
+        
+        Side Effects:
+            - Temporarily changes working directory to afterburner_toolkit/
+            - Executes format converter for SMASH output (if needed)
+            - Runs main analysis executable with subprocess monitoring
+            - Creates results/ subdirectory with flow analysis output
+            - Logs analysis progress and computational performance
+        
+        Raises:
+            subprocess.CalledProcessError: If analysis tools execution fails
+            OSError: If toolkit directory or executables not accessible
+        
+        Output:
+            Comprehensive flow analysis results ready for experimental
+            comparison and physics interpretation.
+        """
         logging.info("[afterburner_toolkit] run...")
 
         afterburner_toolkit_dir = os.path.join(event_dir, "afterburner_toolkit")
@@ -341,6 +477,40 @@ class afterburner_toolkit(BaseModule):
         logging.info("[afterburner_toolkit] Execution finished.")
 
     def fetch_output(self, event_dir):
+        """Collect flow analysis results and organize for final output.
+        
+        Processes the afterburner_toolkit flow analysis output, organizing
+        results for final data packaging and cleanup. Removes temporary particle
+        files while preserving flow coefficient data and correlation functions.
+        
+        Output Organization:
+            - Preserves flow coefficient files (particle_*_vndata_*.dat)
+            - Removes temporary particle list files to save storage
+            - Maintains results directory structure for HDF5 packaging
+            - Logs processing completion and file organization
+        
+        Flow Analysis Results:
+            The toolkit produces species-dependent flow coefficients:
+            - particle_9999_vndata_*: All charged particles
+            - particle_211_vndata_*: Pion flow coefficients  
+            - particle_321_vndata_*: Kaon flow coefficients
+            - particle_2212_vndata_*: Proton flow coefficients
+        
+        Args:
+            event_dir (str): Event directory containing afterburner_toolkit/
+                and results/ subdirectories with analysis output
+        
+        Side Effects:
+            - Removes temporary particle list files (particle_list.dat/bin)
+            - Preserves flow analysis results in toolkit directory
+            - Maintains directory structure for subsequent HDF5 compression
+            - Logs successful flow analysis completion
+        
+        Notes:
+            This is the final step in the CRONOS simulation chain, producing
+            the flow coefficients that encode the physics signatures of
+            heavy-ion collision dynamics for experimental comparison.
+        """
         logging.info("[afterburner_toolkit] Data successfully processed...")
         afterburner_toolkit_dir = os.path.join(event_dir, "afterburner_toolkit")
         results_dir = os.path.join(afterburner_toolkit_dir, "results")

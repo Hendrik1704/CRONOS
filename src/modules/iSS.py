@@ -6,7 +6,55 @@ import shutil
 
 
 class iSS(BaseModule):
+    """Cooper-Frye particlization module for freeze-out surface sampling.
+    
+    Implements Cooper-Frye particlization using the iSS (integrated Sampler)
+    code to convert the hydrodynamic freeze-out surface into hadron momentum
+    distributions. Performs Monte Carlo sampling of particles from the
+    freeze-out hypersurface with proper statistical distributions.
+    
+    Key physics features:
+    - Cooper-Frye particlization with viscous corrections
+    - Quantum statistics (Bose-Einstein and Fermi-Dirac)
+    - Resonance decay handling and feed-down corrections  
+    - Multiple sampling modes (momentum, spatial, energy-momentum)
+    - Support for bulk viscosity and baryon chemical potential
+    - Polarization calculations for Lambda hyperons
+    
+    Module workflow:
+    1. Links iSS executable and particle data tables
+    2. Generates comprehensive parameter file with sampling settings
+    3. Links freeze-out surface from MUSIC and MUSIC parameters
+    4. Executes iSS Cooper-Frye sampling with memory monitoring
+    5. Outputs particle momentum distributions (OSCAR or binary format)
+    
+    Configuration includes sampling parameters, particle selection,
+    statistical settings, and output format options. The module interfaces
+    with both MUSIC (freeze-out surface) and SMASH (particle output).
+    
+    Example:
+        >>> iss = iSS(config.iSS, full_config, project_root, event_id)
+        >>> iss.prepare_environment(event_dir)
+        >>> iss.prepare_input(event_dir)
+        >>> iss.run(event_dir)  # Cooper-Frye sampling
+        >>> iss.fetch_output(event_dir)  # Particle distributions
+    """
     def prepare_environment(self, event_dir):
+        """Set up iSS execution environment with executable and particle tables.
+        
+        Creates iSS directory structure and establishes symbolic links to:
+        - iSS executable (iSS.e)
+        - Particle data tables (iSS_tables directory)
+        
+        The iSS_tables contain particle properties, decay channels, and
+        statistical weights needed for proper Cooper-Frye particlization.
+        
+        Args:
+            event_dir (str): Path to event-specific directory where iSS will execute.
+                
+        Raises:
+            SystemExit: If iSS executable or particle tables are missing.
+        """
         logging.info(f"[iSS] Preparing environment in {event_dir}...")
 
         iss_tables_path = os.path.join(
@@ -34,6 +82,37 @@ class iSS(BaseModule):
             exit(1)
 
     def prepare_input(self, event_dir):
+        """Generate iSS configuration file and adapt settings for downstream modules.
+        
+        Creates the iSS parameter file (parameters_iSS.ini) with Cooper-Frye
+        particlization settings and adapts output format based on whether SMASH
+        hadronic afterburner will be used in the simulation chain.
+        
+        Configuration Adaptation:
+            - If SMASH detected: Use OSCAR format for particle output
+            - If no SMASH: Use binary format with built-in decay handling
+        
+        Physics Parameters:
+            - Hydro mode: Specifies hydrodynamic input format
+            - Afterburner type: Configures particle output for specific codes
+            - Bulk viscosity: Controls non-equilibrium corrections
+            - Chemical potentials: Enables baryon number conservation
+            - Diffusion: Handles charge and strangeness diffusion
+        
+        Args:
+            event_dir (str): Event directory containing iSS/ subdirectory
+                and freeze-out surface from MUSIC hydrodynamics
+        
+        Side Effects:
+            - Creates parameters_iSS.ini in iSS subdirectory
+            - Links freeze-out surface from previous module output
+            - Links MUSIC parameters for thermodynamic consistency
+            - Adapts output format based on module chain configuration
+        
+        Notes:
+            Cooper-Frye particlization converts the freeze-out hypersurface
+            from hydrodynamics into individual hadrons for afterburner evolution.
+        """
         logging.info(f"[iSS] Create input file...")
         current_module_index = self.full_config.general.modules.index("iSS")
         self.config.input_filename = f"output_{current_module_index-1}.dat"
@@ -199,6 +278,41 @@ class iSS(BaseModule):
 
     @time_execution
     def run(self, event_dir):
+        """Execute iSS Cooper-Frye particlization of hydrodynamic freeze-out surface.
+        
+        Runs the iSS particlization code to convert the freeze-out hypersurface
+        from MUSIC hydrodynamics into individual hadron samples using the
+        Cooper-Frye prescription. This bridges hydrodynamics and hadronic physics.
+        
+        Physics Process:
+            The Cooper-Frye formula converts continuous hydrodynamic fields on
+            the freeze-out surface into discrete particle four-momenta and positions,
+            accounting for thermal and chemical equilibrium distributions.
+        
+        Computational Features:
+            - Monte Carlo sampling of particle distributions
+            - Resonance decay handling (if enabled)
+            - Memory-efficient processing of large freeze-out surfaces
+            - Format adaptation for different afterburner codes
+        
+        Args:
+            event_dir (str): Event directory containing configured iSS/ subdirectory
+                with freeze-out surface and parameter files
+        
+        Side Effects:
+            - Temporarily changes working directory to iSS/
+            - Executes external iSS binary with subprocess monitoring
+            - Creates particle output in OSCAR or binary format
+            - Logs execution progress and performance metrics
+        
+        Raises:
+            subprocess.CalledProcessError: If iSS execution fails
+            OSError: If iSS directory or executable not accessible
+        
+        Output:
+            Produces particle list files ready for hadronic afterburner (SMASH)
+            or direct analysis, depending on configuration.
+        """
         logging.info("[iSS] run...")
 
         iSS_dir = os.path.join(event_dir, "iSS")
@@ -229,6 +343,39 @@ class iSS(BaseModule):
         logging.info("[iSS] Execution finished.")
 
     def fetch_output(self, event_dir):
+        """Collect iSS particle output and clean up temporary files.
+        
+        Moves the Cooper-Frye particlization output to the standardized results
+        directory and performs cleanup of temporary iSS files. Handles both OSCAR
+        and binary output formats depending on configuration.
+        
+        Output Format Handling:
+            - OSCAR format (OSCAR.DAT): Text-based particle lists for SMASH
+            - Binary format (particle_samples.bin): Efficient binary particle data
+        
+        File Operations:
+            - Moves particle output to results/output_N.dat
+            - Removes temporary iSS working directory
+            - Cleans up MUSIC parameter file copy
+            - Standardizes output naming for simulation chain
+        
+        Args:
+            event_dir (str): Event directory containing iSS/ and results/ subdirectories
+        
+        Side Effects:
+            - Moves particle output file to results/ directory
+            - Removes entire iSS/ working directory and contents
+            - Removes MUSIC parameter file from results/
+            - Logs successful particle processing completion
+        
+        Raises:
+            FileNotFoundError: If expected iSS output file doesn't exist
+            OSError: If file operations fail due to permissions
+        
+        Notes:
+            The particle output contains hadron species, four-momenta, and
+            space-time positions needed for hadronic afterburner evolution.
+        """
         logging.info("[iSS] Data successfully processed...")
         current_module_index = self.full_config.general.modules.index("iSS")
         if self.config.use_OSCAR_format == 1:

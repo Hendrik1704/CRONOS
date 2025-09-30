@@ -6,7 +6,56 @@ import shutil
 
 
 class SMASH(BaseModule):
+    """SMASH hadronic afterburner module for hadronic rescattering phase.
+    
+    Implements hadronic transport using the SMASH (Simulating Many Accelerated
+    Strongly-interacting Hadrons) code. Evolves hadrons from particlization
+    through hadronic rescattering, accounting for elastic/inelastic collisions,
+    resonance formation/decay, and final freeze-out.
+    
+    Key physics features:
+    - Hadronic transport with elastic and inelastic collisions
+    - Resonance production and decay (ρ, Δ, K*, etc.)
+    - String fragmentation for high-energy collisions
+    - Proper treatment of hadron-hadron cross sections
+    - Optional collision suppression for free-streaming mode
+    - Extended output for analysis toolkit compatibility
+    
+    Module workflow:
+    1. Links SMASH executable, particle tables, and conversion scripts
+    2. Converts iSS output from OSCAR1997A to OSCAR2013 format
+    3. Generates SMASH parameter file with collision settings
+    4. Executes SMASH hadronic evolution with memory monitoring
+    5. Outputs final particle distributions for analysis
+    
+    Configuration includes collision parameters, evolution time, random seed,
+    and output format. The module can run with or without hadronic interactions
+    depending on physics requirements.
+    
+    Example:
+        >>> smash = SMASH(config.SMASH, full_config, project_root, event_id)
+        >>> smash.prepare_environment(event_dir)
+        >>> smash.prepare_input(event_dir)
+        >>> smash.run(event_dir)  # Hadronic afterburner
+        >>> smash.fetch_output(event_dir)  # Final hadron distributions
+    """
     def prepare_environment(self, event_dir):
+        """Set up SMASH execution environment with executable and data files.
+        
+        Creates SMASH directory structure and establishes symbolic links to:
+        - SMASH executable (smash)
+        - Particle data tables (iSS_tables for format conversion)
+        - OSCAR format conversion script (convert_OSCAR1997A_to_OSCAR2013.py)
+        
+        The conversion script is needed to transform iSS output from OSCAR1997A
+        format to OSCAR2013 format that SMASH can process.
+        
+        Args:
+            event_dir (str): Path to event-specific directory where SMASH will execute.
+                
+        Raises:
+            SystemExit: If SMASH executable or required scripts are missing.
+        """
         logging.info(f"[SMASH] Preparing environment in {event_dir}...")
 
         # iSS tables needed for converter script
@@ -53,6 +102,37 @@ class SMASH(BaseModule):
             exit(1)
 
     def prepare_input(self, event_dir):
+        """Generate SMASH configuration file and establish particle input links.
+        
+        Creates the SMASH parameter file (parameters_SMASH.yaml) with hadronic
+        transport settings and establishes symbolic links to particle data from
+        the Cooper-Frye particlization (iSS module).
+        
+        Configuration Components:
+            - General settings: Version, output verbosity, random seed
+            - Modi configuration: External particle list input mode
+            - Output settings: OSCAR format particle lists
+            - Physics parameters: Cross sections, decay modes, potentials
+        
+        Hadronic Transport Physics:
+            SMASH performs microscopic hadronic transport using Monte Carlo
+            methods to simulate hadron-hadron interactions, resonance production/decay,
+            and final particle freeze-out in heavy-ion collisions.
+        
+        Args:
+            event_dir (str): Event directory containing SMASH/ subdirectory
+                and particle input from iSS particlization
+        
+        Side Effects:
+            - Creates parameters_SMASH.yaml in SMASH subdirectory
+            - Creates symbolic link to particle input from previous module
+            - Configures OSCAR output format for analysis compatibility
+            - Sets up random seed and physics parameters from configuration
+        
+        Notes:
+            SMASH uses YAML format for configuration, unlike other modules
+            that use INI format. The particle input must be in OSCAR format.
+        """
         logging.info(f"[SMASH] Create input file...")
         current_module_index = self.full_config.general.modules.index("SMASH")
         self.config.input_filename = f"output_{current_module_index-1}.dat"
@@ -160,6 +240,44 @@ class SMASH(BaseModule):
 
     @time_execution
     def run(self, event_dir):
+        """Execute SMASH hadronic afterburner transport simulation.
+        
+        Runs the SMASH hadronic transport code to evolve the particle ensemble
+        from Cooper-Frye particlization through hadronic interactions until
+        kinetic freeze-out, providing the final particle distributions.
+        
+        Physics Process:
+            SMASH performs microscopic hadronic transport simulation including:
+            - Elastic and inelastic hadron-hadron scattering
+            - Resonance production, decay, and regeneration
+            - String fragmentation for high-energy processes
+            - Final kinetic freeze-out and particle detection
+        
+        Computational Features:
+            - Monte Carlo event-by-event evolution
+            - Adaptive time stepping for numerical stability
+            - Memory-efficient particle list management
+            - Parallel processing capabilities (if configured)
+        
+        Args:
+            event_dir (str): Event directory containing configured SMASH/ subdirectory
+                with particle input and parameter files
+        
+        Side Effects:
+            - Temporarily changes working directory to SMASH/
+            - Executes external SMASH binary with subprocess monitoring
+            - Creates output directory structure (data/0/)
+            - Generates particle lists in OSCAR format
+            - Logs execution progress and performance metrics
+        
+        Raises:
+            subprocess.CalledProcessError: If SMASH execution fails
+            OSError: If SMASH directory or executable not accessible
+        
+        Output:
+            Produces final particle lists ready for flow analysis and
+            experimental comparison after hadronic interactions.
+        """
         logging.info("[SMASH] run...")
 
         smash_dir = os.path.join(event_dir, "SMASH")
@@ -190,6 +308,41 @@ class SMASH(BaseModule):
         logging.info("[SMASH] Execution finished.")
 
     def fetch_output(self, event_dir):
+        """Collect SMASH particle output and prepare for analysis.
+        
+        Moves the final particle lists from SMASH hadronic transport to the
+        standardized results directory and performs cleanup. The output contains
+        the complete final-state particle information after all hadronic interactions.
+        
+        Output Processing:
+            - Collects particle_lists.oscar from SMASH data directory
+            - Moves to standardized output_N.dat format
+            - Handles potential format conversion for analysis tools
+            - Preserves complete particle four-momentum and species information
+        
+        File Operations:
+            - Source: SMASH/data/0/particle_lists.oscar
+            - Target: results/output_N.dat (final simulation output)
+            - Cleanup: Removes SMASH working directory
+        
+        Args:
+            event_dir (str): Event directory containing SMASH/ and results/ subdirectories
+        
+        Side Effects:
+            - Moves SMASH particle output to results/ directory
+            - Removes entire SMASH/ working directory and contents
+            - Converts to OSCAR2013 format if configured
+            - Logs successful hadronic evolution completion
+        
+        Raises:
+            FileNotFoundError: If expected SMASH output file doesn't exist
+            OSError: If file operations fail due to permissions
+        
+        Notes:
+            The final particle output represents the complete heavy-ion collision
+            evolution from initial conditions through hadronic freeze-out,
+            ready for experimental analysis and comparison.
+        """
         logging.info("[SMASH] Data successfully processed...")
         current_module_index = self.full_config.general.modules.index("SMASH")
         src_file = os.path.join(

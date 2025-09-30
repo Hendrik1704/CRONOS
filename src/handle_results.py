@@ -1,3 +1,14 @@
+"""CRONOS Simulation Result Processing and HDF5 Compression Module.
+
+This module handles post-simulation result validation, organization, and compression
+for CRONOS heavy-ion collision simulation outputs. It ensures data quality through
+event validation, manages intermediate file cleanup based on configuration, and
+compresses results into efficient HDF5 format for long-term storage and analysis.
+
+Author: CRONOS Development Team
+Requires: h5py, numpy for HDF5 operations and data handling
+"""
+
 import os
 import logging
 from glob import glob
@@ -6,7 +17,17 @@ import numpy as np
 
 
 def check_an_event_is_good_afterburner_toolkit(folder):
-    """This function checks the given event contains all required files"""
+    """Validate afterburner_toolkit flow analysis output completeness.
+    
+    Performs quality assurance check for afterburner_toolkit module output by
+    verifying presence of required flow analysis files for heavy-ion collision analysis.
+    
+    Args:
+        folder (str): Path to directory containing afterburner_toolkit output files
+    
+    Returns:
+        bool: True if all required files present, False if any missing
+    """
     required_files_list = [
         "particle_9999_vndata_eta_-0.5_0.5.dat",
         "particle_211_vndata_diff_y_-0.5_0.5.dat",
@@ -26,6 +47,19 @@ def check_an_event_is_good_afterburner_toolkit(folder):
 
 
 def check_if_event_is_good(config, event_dir_results_path, event_id):
+    """Orchestrate event quality validation based on active physics modules.
+    
+    Performs comprehensive event validation by dispatching to module-specific
+    quality check functions based on the CRONOS configuration.
+    
+    Args:
+        config (Configuration): CRONOS configuration with active modules
+        event_dir_results_path (str): Path to event results directory
+        event_id (str): Event identifier for logging
+    
+    Returns:
+        bool: True if event passed all quality checks, False otherwise
+    """
     logging.info(f"Checking if event in {event_dir_results_path} is good...")
 
     if "afterburner_toolkit" in config.general.modules:
@@ -55,6 +89,20 @@ def check_if_event_is_good(config, event_dir_results_path, event_id):
 
 
 def zip_into_hdf5(config, event_dir_results_path, event_id):
+    """Compress event results into HDF5 format with automatic content detection.
+    
+    Performs comprehensive HDF5 compression of CRONOS simulation results with
+    intelligent text/binary content detection and preservation.
+    
+    Args:
+        config (Configuration): CRONOS configuration object
+        event_dir_results_path (str): Path to event results directory
+        event_id (str): Event identifier for output file naming
+    
+    Side Effects:
+        - Creates event_{event_id}.h5 in event_dir_results_path
+        - Logs compression progress and dataset creation details
+    """
     logging.info(f"Zipping results in {event_dir_results_path} into HDF5...")
     is_good = check_if_event_is_good(config, event_dir_results_path, event_id)
     if not is_good:
@@ -91,6 +139,23 @@ def zip_into_hdf5(config, event_dir_results_path, event_id):
 
 
 def handle_results(config, event_dir_results_path, event_id):
+    """Orchestrate complete result processing workflow with configurable file management.
+    
+    Main entry point for CRONOS result processing that manages the complete
+    post-simulation workflow including file cleanup, organization, validation,
+    and HDF5 compression based on user configuration settings.
+    
+    Args:
+        config (Configuration): CRONOS configuration with file retention settings
+        event_dir_results_path (str): Path to event results directory  
+        event_id (str): Event identifier for directory naming and logging
+    
+    Side Effects:
+        - Removes intermediate files based on configuration
+        - Creates spvn_results_{event_id}/ subdirectory
+        - Creates event_{event_id}.h5 compressed archive
+        - Provides detailed logging of all operations
+    """
     save_intermediate = config.general.keep_intermediate_results
     logging.debug(
         f"Configuration 'keep_intermediate_results': {save_intermediate}"

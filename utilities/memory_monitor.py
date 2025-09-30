@@ -11,7 +11,26 @@ from datetime import datetime
 
 
 def monitor_memory(interval=5, threshold=80, log_file=None):
-    """Monitor system and process memory usage."""
+    """Monitor system and process memory usage in real-time.
+    
+    Continuously monitors system memory usage and identifies high-memory processes.
+    Displays colored status indicators and warnings when thresholds are exceeded.
+    Optionally logs data to a CSV file for analysis.
+    
+    Args:
+        interval (int, optional): Monitoring interval in seconds. Defaults to 5.
+        threshold (int, optional): Memory usage percentage threshold for warnings. 
+            Defaults to 80.
+        log_file (str, optional): Path to CSV file for logging memory data. 
+            If None, no logging is performed. Defaults to None.
+    
+    Returns:
+        None: Function runs until interrupted with Ctrl+C.
+    
+    Example:
+        >>> monitor_memory(interval=2, threshold=90, log_file="memory.csv")
+        🔍 Starting memory monitoring...
+    """
     
     print(f"🔍 Starting memory monitoring (interval: {interval}s, threshold: {threshold}%)")
     if log_file:
@@ -69,7 +88,25 @@ def monitor_memory(interval=5, threshold=80, log_file=None):
 
 
 def check_cronos_processes():
-    """Check for CRONOS-related processes and their memory usage."""
+    """Identify and analyze CRONOS-related processes and their memory consumption.
+    
+    Searches for both CRONOS Python processes (framework) and external physics
+    code processes (MUSIC, SMASH, KoMPoST, iSS). Provides detailed memory usage
+    statistics and identifies high-memory consumers.
+    
+    The function categorizes processes into two types:
+    - Python processes: CRONOS framework components
+    - External processes: Physics simulation executables
+    
+    Returns:
+        None: Prints process information to stdout.
+    
+    Example:
+        >>> check_cronos_processes()
+        🔍 Checking for CRONOS processes...
+        Found 2 Python processes and 1 external processes:
+        Total memory usage: 2048.5 MB (2.0 GB)
+    """
     print("🔍 Checking for CRONOS processes...\n")
     
     cronos_processes = []
@@ -150,6 +187,22 @@ def check_cronos_processes():
 
 
 def main():
+    """Command-line interface for the CRONOS memory monitoring utility.
+    
+    Provides three main commands:
+    - monitor: Start real-time memory monitoring with configurable intervals and thresholds
+    - check: Snapshot of current CRONOS processes and their memory usage  
+    - info: Display system memory information and recommendations
+    
+    Command-line arguments are parsed using argparse with subcommands for each mode.
+    
+    Returns:
+        None: Executes the requested command and exits.
+    
+    Example:
+        >>> main()  # Called when script is run directly
+        # With arguments: python memory_monitor.py monitor --interval 2 --threshold 90
+    """
     parser = argparse.ArgumentParser(description="Memory monitoring for CRONOS simulations")
     
     subparsers = parser.add_subparsers(dest='command', help='Available commands')

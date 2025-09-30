@@ -1,4 +1,28 @@
 #!/usr/bin/env python3
+"""OSCAR Format Conversion Utility: OSCAR1999A to OSCAR2013.
+
+This utility converts particle data from the legacy OSCAR1999A format to the
+modern OSCAR2013 standard used in heavy-ion collision event generators and
+analysis tools. It handles PDG particle identification, charge assignment,
+and format standardization for compatibility with current analysis frameworks.
+
+OSCAR Format Background:
+    OSCAR (Output of Simulated Collisions And Reactions) is a standard format
+    for storing particle-level information from heavy-ion collision simulations.
+    The 2013 revision includes enhanced metadata, charge information, and
+    improved precision for spatial coordinates.
+
+Conversion Features:
+- PDG particle identification and charge mapping
+- Spatial coordinate precision enhancement with position wiggle
+- Event boundary detection and proper formatting
+- Header generation with units and metadata
+- Random seed control for reproducible position adjustments
+
+Author: CRONOS Development Team
+Compatibility: SMASH, UrQMD, OSCAR-compatible analysis tools
+"""
+
 import argparse
 from pathlib import Path
 import numpy as np
@@ -6,7 +30,14 @@ import pandas as pd
 import time
 
 def load_pdg_table(pdg_path: Path) -> pd.DataFrame:
-    """Load PDG table from SMASH file."""
+    """Load and parse SMASH PDG particle data table for charge information.
+    
+    Args:
+        pdg_path (Path): Path to SMASH PDG data file (typically pdg-SMASH.dat)
+    
+    Returns:
+        pd.DataFrame: Cleaned particle data with PDG_ID and charge columns
+    """
     pdg = pd.read_csv(
         pdg_path,
         header=None,
@@ -30,7 +61,17 @@ def load_pdg_table(pdg_path: Path) -> pd.DataFrame:
     return pdg.dropna()
 
 def get_PDG_ID_charge(pdg_id: int, pdg_df: pd.DataFrame) -> int:
-    """Return the particle charge for a given PDG ID (accounting for antiparticles)."""
+    """Determine electric charge for particle given PDG identification code.
+    
+    Handles both particles and antiparticles according to PDG conventions.
+    
+    Args:
+        pdg_id (int): PDG particle identification code
+        pdg_df (pd.DataFrame): SMASH PDG table with charge information
+    
+    Returns:
+        int: Electric charge in units of elementary charge (0 if unknown)
+    """
     pdg_ids = pdg_df["PDG_ID"].to_numpy()
     charges = pdg_df["charge"].to_numpy()
 
@@ -101,6 +142,13 @@ def write_oscar2013(df: pd.DataFrame, pdg_df: pd.DataFrame, output_path: Path):
     return num_events
 
 def main():
+    """Command-line interface for OSCAR format conversion utility.
+    
+    Converts OSCAR1999A particle data to OSCAR2013 format with proper
+    argument parsing and integration with CRONOS simulation pipelines.
+    
+    Prints number of events converted for subprocess capture.
+    """
     parser = argparse.ArgumentParser(description="Convert OSCAR1999A to OSCAR2013 format.")
     parser.add_argument("pdgPath", type=Path, help="Path to pdg-SMASH.dat file")
     parser.add_argument("inputFilePath", type=Path, help="Path to OSCAR1999A input file")

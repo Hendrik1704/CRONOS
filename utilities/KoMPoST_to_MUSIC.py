@@ -1,4 +1,34 @@
 #!/usr/bin/env python3
+"""KoMPoST to MUSIC Format Conversion and Entropy Matching Utility.
+
+This utility handles the transition between KoMPoST pre-equilibrium evolution
+and MUSIC hydrodynamic simulation in heavy-ion collision workflows. It performs
+entropy matching to ensure thermodynamic consistency between the two physics
+models while converting between their respective data formats.
+
+Physics Background:
+    The transition from pre-equilibrium (KoMPoST) to hydrodynamics (MUSIC)
+    requires careful matching of thermodynamic quantities to maintain energy
+    and entropy conservation. This script implements entropy matching based
+    on effective degrees of freedom and equation of state consistency.
+
+Matching Types:
+    0: Energy matching (direct energy transfer without thermodynamic adjustment)
+    1: Entropy matching (recommended - maintains thermodynamic consistency)
+
+Entropy Matching Algorithm:
+    1. Calculate KoMPoST entropy density using effective degrees of freedom
+    2. Interpolate energy density from EOS entropy-energy relation
+    3. Calculate bulk pressure correction for viscous effects
+    4. Update energy density and add bulk pressure column
+
+Usage:
+    python KoMPoST_to_MUSIC.py <type> <nu_eff> <eos_file> <input> <output>
+
+Author: CRONOS Development Team  
+Physics: Pre-equilibrium to hydrodynamics transition
+"""
+
 import sys
 import numpy as np
 from scipy.interpolate import interp1d
@@ -8,6 +38,15 @@ import os
 HBARC = 0.197326979
 
 def read_file(filename):
+    """Read KoMPoST output file with error handling and validation.
+    
+    Args:
+        filename (str): Path to KoMPoST output file
+    
+    Returns:
+        tuple: (data_array, comment_line) where data is numpy array
+               and comment contains metadata from first line
+    """
     data = []
     comment_line = ""
     
@@ -29,6 +68,19 @@ def read_file(filename):
     return np.array(data), comment_line
 
 def s_matching(e_kompost, nu_eff, file_path_eos):
+    """Perform entropy matching between KoMPoST and MUSIC using equation of state.
+    
+    Calculates thermodynamically consistent energy density for MUSIC based on
+    KoMPoST entropy and adds bulk pressure corrections for viscous effects.
+    
+    Args:
+        e_kompost (array): KoMPoST energy density in GeV/fm^3
+        nu_eff (float): Effective degrees of freedom for entropy calculation
+        file_path_eos (str): Path to equation of state file
+    
+    Returns:
+        tuple: (e_music, bulk_pressure) - matched energy and bulk pressure in GeV/fm^3
+    """
     # Kompost entropy
     s_kompost = (4/3.)*(nu_eff*math.pi*math.pi/30.)**(1/4.)*(e_kompost**(3/4.)) # GeV^3/4 / fm^9/4
     s_kompost = s_kompost*(HBARC**(1/4.)) # GeV/fm^2
@@ -54,6 +106,18 @@ def s_matching(e_kompost, nu_eff, file_path_eos):
     return e_Music, Bulk_pressure 
 
 def main():
+    """Command-line interface for KoMPoST-MUSIC format conversion.
+    
+    Handles both energy and entropy matching modes with proper parameter
+    validation and file I/O for integration with CRONOS simulation chain.
+    
+    Command-line Arguments:
+        type_of_matching: 0 (energy) or 1 (entropy matching)
+        nu_eff: Effective degrees of freedom for entropy calculation
+        eos_file: Path to equation of state data file
+        filename_in: Input file from KoMPoST
+        filename_out: Output file for MUSIC
+    """
     # Check if all parameters are provided as command line arguments
     if len(sys.argv) != 6:
         print("Usage: python script.py type_of_matching nu_eff <eos_file> <filename_in> <filename_out>")
