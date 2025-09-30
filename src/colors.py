@@ -70,3 +70,10 @@ class Colors:
         if bold:
             return Colors.colorize(text, Colors.RED, Colors.BOLD)
         return Colors.colorize(text, Colors.RED)
+    
+    @staticmethod
+    def cyan(text, bold=False):
+        """Convenience method for cyan text."""
+        if bold:
+            return Colors.colorize(text, Colors.CYAN, Colors.BOLD)
+        return Colors.colorize(text, Colors.CYAN)

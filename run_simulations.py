@@ -42,6 +42,11 @@ if __name__ == "__main__":
         default="run/job_0/",
         help="Path to the job directory that is supposed to be executed",
     )
+    parser.add_argument(
+        "--force-restart",
+        action="store_true",
+        help="Force restart from beginning, ignoring existing checkpoints",
+    )
     args = parser.parse_args()
 
     config = load_config(args.main_config_path, args.user_config_path)
@@ -52,4 +57,39 @@ if __name__ == "__main__":
 
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-    run_modules(config, MODULE_REGISTRY, args.job_dir, project_root)
+    # Handle force restart by removing checkpoint file
+    if args.force_restart:
+        checkpoint_file = os.path.join(args.job_dir, ".cronos_checkpoint.json")
+        if os.path.exists(checkpoint_file):
+            os.remove(checkpoint_file)
+            logging.info("Removed existing checkpoint file - starting from beginning")
+
+    try:
+        run_modules(config, MODULE_REGISTRY, args.job_dir, project_root)
+        logging.info("Simulation completed successfully!")
+        exit(0)
+    except Exception as e:
+        logging.error(f"Simulation failed: {e}")
+        
+        # Provide helpful diagnostic information
+        checkpoint_file = os.path.join(args.job_dir, ".cronos_checkpoint.json")
+        if os.path.exists(checkpoint_file):
+            logging.info("Checkpoint file exists - you can inspect it with:")
+            logging.info(f"  python checkpoint_utils.py inspect {args.job_dir}")
+            logging.info("You can resubmit the job to resume from the last successful checkpoint")
+        else:
+            logging.info("No checkpoint file found - this appears to be an early failure")
+        
+        # Check for output files to help diagnose the issue
+        if os.path.exists(args.job_dir):
+            output_files = []
+            for root, dirs, files in os.walk(args.job_dir):
+                for file in files:
+                    if file.endswith(('.h5', '.dat', '.txt', '.log')):
+                        output_files.append(os.path.join(root, file))
+            
+            if output_files:
+                logging.info(f"Found {len(output_files)} output files - simulation may have partially succeeded")
+                logging.debug(f"Output files: {output_files[:5]}...")  # Show first 5 files
+        
+        exit(1)

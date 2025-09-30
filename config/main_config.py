@@ -10,6 +10,7 @@ general ={
     "log_level": "INFO",
     "module_terminal_output": True,  # If True, show terminal output of each module
                                       # If False, suppress terminal output of each module
+    "cleanup_checkpoints": True,  # If True, delete checkpoint file after successful completion
 
     # List of modules to connect/load.
     # Possible modules: from_file_IC, KoMPoST, entropy_matching, MUSIC, iSS, SMASH, afterburner_toolkit
