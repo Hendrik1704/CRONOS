@@ -1,46 +1,24 @@
 ````markdown
-# CRONOS| Test File | Description | Components Tested |
-|-----------|-------------|-----------------|
-| `test_configuration.py` | Configuration system | Configuration class, config loading/merging |
-| `test_module_base.py` | Base module functionality | BaseModule, memory monitoring, d### 🚀 **Automated CI/CD** 
+# CRONOS Testing Suite
 
-CRONOS includes comprehensive **automated testing workflows** that run on every push and pull request:
-
-#### **Main Test Workflow** (`.github/workflows/test.yml`)
-- ✅ **Triggers**: Push to `main`/`development` branches, pull requests
-- ✅ **Python Matrix**: Tests across Python 3.11, 3.12
-- ✅ **Full Test Suite**: Complete test coverage with reporting
-- ✅ **Security Scanning**: Automated vulnerability detection
-- ✅ **Minimal Installation Test**: Validates core dependencies
-
-**Python Version Compatibility:**
-- **Python 3.11+**: Full compatibility with all tests passing
-- **Python 3.10**: Partial compatibility - physics module `test_run_method` tests may fail due to subprocess handling differences
-- **Python 3.9 and older**: Not supported due to dependency compatibility issuesAdvanced Testing Workflow** (`.github/workflows/advanced-tests.yml`)
-- 🚀 **Triggers**: Push to main/development branches, pull requests + manual dispatch
-- 🚀 **Performance Tests**: Benchmarking and memory profiling
-- 🔗 **Integration Tests**: Cross-module functionality validation
-- 🌐 **Cross-Platform**: Ubuntu, Windows, macOS compatibility
-- ⚙️ **Default Mode**: Runs all advanced tests by default |
-| `test_checkpoint_manager.py` | Checkpoint management | CheckpointManager, progress tracking |
-| `test_memory_monitor.py` | Memory monitoring | Memory tracking utilities, threshold monitoring |
-| `test_physics_modules.py` | **All physics modules** | **Complete coverage of 7 physics modules** |
-| `test_executor.py` | Execution framework | Event execution, error analysis, module coordination |
-| `test_checkpoint_utils.py` | Checkpoint utilities | Checkpoint validation, repair, statistics |Suite| Physics Module | Description | Status |
-|----------------|-------------|--------|
-| **FromFileIC** | Initial conditions from file | ✅ Complete |
-| **KoMPoST** | Pre-equilibrium dynamics | ✅ Complete |
-| **MUSIC** | Relativistic hydrodynamics | ✅ Complete |
-| **SMASH** | Hadronic transport | ✅ Complete |
-| **iSS** | Particlization (Cooper-Frye) | ✅ Complete |
-| **EntropyMatching** | Entropy matching utility | ✅ Complete |
-| **afterburner_toolkit** | Analysis toolkit | ✅ Complete |document describes the comprehensive testing suite implemented for the CRONOS nuclear physics simulation framework.
+This document describes the comprehensive testing suite implemented for the CRONOS nuclear physics simulation framework.
 
 Our test suite provides **complete coverage** of all CRONOS framework components with a **100% success rate**.
 
 ## Overview
 
-The CRONOS testing suite provides comprehensive unit and integration tests covering all major components of the framework:
+The CR#### **Advanced Testing Workflow** (`.github/workflows/advanced-tests.yml`)
+- 🚀 **Triggers**: Push to main/development branches, pull requests + manual dispatch
+- ⚡ **Performance Tests**: Benchmarking and memory profiling
+- 🔗 **Integration Tests**: Cross-module functionality validation
+- 🌐 **Cross-Platform**: Ubuntu, Windows, macOS compatibility
+
+**Python Version Compatibility:**
+- **Python 3.11+**: Full compatibility with all tests passing
+- **Python 3.10**: Partial compatibility - physics module `test_run_method` tests may fail due to subprocess handling differences
+- **Python 3.9 and older**: Not supported due to dependency compatibility issues
+
+#### **Workflow Features**sting suite provides comprehensive unit and integration tests covering all major components of the framework:
 
 - **Configuration System**: Tests for configuration loading, merging, and validation
 - **BaseModule Interface**: Tests for the abstract module base class and utilities
@@ -280,7 +258,8 @@ class TestYourClass:
     @patch('src.your_module.external_dependency')
     def test_with_mocks(self, mock_dependency):
         """Test with mocked dependencies."""
-        # Test with mocks
+                # Test with mocks
+```
 ```
 
 ### Test Naming
@@ -402,6 +381,8 @@ python -m pytest -s
 
 # Run single test with debugging
 python -m pytest tests/test_module_base.py::TestBaseModule::test_initialization -v -s
+```
+
 ```
 
 This comprehensive testing suite ensures CRONOS framework reliability and makes development safer and more efficient.
