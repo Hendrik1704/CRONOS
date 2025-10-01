@@ -116,15 +116,22 @@ jobs:
         python -c "
         from src.configuration import Configuration
         from src.checkpoint_manager import CheckpointManager
-        from utilities.memory_monitor import get_memory_info, check_memory_threshold
+        from src.module_base import get_memory_info
         from src.executor import analyze_error, run_modules
+        from utilities.memory_monitor import monitor_memory, check_cronos_processes
         import tempfile
         import os
         
+        # Create a test configuration
+        test_config = {
+            'general': {'job_directory': '/tmp', 'modules': ['test_module']},
+            'modules': {}
+        }
+        
         # Integration test: Configuration + CheckpointManager + Executor
         with tempfile.TemporaryDirectory() as temp_dir:
-            config = Configuration()
-            config.general = {'job_directory': temp_dir, 'modules': ['test_module']}
+            config = Configuration(test_config)
+            config.general['job_directory'] = temp_dir
             
             checkpoint_mgr = CheckpointManager(config)
             print('✅ Configuration + CheckpointManager integration working')
