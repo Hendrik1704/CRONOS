@@ -133,7 +133,7 @@ jobs:
             config = Configuration(test_config)
             config.general['job_directory'] = temp_dir
             
-            checkpoint_mgr = CheckpointManager(config)
+            checkpoint_mgr = CheckpointManager(temp_dir)
             print('✅ Configuration + CheckpointManager integration working')
             
             # Test error analysis function
