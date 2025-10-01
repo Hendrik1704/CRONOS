@@ -177,7 +177,7 @@ class SMASH(BaseModule):
                 memory_threshold_mb=self.full_config.general.memory_threshold_mb,
                 module_name="SMASH-convert",
             )
-            num_events = int(result.stdout.strip())
+            num_events = int(result["stdout"].strip())
             self.config.Nevents = num_events
             logging.info(
                 f"[SMASH] Number of events set to {num_events} from Cooper-Frye FO..."

@@ -261,8 +261,13 @@ def run_subprocess_with_memory_monitoring(
     )
 
     try:
-        # Wait for process to complete
-        return_code = process.wait()
+        # Wait for process to complete and capture output if needed
+        if capture_output:
+            stdout, stderr = process.communicate()
+            return_code = process.returncode
+        else:
+            stdout, stderr = None, None
+            return_code = process.wait()
         end_time = time.time()
 
         # Stop monitoring
@@ -289,6 +294,11 @@ def run_subprocess_with_memory_monitoring(
                     f"consider reducing grid size or other parameters"
                 )
 
+        # Add captured output to memory_stats if available
+        if capture_output:
+            memory_stats["stdout"] = stdout
+            memory_stats["stderr"] = stderr
+            
         return return_code, memory_stats
 
     except KeyboardInterrupt:
@@ -483,13 +493,21 @@ def run_external_command(
         if return_code != 0:
             raise subprocess.CalledProcessError(return_code, cmd)
 
-        return {
+        result = {
             "return_code": return_code,
             "peak_memory_mb": memory_stats["peak_memory_mb"],
             "peak_memory_percent": memory_stats["peak_memory_percent"],
             "memory_samples": len(memory_stats["samples"]),
             "success": True,
         }
+        
+        # Include captured output if available
+        if "stdout" in memory_stats:
+            result["stdout"] = memory_stats["stdout"]
+        if "stderr" in memory_stats:
+            result["stderr"] = memory_stats["stderr"]
+            
+        return result
 
     except subprocess.TimeoutExpired as e:
         logging.error(f"[{module_name}] Command timed out after {timeout}s")
