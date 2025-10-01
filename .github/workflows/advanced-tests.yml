@@ -40,32 +40,34 @@ jobs:
     
     - name: Run performance benchmarks
       run: |
-      echo "🚀 Running CRONOS Performance Tests"
-      echo "Testing configuration loading performance..."
-      python -c "
-      import time
-      from src.configuration import Configuration
-      
-      # Create a minimal test configuration
-      test_config = {
-          'general': {'job_directory': '/tmp', 'modules': ['test']},
-          'modules': {}
-      }
-      
-      # Benchmark configuration loading
-      start_time = time.time()
-      for i in range(100):
-          config = Configuration(test_config)
-      end_time = time.time()
-      
-      avg_time = (end_time - start_time) / 100
-      print(f'Average configuration load time: {avg_time:.4f}s')
-      
-      if avg_time > 0.1:  # Threshold: 100ms
-          print('⚠️  Configuration loading slower than expected')
-      else:
-          print('✅ Configuration loading performance acceptable')
-      "    - name: Memory usage testing
+        echo "🚀 Running CRONOS Performance Tests"
+        echo "Testing configuration loading performance..."
+        python -c "
+        import time
+        from src.configuration import Configuration
+        
+        # Create a minimal test configuration
+        test_config = {
+            'general': {'job_directory': '/tmp', 'modules': ['test']},
+            'modules': {}
+        }
+        
+        # Benchmark configuration loading
+        start_time = time.time()
+        for i in range(100):
+            config = Configuration(test_config)
+        end_time = time.time()
+        
+        avg_time = (end_time - start_time) / 100
+        print(f'Average configuration load time: {avg_time:.4f}s')
+        
+        if avg_time > 0.1:  # Threshold: 100ms
+            print('⚠️  Configuration loading slower than expected')
+        else:
+            print('✅ Configuration loading performance acceptable')
+          "
+    
+    - name: Memory usage testing
       run: |
         echo "🧠 Testing memory usage patterns"
         python -c "
@@ -180,7 +182,12 @@ jobs:
         print(f'Platform: {sys.platform}')
         print(f'Python: {sys.version}')
         
-        config = Configuration()
+        # Create a minimal test configuration
+        test_config = {
+            'general': {'job_directory': '/tmp', 'modules': ['test']},
+            'modules': {}
+        }
+        config = Configuration(test_config)
         print('✅ CRONOS core functionality works on this platform')
         "
 
