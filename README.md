@@ -306,6 +306,8 @@ We welcome contributions from the community! Everyone is encouraged to:
 - Improve documentation
 - Add support for new physics modules
 
+For detailed information about contributors, acknowledgments, and how to contribute, see **[AUTHORS.md](AUTHORS.md)**.
+
 Please feel free to open a Pull Request or create an issue on GitHub.
 
 ## Citation
