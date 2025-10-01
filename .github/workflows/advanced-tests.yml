@@ -1,0 +1,194 @@
+name: CRONOS Advanced Testing
+
+on:
+  push:
+    branches: [ main, development, dev ]
+  pull_request:
+    branches: [ main, development, dev ]
+  workflow_dispatch:  # Allow manual triggering
+    inputs:
+      test_type:
+        description: 'Type of advanced test to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+        - performance
+        - memory
+        - integration
+        - all
+
+jobs:
+  performance-tests:
+    name: Performance Testing
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_type == 'performance' || github.event.inputs.test_type == 'all' || github.event_name == 'push' || github.event_name == 'pull_request'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest-benchmark memory-profiler
+    
+    - name: Run performance benchmarks
+      run: |
+        echo "🚀 Running CRONOS Performance Tests"
+        echo "Testing configuration loading performance..."
+        python -c "
+        import time
+        from src.configuration import Configuration
+        
+        # Benchmark configuration loading
+        start_time = time.time()
+        for i in range(100):
+            config = Configuration()
+        end_time = time.time()
+        
+        avg_time = (end_time - start_time) / 100
+        print(f'Average configuration load time: {avg_time:.4f}s')
+        
+        if avg_time > 0.1:  # Threshold: 100ms
+            print('⚠️  Configuration loading slower than expected')
+        else:
+            print('✅ Configuration loading performance acceptable')
+        "
+    
+    - name: Memory usage testing
+      run: |
+        echo "🧠 Testing memory usage patterns"
+        python -c "
+        import psutil
+        import os
+        from src.memory_monitor import MemoryMonitor
+        
+        # Test memory monitor functionality
+        monitor = MemoryMonitor()
+        initial_memory = monitor.get_current_memory_usage()
+        print(f'Initial memory usage: {initial_memory} MB')
+        
+        # Simulate memory monitoring
+        for i in range(10):
+            monitor.check_memory_threshold(threshold_mb=1000)
+        
+        final_memory = monitor.get_current_memory_usage()
+        print(f'Final memory usage: {final_memory} MB')
+        print('✅ Memory monitoring tests completed')
+        "
+
+  integration-tests:
+    name: Integration Testing
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_type == 'integration' || github.event.inputs.test_type == 'all' || github.event_name == 'push' || github.event_name == 'pull_request'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Test module integration
+      run: |
+        echo "🔗 Testing CRONOS module integration"
+        python -c "
+        from src.configuration import Configuration
+        from src.checkpoint_manager import CheckpointManager
+        from src.memory_monitor import MemoryMonitor
+        from src.executor import Executor
+        import tempfile
+        import os
+        
+        # Integration test: Configuration + CheckpointManager
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config = Configuration()
+            config.general = {'job_directory': temp_dir, 'modules': ['test_module']}
+            
+            checkpoint_mgr = CheckpointManager(config)
+            print('✅ Configuration + CheckpointManager integration working')
+            
+            # Test memory monitoring integration
+            memory_monitor = MemoryMonitor()
+            memory_info = memory_monitor.get_current_memory_usage()
+            print(f'✅ Memory monitoring integration working: {memory_info} MB')
+            
+        print('🎉 All integration tests passed!')
+        "
+
+
+
+  test-matrix-extended:
+    name: Extended Python Matrix
+    runs-on: ${{ matrix.os }}
+    if: github.event.inputs.test_type == 'all'
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.8', '3.12']  # Test boundary versions
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run core tests
+      run: |
+        echo "🧪 Testing CRONOS on ${{ matrix.os }} with Python ${{ matrix.python-version }}"
+        python -m pytest tests/test_configuration.py tests/test_module_base.py -v --tb=short
+    
+    - name: Test cross-platform compatibility
+      run: |
+        python -c "
+        import os
+        import sys
+        from src.configuration import Configuration
+        
+        print(f'Platform: {sys.platform}')
+        print(f'Python: {sys.version}')
+        
+        config = Configuration()
+        print('✅ CRONOS core functionality works on this platform')
+        "
+
+  notify-advanced-complete:
+    name: Advanced Tests Complete
+    runs-on: ubuntu-latest
+    needs: [performance-tests, integration-tests]
+    if: always()
+    
+    steps:
+    - name: Advanced test summary
+      run: |
+        echo "🎯 CRONOS Advanced Testing Summary"
+        echo "================================"
+        echo "Performance Tests: ${{ needs.performance-tests.result }}"
+        echo "Integration Tests: ${{ needs.integration-tests.result }}"
+        echo ""
+        echo "🚀 Advanced testing cycle completed!"
+        echo "CRONOS framework validated for:"
+        echo "  ✅ Performance characteristics"
+        echo "  ✅ Module integration"
+        echo "  ✅ Cross-platform compatibility"

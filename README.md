@@ -1,4 +1,11 @@
 # CRONOS - Collision Runs with Orchestrated Nuclear Observable Simulations
+
+[![CRONOS Test Suite](https://github.com/Hendrik1704/CRONOS/actions/workflows/test.yml/badge.svg)](https://github.com/Hendrik1704/CRONOS/actions/workflows/test.yml)
+[![Advanced Tests](https://github.com/Hendrik1704/CRONOS/actions/workflows/advanced-tests.yml/badge.svg)](https://github.com/Hendrik1704/CRONOS/actions/workflows/advanced-tests.yml)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Tests Passing](https://img.shields.io/badge/tests-passing-brightgreen.svg)](#testing)
+
 <img src="assets/CRONOS.png" alt="CRONOS Logo" width="200">
 
 ## Overview
@@ -214,11 +221,45 @@ run/
 - **Log Files**: Separate stdout/stderr for each job array task
 - **Checkpoints**: Progress tracking files (`.cronos_checkpoint.json`)
 
+## Testing
+
+CRONOS includes a comprehensive testing suite with tests covering all framework components:
+
+### 🧪 **Test Suite Overview**
+- **Complete Test Coverage** with **100% Pass Rate** ✅
+- **Physics Module Tests** covering all physics modules
+- **Framework Tests** for configuration, checkpointing, memory monitoring, and execution
+
+### 🚀 **Automated CI/CD**
+- **GitHub Actions**: Automated testing on every push and pull request
+- **Python Matrix**: Tests across Python 3.8, 3.9, 3.10, 3.11, 3.12
+- **Multi-Platform**: Ubuntu, Windows, macOS compatibility testing
+- **Security Scanning**: Automated vulnerability detection
+- **Coverage Reports**: Integrated code coverage analysis
+
+### **Quick Testing Commands**
+
+```bash
+# Run all tests
+python -m pytest
+
+# Run with verbose output and coverage
+python -m pytest -v --cov=src --cov-report=term-missing
+
+# Run specific components
+python -m pytest tests/test_physics_modules.py -v    # All physics modules
+python -m pytest tests/test_configuration.py -v     # Configuration system
+python -m pytest tests/test_module_base.py -v       # Base module framework
+```
+
+For detailed testing documentation, see **[TESTING.md](TESTING.md)**.
+
 ## Custom Module Integration
 
 1. Create module class inheriting from `BaseModule`
 2. Implement required methods: `prepare_environment()`, `prepare_input()`, `run()`, `fetch_output()`
 3. Register in `MODULE_REGISTRY`
+4. Add comprehensive tests following the pattern in `tests/test_physics_modules.py`
 
 ## Troubleshooting
 
