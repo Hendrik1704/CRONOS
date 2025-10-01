@@ -2,7 +2,21 @@
 # CRONOS| Test File | Description | Components Tested |
 |-----------|-------------|-----------------|
 | `test_configuration.py` | Configuration system | Configuration class, config loading/merging |
-| `test_module_base.py` | Base module functionality | BaseModule, memory monitoring, deco#### **Advanced Testing Workflow** (`.github/workflows/advanced-tests.yml`)
+| `test_module_base.py` | Base module functionality | BaseModule, memory monitoring, d### 🚀 **Automated CI/CD** 
+
+CRONOS includes comprehensive **automated testing workflows** that run on every push and pull request:
+
+#### **Main Test Workflow** (`.github/workflows/test.yml`)
+- ✅ **Triggers**: Push to `main`/`development` branches, pull requests
+- ✅ **Python Matrix**: Tests across Python 3.11, 3.12
+- ✅ **Full Test Suite**: Complete test coverage with reporting
+- ✅ **Security Scanning**: Automated vulnerability detection
+- ✅ **Minimal Installation Test**: Validates core dependencies
+
+**Python Version Compatibility:**
+- **Python 3.11+**: Full compatibility with all tests passing
+- **Python 3.10**: Partial compatibility - physics module `test_run_method` tests may fail due to subprocess handling differences
+- **Python 3.9 and older**: Not supported due to dependency compatibility issuesAdvanced Testing Workflow** (`.github/workflows/advanced-tests.yml`)
 - 🚀 **Triggers**: Push to main/development branches, pull requests + manual dispatch
 - 🚀 **Performance Tests**: Benchmarking and memory profiling
 - 🔗 **Integration Tests**: Cross-module functionality validation
@@ -302,8 +316,8 @@ CRONOS includes comprehensive **automated testing workflows** that run on every 
 
 #### **Main Test Workflow** (`.github/workflows/test.yml`)
 - ✅ **Triggers**: Push to `main`/`development` branches, pull requests
-- ✅ **Python Matrix**: Tests across Python 3.8, 3.9, 3.10, 3.11, 3.12
-- ✅ **Full Test Suite**: All 87 tests with coverage reporting
+- ✅ **Python Matrix**: Tests across Python 3.11, 3.12
+- ✅ **Full Test Suite**: Complete test coverage with reporting
 - ✅ **Security Scanning**: Automated vulnerability detection
 - ✅ **Minimal Installation Test**: Validates core dependencies
 

@@ -22,7 +22,7 @@ CRONOS uses **GitHub Actions** for comprehensive automated testing and quality a
 - Manual workflow dispatch
 
 **Features:**
-- **Python Matrix Testing**: Tests across Python 3.8, 3.9, 3.10, 3.11, 3.12
+- **Python Matrix Testing**: Tests across Python 3.11, 3.12
 - **Full Test Suite**: Complete test coverage with detailed reporting
 - **Security Scanning**: Bandit security analysis on pull requests
 - **Minimal Installation Test**: Validates core dependencies work standalone

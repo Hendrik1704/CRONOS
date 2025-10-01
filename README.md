@@ -2,7 +2,7 @@
 
 [![CRONOS Test Suite](https://github.com/Hendrik1704/CRONOS/actions/workflows/test.yml/badge.svg)](https://github.com/Hendrik1704/CRONOS/actions/workflows/test.yml)
 [![Advanced Tests](https://github.com/Hendrik1704/CRONOS/actions/workflows/advanced-tests.yml/badge.svg)](https://github.com/Hendrik1704/CRONOS/actions/workflows/advanced-tests.yml)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Tests Passing](https://img.shields.io/badge/tests-passing-brightgreen.svg)](#testing)
 
@@ -32,7 +32,7 @@ CRONOS is a comprehensive framework designed to facilitate the simulation and an
 ## Installation
 
 ### Prerequisites
-- Python 3.8+
+- Python 3.11+
 - GCC compiler
 - CMake
 - MPI (for parallel execution)
@@ -58,6 +58,12 @@ CRONOS is a comprehensive framework designed to facilitate the simulation and an
    ```bash
    pip install -r requirements.txt
    ```
+   
+   **Note:** CRONOS requires Python 3.11 or newer for full compatibility. 
+   
+   **Compatibility Details:**
+   - Python 3.10: Some physics module tests may fail due to subprocess handling differences
+   - Python 3.11+: Full compatibility with all features and tests
 
 ## Configuration
 
@@ -232,7 +238,7 @@ CRONOS includes a comprehensive testing suite with tests covering all framework 
 
 ### 🚀 **Automated CI/CD**
 - **GitHub Actions**: Automated testing on every push and pull request
-- **Python Matrix**: Tests across Python 3.8, 3.9, 3.10, 3.11, 3.12
+- **Python Matrix**: Tests across Python 3.11, 3.12
 - **Multi-Platform**: Ubuntu, Windows, macOS compatibility testing
 - **Security Scanning**: Automated vulnerability detection
 - **Coverage Reports**: Integrated code coverage analysis

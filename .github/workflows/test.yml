@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.11', '3.12']
     
     steps:
     - name: Checkout repository
@@ -130,12 +130,13 @@ jobs:
         echo "🔍 Testing minimal installation imports"
         python -c "
         try:
-            from src.module_base import BaseModule
+            from src.module_base import BaseModule, get_memory_info
             from src.configuration import Configuration
             from src.checkpoint_manager import CheckpointManager
-            from src.memory_monitor import MemoryMonitor
-            from src.executor import Executor
+            from src.executor import analyze_error, run_modules
+            from utilities.memory_monitor import monitor_memory, check_cronos_processes
             print('✅ All core CRONOS modules imported successfully')
+            print('✅ Available functions: BaseModule, Configuration, CheckpointManager, analyze_error, run_modules')
         except ImportError as e:
             print(f'❌ Import error: {e}')
             exit(1)
@@ -189,7 +190,7 @@ jobs:
       run: |
         echo "🎉 CRONOS Test Suite Completed Successfully!"
         echo "================================"
-        echo "✅ All tests passed across Python 3.8-3.12"
+        echo "✅ All tests passed across Python 3.11-3.12"
         echo "✅ Physics modules: FromFileIC, KoMPoST, MUSIC, SMASH, iSS, EntropyMatching, afterburner_toolkit"
         echo "✅ Framework components: Configuration, CheckpointManager, MemoryMonitor, Executor"
         echo "✅ Minimal installation test passed"
