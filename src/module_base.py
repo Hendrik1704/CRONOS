@@ -10,20 +10,20 @@ from .colors import Colors
 
 def get_memory_info():
     """Retrieve comprehensive memory usage information for current process and system.
-    
+
     Collects memory statistics using psutil for both the current Python process
     and overall system memory status. Used for memory monitoring and threshold checks.
-    
+
     Returns:
         dict or None: Memory information dictionary containing:
             - process_rss_mb (float): Process resident set size in MB
-            - process_vms_mb (float): Process virtual memory size in MB  
+            - process_vms_mb (float): Process virtual memory size in MB
             - process_percent (float): Process memory as percentage of system total
             - system_total_gb (float): Total system memory in GB
             - system_available_gb (float): Available system memory in GB
             - system_percent (float): Used system memory percentage
         Returns None if memory information cannot be retrieved.
-        
+
     Example:
         >>> info = get_memory_info()
         >>> print(f"Process using {info['process_rss_mb']:.1f}MB")
@@ -56,20 +56,20 @@ def get_memory_info():
 
 def check_memory_threshold(threshold_percent=90):
     """Evaluate whether current system memory usage exceeds specified threshold.
-    
+
     Checks system memory percentage against a configurable threshold to determine
     if memory usage is critically high. Used for early warning systems and
     resource management decisions.
-    
+
     Args:
         threshold_percent (int, optional): Memory usage percentage threshold.
             Defaults to 90.
-            
+
     Returns:
         tuple: A tuple containing:
             - bool: True if memory usage exceeds threshold, False otherwise
             - dict or None: Memory information from get_memory_info()
-            
+
     Example:
         >>> is_high, info = check_memory_threshold(85)
         >>> if is_high:
@@ -85,36 +85,36 @@ def monitor_subprocess_memory(
     process, module_name, memory_threshold_mb=8192, check_interval=2
 ):
     """Monitor memory usage of a running subprocess in real-time using threading.
-    
+
     Starts a daemon thread to continuously monitor memory consumption of an external
     subprocess (physics codes like MUSIC, SMASH, etc.). Tracks peak memory usage,
     generates warnings when thresholds are exceeded, and collects time-series data.
-    
+
     The monitoring runs asynchronously and stops automatically when the subprocess
     terminates or monitoring is explicitly disabled.
-    
+
     Args:
         process (subprocess.Popen): The subprocess object to monitor.
         module_name (str): Name of the calling module for log identification.
         memory_threshold_mb (int, optional): Memory threshold in MB for warnings.
             Defaults to 8192 (8GB).
-        check_interval (int, optional): Monitoring interval in seconds. 
+        check_interval (int, optional): Monitoring interval in seconds.
             Defaults to 2.
-            
+
     Returns:
         dict: Memory statistics dictionary containing:
             - peak_memory_mb (float): Maximum memory usage observed
             - peak_memory_percent (float): Peak memory as system percentage
             - samples (list): Time-series memory usage data points
             - monitoring_active (bool): Flag to control monitoring thread
-            
+
     Example:
         >>> process = subprocess.Popen(['./physics_code'])
         >>> stats = monitor_subprocess_memory(process, "MUSIC", 4096)
         >>> # Monitoring continues in background thread
         >>> process.wait()
         >>> print(f"Peak memory: {stats['peak_memory_mb']:.1f}MB")
-        
+
     Note:
         Uses daemon threads to avoid blocking main execution. Memory warnings
         are logged when subprocess exceeds the configured threshold.
@@ -186,18 +186,18 @@ def run_subprocess_with_memory_monitoring(
     cmd, module_name, memory_threshold_mb=8192, cwd=None, **kwargs
 ):
     """Execute subprocess with comprehensive real-time memory monitoring.
-    
+
     Runs external commands (physics codes) while monitoring their memory consumption.
     Handles subprocess.run() compatibility by filtering arguments and implementing
     equivalent functionality using subprocess.Popen() with memory tracking.
-    
+
     The function automatically:
     - Converts subprocess.run() arguments for Popen compatibility
     - Starts memory monitoring in a separate thread
     - Tracks peak memory usage throughout execution
     - Generates warnings when memory thresholds are exceeded
     - Implements 'check' behavior for error handling
-    
+
     Args:
         cmd (list or str): Command and arguments to execute.
         module_name (str): Name of calling module for log identification.
@@ -210,24 +210,24 @@ def run_subprocess_with_memory_monitoring(
             - text (bool): Use text mode for captured output
             - stdout, stderr: Output redirection
             - timeout: Maximum execution time
-            
+
     Returns:
         tuple: A tuple containing:
             - int: Process return code (0 for success)
             - dict: Memory statistics with peak usage and samples
-            
+
     Raises:
         subprocess.CalledProcessError: If check=True and process returns non-zero.
         subprocess.TimeoutExpired: If timeout is exceeded.
         KeyboardInterrupt: If interrupted by user (Ctrl+C).
-        
+
     Example:
         >>> cmd = ['./MUSIChydro', 'input.ini']
         >>> returncode, stats = run_subprocess_with_memory_monitoring(
         ...     cmd, "MUSIC", memory_threshold_mb=4096, check=True
         ... )
         >>> print(f"MUSIC completed, peak memory: {stats['peak_memory_mb']:.1f}MB")
-        
+
     Note:
         This function replaces direct subprocess.run() calls in physics modules
         to enable memory monitoring of external physics codes.
@@ -298,7 +298,7 @@ def run_subprocess_with_memory_monitoring(
         if capture_output:
             memory_stats["stdout"] = stdout
             memory_stats["stderr"] = stderr
-            
+
         return return_code, memory_stats
 
     except KeyboardInterrupt:
@@ -317,34 +317,34 @@ def run_subprocess_with_memory_monitoring(
 
 def time_execution(func):
     """Decorator to measure and log function execution time with memory monitoring.
-    
+
     A function decorator that wraps module methods to automatically measure
     execution time and memory usage. Provides colored log output and memory
     warnings for performance monitoring of physics simulation modules.
-    
+
     The decorator:
     - Measures total execution time with high precision
     - Monitors memory usage before and after execution
     - Logs results with color-coded formatting
     - Generates warnings for high memory usage
     - Preserves original function metadata
-    
+
     Args:
         func (callable): The function to be decorated (typically module.run()).
-        
+
     Returns:
         callable: Wrapped function with timing and memory monitoring.
-        
+
     Example:
         >>> @time_execution
         ... def run_physics_simulation(self):
         ...     # Physics simulation code
         ...     pass
-        
+
         >>> # When called, outputs:
         >>> # [MODULE] Starting execution...
         >>> # [MODULE] Completed in 45.32s (Peak memory: 2048.5MB)
-        
+
     Note:
         Applied to module.run() methods in physics modules to track
         simulation performance and resource usage.
@@ -500,13 +500,13 @@ def run_external_command(
             "memory_samples": len(memory_stats["samples"]),
             "success": True,
         }
-        
+
         # Include captured output if available
         if "stdout" in memory_stats:
             result["stdout"] = memory_stats["stdout"]
         if "stderr" in memory_stats:
             result["stderr"] = memory_stats["stderr"]
-            
+
         return result
 
     except subprocess.TimeoutExpired as e:
@@ -531,23 +531,23 @@ def run_external_command(
 
 class BaseModule(ABC):
     """Abstract base class for all physics simulation modules in CRONOS framework.
-    
+
     Defines the standard interface and lifecycle for physics modules including
     initial conditions, pre-equilibrium evolution, hydrodynamics, particlization,
     and afterburner components. All modules must implement the core lifecycle methods.
-    
+
     The module lifecycle consists of four phases:
     1. Environment preparation (linking executables, creating directories)
     2. Input preparation (generating parameter files, linking data)
     3. Execution (running physics codes with memory monitoring)
     4. Output handling (collecting results, cleanup)
-    
+
     Attributes:
         config: Module-specific configuration parameters
         full_config: Complete simulation configuration (all modules)
         project_root: Path to CRONOS project root directory
         event_id: Unique identifier for current simulation event
-        
+
     Example:
         >>> class MUSIC(BaseModule):
         ...     def prepare_environment(self, event_dir):
@@ -568,7 +568,7 @@ class BaseModule(ABC):
         self, config, full_config=None, project_root=None, event_id=None
     ):
         """Initialize base module with configuration and runtime parameters.
-        
+
         Args:
             config: Module-specific configuration dictionary containing parameters
                 for this physics module (e.g., MUSIC config, SMASH config).
@@ -587,23 +587,23 @@ class BaseModule(ABC):
     @abstractmethod
     def prepare_environment(self, event_dir):
         """Prepare the execution environment for this physics module.
-        
+
         Sets up the necessary environment for module execution including:
         - Creating module-specific directory structure
         - Linking external executables and libraries
         - Setting up data tables and equation of state files
         - Configuring any required symlinks or environment variables
-        
+
         This method is called before prepare_input() and should ensure all
         external dependencies are properly accessible for the module.
-        
+
         Args:
             event_dir (str): Path to event-specific directory where the module
                 will execute. Module should create its subdirectory here.
-                
+
         Raises:
             SystemExit: If required executables or data files are missing.
-            
+
         Example:
             >>> def prepare_environment(self, event_dir):
             ...     music_dir = os.path.join(event_dir, "MUSIC")
@@ -616,20 +616,20 @@ class BaseModule(ABC):
     @abstractmethod
     def prepare_input(self, event_dir):
         """Generate input files and link data required for module execution.
-        
+
         Creates module-specific input files and establishes links to data from
         previous modules in the simulation chain. This includes:
         - Generating parameter/configuration files from module config
         - Linking output from previous modules as input
         - Setting up initial conditions or boundary conditions
         - Preparing any module-specific data transformations
-        
+
         This method is called after prepare_environment() and before run().
-        
+
         Args:
             event_dir (str): Path to event-specific directory containing module
                 subdirectories and results from previous modules.
-                
+
         Example:
             >>> def prepare_input(self, event_dir):
             ...     # Link previous module output
@@ -644,7 +644,7 @@ class BaseModule(ABC):
     @abstractmethod
     def run(self, event_dir):
         """Execute the physics simulation for this module.
-        
+
         Performs the main computation/simulation work of the module. This typically
         involves running external physics codes with memory monitoring, but can also
         include pure Python calculations. The method should:
@@ -652,18 +652,18 @@ class BaseModule(ABC):
         - Use run_external_command() for external executables to enable memory monitoring
         - Handle execution errors appropriately
         - Log execution progress and results
-        
+
         This method is decorated with @time_execution to automatically measure
         execution time and peak memory usage.
-        
+
         Args:
             event_dir (str): Path to event-specific directory where module
                 operates and finds its input data.
-                
+
         Raises:
             subprocess.CalledProcessError: If external physics code fails.
             RuntimeError: If module execution encounters critical errors.
-            
+
         Example:
             >>> @time_execution
             ... def run(self, event_dir):
@@ -680,21 +680,21 @@ class BaseModule(ABC):
     @abstractmethod
     def fetch_output(self, event_dir):
         """Collect, organize, and store module output for subsequent processing.
-        
+
         Handles post-execution tasks including:
         - Moving/copying output files to standardized locations
         - Renaming files according to CRONOS conventions
         - Cleaning up temporary files and directories
         - Preparing output for next module in simulation chain
         - Organizing results for final HDF5 packaging
-        
+
         Output files are typically moved to the event_dir/results/ directory
         with standardized naming (e.g., output_N.dat where N is module index).
-        
+
         Args:
             event_dir (str): Path to event-specific directory where module
                 executed and where results should be organized.
-                
+
         Example:
             >>> def fetch_output(self, event_dir):
             ...     # Move output to standard location

@@ -7,50 +7,51 @@ import shutil
 
 class KoMPoST(BaseModule):
     """KoMPoST pre-equilibrium evolution module using effective kinetic theory.
-    
+
     Implements pre-equilibrium evolution of the energy-momentum tensor using the
     KoMPoST (Kinetic Theory-based pre-equilibrium evolution) framework. Evolves
     the system from initial time until hydrodynamic applicability through
     effective kinetic theory (EKT) with viscous corrections.
-    
+
     Key physics features:
     - Pre-equilibrium evolution with effective kinetic theory
     - Viscous corrections with configurable shear viscosity
     - Energy and momentum perturbation evolution
     - Transition from initial conditions to hydrodynamic regime
     - Support for various initial condition formats (IP-Glasma, MC-Glauber)
-    
+
     Module workflow:
     1. Links KoMPoST executable and EKT tables
     2. Generates parameter file with evolution settings
     3. Links initial energy-momentum tensor from previous module
     4. Executes KoMPoST pre-equilibrium evolution
     5. Outputs evolved T^μν ready for hydrodynamics (MUSIC)
-    
+
     Configuration includes evolution times, viscosity parameters, grid settings,
     and decomposition methods. The output provides smooth initial conditions
     for subsequent hydrodynamic evolution.
-    
+
     Example:
         >>> kompost = KoMPoST(config.KoMPoST, full_config, project_root, event_id)
         >>> kompost.prepare_environment(event_dir)
-        >>> kompost.prepare_input(event_dir) 
+        >>> kompost.prepare_input(event_dir)
         >>> kompost.run(event_dir)  # Pre-equilibrium evolution
         >>> kompost.fetch_output(event_dir)  # Evolved T^μν for MUSIC
     """
+
     def prepare_environment(self, event_dir):
         """Set up KoMPoST execution environment with executable and EKT tables.
-        
+
         Creates KoMPoST directory structure and establishes symbolic links to:
         - KoMPoST executable (KoMPoST.exe)
         - Effective kinetic theory data tables (EKT directory)
-        
+
         The EKT tables contain pre-computed coefficients for the effective
         kinetic theory evolution used in the pre-equilibrium phase.
-        
+
         Args:
             event_dir (str): Path to event-specific directory where KoMPoST will execute.
-                
+
         Raises:
             SystemExit: If KoMPoST executable or EKT tables are missing.
         """
@@ -84,26 +85,26 @@ class KoMPoST(BaseModule):
 
     def prepare_input(self, event_dir):
         """Generate KoMPoST configuration file and establish input data links.
-        
+
         Creates the KoMPoST parameter file (parameters_KoMPoST.ini) with physics
         settings and establishes symbolic links to input energy-momentum tensor
         data from previous simulation stages.
-        
+
         Configuration Parameters:
         - tIn: Initial time for pre-equilibrium evolution (fm/c)
-        - tOut: Final time when hydrodynamics takes over (fm/c)  
+        - tOut: Final time when hydrodynamics takes over (fm/c)
         - InputFile: Energy-momentum tensor data from initial conditions
         - OutputFileTag: Prefix for KoMPoST output files
-        
+
         Physics Context:
             KoMPoST performs effective kinetic theory evolution of the energy-momentum
             tensor from initial non-equilibrium state until local equilibration.
             The configuration controls the evolution time window and numerical precision.
-        
+
         Args:
             event_dir (str): Event directory containing KoMPoST/ subdirectory
                 and results/ directory for input file linking
-        
+
         Side Effects:
             - Creates parameters_KoMPoST.ini in KoMPoST subdirectory
             - Creates symbolic link to previous module output as input
@@ -190,32 +191,32 @@ class KoMPoST(BaseModule):
     @time_execution
     def run(self, event_dir):
         """Execute KoMPoST pre-equilibrium evolution simulation.
-        
+
         Runs the KoMPoST effective kinetic theory code to evolve the energy-momentum
         tensor from initial non-equilibrium state through pre-equilibrium dynamics
         until local thermodynamic equilibrium is achieved.
-        
+
         Physics Process:
             KoMPoST solves the effective kinetic theory equations that describe
             the approach to local equilibrium in the early stages of heavy-ion
             collisions. It bridges the gap between initial condition models and
             relativistic hydrodynamics.
-        
+
         Execution Details:
             - Changes to KoMPoST directory for proper file access
             - Executes KoMPoST.exe with parameters_KoMPoST.ini configuration
             - Uses run_external_command for memory monitoring and error handling
             - Restores original working directory after execution
-        
+
         Args:
             event_dir (str): Event directory containing configured KoMPoST/ subdirectory
-        
+
         Side Effects:
             - Temporarily changes working directory to KoMPoST/
             - Executes external KoMPoST binary with subprocess monitoring
             - Creates output files with energy-momentum tensor evolution
             - Logs execution progress and performance metrics
-        
+
         Raises:
             subprocess.CalledProcessError: If KoMPoST execution fails
             OSError: If KoMPoST directory or executable not accessible
@@ -251,33 +252,33 @@ class KoMPoST(BaseModule):
 
     def fetch_output(self, event_dir):
         """Collect and organize KoMPoST simulation output for downstream modules.
-        
+
         Moves the KoMPoST energy-momentum tensor output to the standardized
         results directory for use by subsequent physics modules (typically MUSIC
         hydrodynamics). Handles the complex KoMPoST output filename format.
-        
+
         Output Processing:
             KoMPoST generates files with descriptive physics names that include
             flow components and transport coefficients. This method standardizes
             the naming for integration with the CRONOS simulation chain.
-        
+
         File Operations:
             - Source: KoMPoST/output_N.music_init_flowNonLinear_pimunuTransverse_pimunuNS.txt
             - Target: results/output_N.dat (standardized format)
             - Preserves all physics data while simplifying file management
-        
+
         Args:
             event_dir (str): Event directory containing KoMPoST/ and results/ subdirectories
-        
+
         Side Effects:
             - Moves KoMPoST output file to results/ directory
             - Renames file to standard output_N.dat format
             - Logs successful data processing completion
-        
+
         Raises:
             FileNotFoundError: If expected KoMPoST output file doesn't exist
             OSError: If file move operation fails due to permissions
-        
+
         Notes:
             The output contains energy density, flow velocity, and viscous stress
             tensor components needed for hydrodynamic initialization in MUSIC.

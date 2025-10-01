@@ -9,24 +9,25 @@ import shutil
 import pprint
 import traceback
 
+
 def analyze_error(exception, module_name):
     """Analyze simulation exceptions to provide enhanced error diagnostics and optimization suggestions.
-    
+
     This function performs intelligent analysis of simulation failures to categorize
     error types, detect memory-related issues, and provide actionable suggestions
     for resolving common problems in heavy-ion collision simulations.
-    
+
     Error Categories Detected:
     - Memory-related errors (MemoryError, malloc failures, bad_alloc)
     - Resource exhaustion (file limits, disk space, quotas)
     - System-level issues (process limits, permissions)
     - Physics code failures (subprocess errors, numerical issues)
-    
+
     Args:
         exception (Exception): The exception object that caused the failure
         module_name (str): Name of the physics module where failure occurred
             (e.g., 'KoMPoST', 'MUSIC', 'iSS', 'SMASH')
-    
+
     Returns:
         dict: Comprehensive error analysis containing:
             - enhanced_message (str): Human-readable error description
@@ -35,7 +36,7 @@ def analyze_error(exception, module_name):
             - memory_info (dict): Current system memory state if available
             - error_type (str): Original exception type name
             - suggestions (list): Optimization recommendations
-    
+
     Example:
         >>> try:
         ...     run_physics_module()
@@ -107,11 +108,11 @@ def analyze_error(exception, module_name):
 
 def get_memory_suggestions(memory_info, module_name):
     """Generate memory optimization suggestions based on system state and physics module.
-    
+
     Provides context-aware recommendations for reducing memory usage in CRONOS
     simulations, with module-specific optimizations for different physics codes
     and general strategies for cluster resource management.
-    
+
     Args:
         memory_info (dict): Current system memory information containing:
             - system_percent (float): System memory usage percentage (0-100)
@@ -119,17 +120,17 @@ def get_memory_suggestions(memory_info, module_name):
             - system_available_gb (float): Available system memory in GB
         module_name (str): Name of physics module experiencing memory issues
             ('KoMPoST', 'MUSIC', 'iSS', 'SMASH', 'afterburner_toolkit')
-    
+
     Returns:
         list[str]: Ordered list of optimization suggestions, from most critical
             to general recommendations. Empty list if memory usage is acceptable.
-    
+
     Suggestion Categories:
         - Critical: Memory usage >95% - immediate action required
-        - High: Memory usage >85% - monitoring and optimization needed  
+        - High: Memory usage >85% - monitoring and optimization needed
         - Module-specific: Physics code parameter optimizations
         - General: Framework-level memory reduction strategies
-    
+
     Example:
         >>> memory_info = {'system_percent': 92.5, 'process_rss_mb': 8192}
         >>> suggestions = get_memory_suggestions(memory_info, 'MUSIC')
@@ -190,11 +191,11 @@ def get_memory_suggestions(memory_info, module_name):
 
 def prepare_modules(args, config, module_registry, project_root):
     """Prepare the complete CRONOS simulation environment with directory structure and module initialization.
-    
+
     This function creates the hierarchical directory structure required for CRONOS
     simulations, initializes all physics modules, and prepares the environment for
     either local execution or cluster submission via SLURM job arrays.
-    
+
     Directory Structure Created:
         run_dir/
         ├── job_0/
@@ -206,13 +207,13 @@ def prepare_modules(args, config, module_registry, project_root):
         │   └── event_1/
         └── job_1/
             └── ...
-    
+
     Special Handling:
     - FromFileIC mode: Creates one job per initial condition file
     - Standard mode: Creates jobs based on config.number_of_jobs
     - Each job contains config.number_events_per_job event directories
     - Each event contains directories for all configured physics modules
-    
+
     Args:
         args (argparse.Namespace): Parsed command-line arguments containing:
             - run_dir (str): Base directory for simulation runs
@@ -226,12 +227,12 @@ def prepare_modules(args, config, module_registry, project_root):
             - Keys: Module names as strings (e.g., 'KoMPoST', 'MUSIC')
             - Values: Module class objects (subclasses of BaseModule)
         project_root (Path): Absolute path to CRONOS project root directory
-    
+
     Raises:
         SystemExit: If run directory is not empty or module is not registered
         TypeError: If registered module does not subclass BaseModule
         OSError: If directory creation fails due to permissions
-    
+
     Side Effects:
         - Creates complete directory structure in args.run_dir
         - Calls prepare_environment() on each module instance
@@ -239,7 +240,7 @@ def prepare_modules(args, config, module_registry, project_root):
         - Generates cluster submission scripts via submission_script_cluster()
         - Updates config.number_of_jobs and config.number_events_per_job for FromFileIC
         - Provides colored terminal feedback on preparation status
-    
+
     Example:
         >>> args = argparse.Namespace(run_dir='run/', cluster='local')
         >>> config = load_config('config/main.py', 'config/user.py')
@@ -322,33 +323,33 @@ def prepare_modules(args, config, module_registry, project_root):
 
 def run_modules(config, module_registry, job_dir, project_root):
     """Execute complete CRONOS simulation with checkpoint support and comprehensive error handling.
-    
+
     This function orchestrates the execution of heavy-ion collision simulations
     through the complete physics chain, with robust checkpoint-based resumption
     and advanced memory monitoring for production cluster environments.
-    
+
     Physics Execution Workflow:
     1. Initial conditions generation (KoMPoST/from_file_IC)
     2. Pre-equilibrium evolution (KoMPoST)
-    3. Hydrodynamic evolution (MUSIC) 
+    3. Hydrodynamic evolution (MUSIC)
     4. Cooper-Frye particlization (iSS)
     5. Hadronic afterburner (SMASH)
     6. Flow analysis (afterburner_toolkit)
-    
+
     Checkpoint Features:
     - Automatic checkpoint creation after each module completion
     - Event-level and module-level progress tracking
     - Intelligent resumption from last successful checkpoint
     - Comprehensive failure analysis and memory diagnostics
     - Integration with SLURM job resubmission workflows
-    
+
     Error Handling:
     - Memory-related error detection with usage analysis
     - Subprocess memory monitoring for external physics codes
     - Enhanced error messages with optimization suggestions
     - Detailed traceback logging for debugging
     - Partial simulation recovery capabilities
-    
+
     Args:
         config (Configuration): Complete CRONOS configuration object containing:
             - general.modules (list): Ordered list of physics modules to execute
@@ -365,13 +366,13 @@ def run_modules(config, module_registry, job_dir, project_root):
             - External code executable locations
             - Configuration file resolution
             - Resource and data file access
-    
+
     Raises:
         SystemExit: If job directory doesn't exist or configuration is invalid
         MemoryError: If system runs out of memory during simulation
         subprocess.CalledProcessError: If external physics code fails
         Exception: Any module execution error (logged with enhanced analysis)
-    
+
     Side Effects:
         - Creates/updates .cronos_checkpoint.json with progress tracking
         - Executes external physics codes via subprocess with memory monitoring
@@ -379,18 +380,18 @@ def run_modules(config, module_registry, job_dir, project_root):
         - Calls handle_results() for output processing and compression
         - Provides colored terminal output for progress and error reporting
         - May consume significant CPU, memory, and disk resources
-    
+
     Checkpoint Resumption:
         The function automatically detects existing checkpoints and resumes
         from the last successful module completion. Events and modules that
         completed successfully are skipped, allowing efficient recovery from
         failures in long-running simulations.
-    
+
     Memory Management:
         Advanced memory monitoring tracks both Python process memory and
         subprocess memory usage. Memory-related failures trigger detailed
         analysis with optimization suggestions for cluster resource requests.
-    
+
     Example:
         >>> config = load_config('config/main.py', 'config/user.py')
         >>> registry = {'KoMPoST': KoMPoST, 'MUSIC': MUSIC, 'iSS': iSS}

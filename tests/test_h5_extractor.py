@@ -26,14 +26,14 @@ with patch.dict("sys.modules", {"h5py": h5py_mock}):
     colors_mock.BLUE = "\033[94m"
     colors_mock.CYAN = "\033[96m"
     colors_mock.BOLD = "\033[1m"
-    
+
     with patch.dict("sys.modules", {"src.colors": colors_mock}):
         from utilities.h5_extractor import HDF5Extractor, main
 
 
 class TestHDF5Extractor:
     """Test cases for HDF5Extractor."""
-    
+
     def setup_method(self):
         """Set up test environment."""
         self.temp_dir = tempfile.mkdtemp()
@@ -85,7 +85,7 @@ class TestHDF5Extractor:
 
 class TestMainFunction:
     """Test cases for main CLI function."""
-    
+
     def setup_method(self):
         """Set up test environment."""
         self.temp_dir = tempfile.mkdtemp()
@@ -98,9 +98,12 @@ class TestMainFunction:
 
     def test_main_list_only(self, capsys):
         """Test main function list-only mode."""
-        with patch("sys.argv", ["h5_extractor.py", str(self.test_h5_file), "--list-only"]):
+        with patch(
+            "sys.argv",
+            ["h5_extractor.py", str(self.test_h5_file), "--list-only"],
+        ):
             result = main()
-            
+
         assert result == 0
         captured = capsys.readouterr()
         assert "File listing complete" in captured.out
@@ -117,7 +120,7 @@ class TestMainFunction:
         """Test main function when no datasets are available."""
         with patch("sys.argv", ["h5_extractor.py", str(self.test_h5_file)]):
             result = main()
-            
+
         # Should succeed even with no datasets
         assert result == 0
         captured = capsys.readouterr()

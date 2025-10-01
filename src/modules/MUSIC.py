@@ -8,53 +8,54 @@ import glob
 
 class MUSIC(BaseModule):
     """MUSIC relativistic hydrodynamics module for CRONOS simulation framework.
-    
+
     Implements (3+1)D relativistic viscous hydrodynamics evolution using the MUSIC
     code. MUSIC evolves the energy-momentum tensor from initial conditions through
     hydrodynamic expansion until freeze-out, producing a hypersurface for subsequent
     particlization with iSS.
-    
+
     Key physics features:
     - (3+1)D relativistic hydrodynamics with boost invariance option
-    - Shear and bulk viscosity with temperature-dependent transport coefficients  
+    - Shear and bulk viscosity with temperature-dependent transport coefficients
     - Multiple equations of state (ideal gas, lattice QCD, hotQCD)
     - Freeze-out surface finding with temperature or energy density criteria
     - Initial conditions from various sources (MC-Glauber, IP-Glasma, KoMPoST)
-    
+
     Module workflow:
     1. Links MUSIC executable, EOS tables, and transport coefficient tables
     2. Generates MUSIC parameter file from configuration
     3. Links initial conditions from previous module (e.g., KoMPoST output)
     4. Executes MUSIC hydrodynamics with memory monitoring
     5. Collects freeze-out surface and cleans up temporary files
-    
+
     Configuration parameters include grid size, evolution time, viscosity ratios,
     EOS selection, and freeze-out criteria. See config/main_config.py for details.
-    
+
     Example:
         >>> music = MUSIC(config.MUSIC, full_config, project_root, event_id)
         >>> music.prepare_environment(event_dir)
-        >>> music.prepare_input(event_dir) 
+        >>> music.prepare_input(event_dir)
         >>> music.run(event_dir)  # Executes MUSIC hydrodynamics
         >>> music.fetch_output(event_dir)  # Collects freeze-out surface
     """
+
     def prepare_environment(self, event_dir):
         """Set up MUSIC execution environment with executable and data tables.
-        
+
         Creates MUSIC directory structure and establishes symbolic links to:
         - MUSIC executable (MUSIChydro)
-        - Equation of state tables (EOS directory)  
+        - Equation of state tables (EOS directory)
         - Transport coefficient tables (tables directory)
-        
+
         This ensures MUSIC has access to all required physics data and executable
         while maintaining clean separation between project structure and execution.
-        
+
         Args:
             event_dir (str): Path to event-specific directory where MUSIC will execute.
-                
+
         Raises:
             SystemExit: If any required MUSIC components are missing.
-            
+
         Example:
             >>> music.prepare_environment(\"/path/to/run/job_0/event_0/\")
             # Creates /path/to/run/job_0/event_0/MUSIC/ with proper links
@@ -98,27 +99,27 @@ class MUSIC(BaseModule):
 
     def prepare_input(self, event_dir):
         """Generate MUSIC parameter file and link initial conditions data.
-        
+
         Creates the MUSIC parameter file (parameters_MUSIC.ini) containing all
         configuration parameters for hydrodynamic evolution. Links input data
         from previous module and copies parameter file to results for iSS usage.
-        
+
         Key tasks:
         - Determines input filename from module execution order
         - Generates comprehensive MUSIC parameter file with all physics settings
         - Links initial conditions from previous module output
         - Copies parameter file to results directory for iSS module access
-        
+
         The parameter file includes settings for:
         - Grid configuration (size, spacing, dimensions)
         - Evolution parameters (time step, duration, freeze-out criteria)
         - Physics options (viscosity, EOS, transport coefficients)
         - Output settings (evolution data, freeze-out surface format)
-        
+
         Args:
             event_dir (str): Path to event-specific directory containing results
                 from previous modules and MUSIC subdirectory.
-                
+
         Raises:
             SystemExit: If MUSIC directory doesn't exist or input linking fails.
         """
@@ -296,29 +297,29 @@ class MUSIC(BaseModule):
     @time_execution
     def run(self, event_dir):
         """Execute MUSIC hydrodynamic evolution with memory monitoring.
-        
+
         Runs the MUSIC hydrodynamics code using the prepared parameter file and
         initial conditions. Executes with comprehensive memory monitoring to track
         resource usage during the computationally intensive hydrodynamic evolution.
-        
+
         The execution process:
         1. Changes to MUSIC working directory
         2. Configures output suppression based on settings
         3. Runs MUSIChydro executable with parameter file
         4. Monitors memory usage throughout evolution
         5. Handles execution errors and cleanup
-        
+
         Memory monitoring tracks peak usage and generates warnings if the evolution
         exceeds configured thresholds, helping optimize grid parameters and system
         resource allocation for large-scale simulations.
-        
+
         Args:
             event_dir (str): Path to event-specific directory containing MUSIC
                 subdirectory with prepared parameter file and initial conditions.
-                
+
         Raises:
             subprocess.CalledProcessError: If MUSIC execution fails.
-            
+
         Note:
             Execution time and peak memory usage are automatically logged
             due to @time_execution decorator.
@@ -354,26 +355,26 @@ class MUSIC(BaseModule):
 
     def fetch_output(self, event_dir):
         """Collect MUSIC freeze-out surface and clean up temporary files.
-        
+
         Locates the freeze-out hypersurface file produced by MUSIC, moves it to
         the standardized output location, and cleans up the temporary MUSIC
         directory. The freeze-out surface contains the space-time coordinates
         and thermodynamic quantities needed for Cooper-Frye particlization.
-        
+
         The process:
         1. Searches for freeze-out surface files (surface_*.dat pattern)
         2. Handles multiple surface files by selecting the first match
         3. Moves surface to standardized output name for next module
         4. Removes temporary MUSIC directory and working files
         5. Logs completion and file locations
-        
+
         Args:
             event_dir (str): Path to event-specific directory containing MUSIC
                 output and results directory for standardized file placement.
-                
+
         Raises:
             Logs errors if no surface files found but continues execution.
-            
+
         Example:
             >>> music.fetch_output(event_dir)
             # Moves surface_0.dat to results/output_2.dat (if MUSIC is module 2)

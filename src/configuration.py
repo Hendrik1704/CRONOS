@@ -6,33 +6,33 @@ from typing import Any, Dict
 
 class Configuration:
     """Flexible nested configuration object with multiple access patterns and deep merging.
-    
+
     Provides a unified interface for managing hierarchical configuration data with
-    support for both attribute-style (config.general.modules) and dictionary-style 
+    support for both attribute-style (config.general.modules) and dictionary-style
     (config['general']['modules']) access patterns. Enables deep merging of nested
     configurations for layered configuration management.
-    
+
     Key features:
     - Attribute and dictionary-style access to nested data
     - Recursive nested Configuration objects for hierarchical access
     - Deep merging preserving nested structure
     - Conversion between Configuration objects and plain dictionaries
     - Support for CRONOS module-specific and general configuration sections
-    
+
     Attributes:
         _data (dict): Internal storage of configuration parameters as nested structure.
-        
+
     Example:
         >>> config_dict = {'general': {'log_level': 'INFO'}, 'MUSIC': {'tau_0': 0.5}}
         >>> config = Configuration(config_dict)
-        >>> 
+        >>>
         >>> # Attribute-style access
         >>> print(config.general.log_level)  # 'INFO'
         >>> print(config.MUSIC.tau_0)        # 0.5
-        >>> 
+        >>>
         >>> # Dictionary-style access
         >>> print(config['general']['log_level'])  # 'INFO'
-        >>> 
+        >>>
         >>> # Deep merging
         >>> overrides = {'general': {'log_level': 'DEBUG'}}
         >>> config.merge(overrides)
@@ -131,25 +131,25 @@ class Configuration:
 
 def _load_py_config(path: str) -> Dict[str, Any]:
     """Load Python configuration file and extract public variables as dictionary.
-    
+
     Dynamically imports a Python file and extracts all public (non-underscore)
     variables as a configuration dictionary. This enables Python-based configuration
     files with full language support (comments, calculations, imports).
-    
+
     The function uses importlib to safely load the Python file as a module and
     extracts only variables that don't start with underscore (convention for public API).
-    
+
     Args:
         path (str): Path to Python configuration file (e.g., 'config/main_config.py').
-        
+
     Returns:
         dict[str, Any]: Dictionary containing all public variables from the Python file.
             Keys are variable names, values are the variable values.
-            
+
     Raises:
         FileNotFoundError: If the specified config file doesn't exist.
         ImportError: If the Python file has syntax errors or import issues.
-        
+
     Example:
         >>> # config/test.py contains: general = {'log_level': 'INFO'}
         >>> config_data = _load_py_config('config/test.py')
@@ -174,38 +174,38 @@ def _load_py_config(path: str) -> Dict[str, Any]:
 
 def load_config(*paths: str) -> Configuration:
     """Load and merge multiple Python configuration files with override precedence.
-    
+
     Loads multiple Python configuration files in sequence, performing deep merges
     where later files override earlier ones. This implements layered configuration
     management typical in CRONOS: main_config.py provides defaults, user_config.py
     provides simulation-specific overrides.
-    
+
     The merge process preserves nested structure, so only specified keys in later
     configs override earlier values, leaving other nested keys intact.
-    
+
     Args:
         *paths (str): Variable number of paths to Python configuration files.
             Files are processed in order, with later files taking precedence.
             At least one path must be provided.
-            
+
     Returns:
         Configuration: Merged configuration object with all files combined.
             Later files override earlier ones at each level of nesting.
-            
+
     Raises:
         ValueError: If no configuration file paths are provided.
         FileNotFoundError: If any specified config file doesn't exist.
         ImportError: If any Python config file has syntax or import errors.
-        
+
     Example:
         >>> # Load main config with user overrides
         >>> config = load_config('config/main_config.py', 'config/user_config.py')
-        >>> 
+        >>>
         >>> # User config overrides take precedence
         >>> # main: general = {'log_level': 'INFO', 'debug': False}
         >>> # user: general = {'log_level': 'DEBUG'}
         >>> # result: general = {'log_level': 'DEBUG', 'debug': False}
-        
+
     Note:
         This is the primary entry point for CRONOS configuration loading.
     """
