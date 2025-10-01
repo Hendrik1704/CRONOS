@@ -1,4 +1,3 @@
-````markdown
 # CRONOS Testing Suite
 
 This document describes the comprehensive testing suite implemented for the CRONOS nuclear physics simulation framework.
@@ -7,18 +6,7 @@ Our test suite provides **complete coverage** of all CRONOS framework components
 
 ## Overview
 
-The CR#### **Advanced Testing Workflow** (`.github/workflows/advanced-tests.yml`)
-- 🚀 **Triggers**: Push to main/development branches, pull requests + manual dispatch
-- ⚡ **Performance Tests**: Benchmarking and memory profiling
-- 🔗 **Integration Tests**: Cross-module functionality validation
-- 🌐 **Cross-Platform**: Ubuntu, Windows, macOS compatibility
-
-**Python Version Compatibility:**
-- **Python 3.11+**: Full compatibility with all tests passing
-- **Python 3.10**: Partial compatibility - physics module `test_run_method` tests may fail due to subprocess handling differences
-- **Python 3.9 and older**: Not supported due to dependency compatibility issues
-
-#### **Workflow Features**sting suite provides comprehensive unit and integration tests covering all major components of the framework:
+The CRONOS testing suite provides comprehensive unit and integration tests covering all major components of the framework:
 
 - **Configuration System**: Tests for configuration loading, merging, and validation
 - **BaseModule Interface**: Tests for the abstract module base class and utilities
@@ -258,8 +246,7 @@ class TestYourClass:
     @patch('src.your_module.external_dependency')
     def test_with_mocks(self, mock_dependency):
         """Test with mocked dependencies."""
-                # Test with mocks
-```
+        # Test with mocks
 ```
 
 ### Test Naming
@@ -301,10 +288,15 @@ CRONOS includes comprehensive **automated testing workflows** that run on every 
 - ✅ **Minimal Installation Test**: Validates core dependencies
 
 #### **Advanced Testing Workflow** (`.github/workflows/advanced-tests.yml`)
-- � **Triggers**: Push to main/development branches, pull requests + manual dispatch
-- 🚀 **Performance Tests**: Benchmarking and memory profiling
+- 🚀 **Triggers**: Push to main/development branches, pull requests + manual dispatch
+- ⚡ **Performance Tests**: Benchmarking and memory profiling
 - 🔗 **Integration Tests**: Cross-module functionality validation
 - 🌐 **Cross-Platform**: Ubuntu, Windows, macOS compatibility
+
+**Python Version Compatibility:**
+- **Python 3.11+**: Full compatibility with all tests passing
+- **Python 3.10**: Partial compatibility - physics module `test_run_method` tests may fail due to subprocess handling differences
+- **Python 3.9 and older**: Not supported due to dependency compatibility issues
 
 #### **Workflow Features**
 - **Parallel Testing**: Matrix strategy across multiple Python versions
@@ -381,8 +373,6 @@ python -m pytest -s
 
 # Run single test with debugging
 python -m pytest tests/test_module_base.py::TestBaseModule::test_initialization -v -s
-```
-
 ```
 
 This comprehensive testing suite ensures CRONOS framework reliability and makes development safer and more efficient.
