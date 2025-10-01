@@ -40,28 +40,32 @@ jobs:
     
     - name: Run performance benchmarks
       run: |
-        echo "🚀 Running CRONOS Performance Tests"
-        echo "Testing configuration loading performance..."
-        python -c "
-        import time
-        from src.configuration import Configuration
-        
-        # Benchmark configuration loading
-        start_time = time.time()
-        for i in range(100):
-            config = Configuration()
-        end_time = time.time()
-        
-        avg_time = (end_time - start_time) / 100
-        print(f'Average configuration load time: {avg_time:.4f}s')
-        
-        if avg_time > 0.1:  # Threshold: 100ms
-            print('⚠️  Configuration loading slower than expected')
-        else:
-            print('✅ Configuration loading performance acceptable')
-        "
-    
-    - name: Memory usage testing
+      echo "🚀 Running CRONOS Performance Tests"
+      echo "Testing configuration loading performance..."
+      python -c "
+      import time
+      from src.configuration import Configuration
+      
+      # Create a minimal test configuration
+      test_config = {
+          'general': {'job_directory': '/tmp', 'modules': ['test']},
+          'modules': {}
+      }
+      
+      # Benchmark configuration loading
+      start_time = time.time()
+      for i in range(100):
+          config = Configuration(test_config)
+      end_time = time.time()
+      
+      avg_time = (end_time - start_time) / 100
+      print(f'Average configuration load time: {avg_time:.4f}s')
+      
+      if avg_time > 0.1:  # Threshold: 100ms
+          print('⚠️  Configuration loading slower than expected')
+      else:
+          print('✅ Configuration loading performance acceptable')
+      "    - name: Memory usage testing
       run: |
         echo "🧠 Testing memory usage patterns"
         python -c "
@@ -110,8 +114,8 @@ jobs:
         python -c "
         from src.configuration import Configuration
         from src.checkpoint_manager import CheckpointManager
-        from src.memory_monitor import MemoryMonitor
-        from src.executor import Executor
+        from utilities.memory_monitor import get_memory_info, check_memory_threshold
+        from src.executor import analyze_error, run_modules
         import tempfile
         import os
         
@@ -123,14 +127,12 @@ jobs:
             checkpoint_mgr = CheckpointManager(config)
             print('✅ Configuration + CheckpointManager integration working')
             
-            from src.executor import analyze_error
             # Test error analysis function
             test_exception = ValueError('Test error')
             error_analysis = analyze_error(test_exception, 'test_module')
             print('✅ Executor error analysis function working')
             
             # Test memory monitoring integration
-            from src.module_base import get_memory_info
             memory_info = get_memory_info()
             print(f'✅ Memory monitoring integration working: {memory_info}')
             
