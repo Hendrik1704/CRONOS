@@ -227,6 +227,31 @@ run/
 - **Log Files**: Separate stdout/stderr for each job array task
 - **Checkpoints**: Progress tracking files (`.cronos_checkpoint.json`)
 
+### HDF5 Data Extraction Utility
+
+CRONOS includes a utility for extracting HDF5 simulation results in their native format:
+
+```bash
+# List contents of HDF5 file
+python utilities/h5_extractor.py simulation_results.h5 --list-only
+
+# Interactive extraction mode (recommended)
+python utilities/h5_extractor.py simulation_results.h5 --interactive
+
+# Extract specific datasets (native format)
+python utilities/h5_extractor.py simulation_results.h5 --extract 0,2,5
+
+# Extract all datasets
+python utilities/h5_extractor.py simulation_results.h5 --extract all --output-dir results/
+
+# Command-line options:
+# --list-only (-l): Only display file contents without extracting
+# --extract (-e): Comma-separated dataset indices or 'all'
+# --output-dir (-o): Output directory [default: extracted_data]
+# --interactive (-i): Interactive dataset selection mode
+# --log-level: Logging verbosity (DEBUG, INFO, WARNING, ERROR)
+```--
+
 ## Testing
 
 CRONOS includes a comprehensive testing suite with tests covering all framework components:
