@@ -170,7 +170,7 @@ class SMASH(BaseModule):
                     self.config.input_filename,
                     "OSCAR0",
                     "--seed",
-                    str(self.config.Randomseed),
+                    str(self.full_config.general.random_seed),
                 ],
                 check=True,
                 capture_output=True,
@@ -204,7 +204,9 @@ class SMASH(BaseModule):
             f.write(f"    Time_Step_Mode: None\n")
             f.write(f"    Delta_Time:    {self.config.Delta_Time}\n")
             f.write(f"    End_Time:      {self.config.End_Time}\n")
-            f.write(f"    Randomseed:    {self.config.Randomseed}\n")
+            f.write(
+                f"    Randomseed:    {self.full_config.general.random_seed}\n"
+            )
             f.write(f"    Nevents:       {self.config.Nevents}\n")
 
             if self.config.No_Collisions == 1:

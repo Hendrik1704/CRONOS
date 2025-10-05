@@ -159,7 +159,7 @@ class iSS(BaseModule):
             f.write(
                 f"polarizationRapType = {self.config.polarizationRapType}\n"
             )
-            f.write(f"randomSeed = {self.config.randomSeed}\n")
+            f.write(f"randomSeed = {self.full_config.general.random_seed}\n")
             f.write(f"calculate_vn = {self.config.calculate_vn}\n")
             f.write(f"MC_sampling = {self.config.MC_sampling}\n")
             f.write(

@@ -1,7 +1,7 @@
 # This file contains the user settings for the application.
 # It overrides the main config parameters.
 
-general ={
+general = {
     # Logging level for the application
     # Possible choices:
     #   "INFO"  - Show key runtime messages
@@ -9,15 +9,15 @@ general ={
     #   "NONE"  - Suppress all log output
     "log_level": "INFO",
     "module_terminal_output": False,
-
     # List of modules to connect/load.
-    "modules": ["from_file_IC",
-                "KoMPoST",
-                "entropy_matching",
-                "MUSIC",
-                "iSS",
-                "afterburner_toolkit"],
-
+    "modules": [
+        "from_file_IC",
+        "KoMPoST",
+        "entropy_matching",
+        "MUSIC",
+        "iSS",
+        "afterburner_toolkit",
+    ],
     "keep_particle_files": False,
 }
 
@@ -55,7 +55,7 @@ MUSIC = {
 iSS = {
     "afterburner_type": 0,  # 0: no afterburner, 1: UrQMD, 2: SMASH
     "sample_upto_desired_particle_number": 0,  # 1: flag to run sampling until desired
-                                               # particle numbers is reached
+    # particle numbers is reached
     "number_of_repeated_sampling": 25000,  # number of repeated sampling
 }
 

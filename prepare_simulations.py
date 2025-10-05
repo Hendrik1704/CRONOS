@@ -69,17 +69,19 @@ MODULE_REGISTRY = {
     "afterburner_toolkit": afterburner_toolkit,
 }
 
-CLUSTER_OPTIONS = ["local",
-                   "noctua1",
+CLUSTER_OPTIONS = [
+    "local",
+    "noctua1",
 ]
+
 
 def main():
     """Main function for CRONOS simulation preparation.
-    
+
     Parses command-line arguments, loads configuration files, validates cluster
     settings, and prepares the simulation environment with all necessary
     directories and module initialization.
-    
+
     The function performs the following steps:
     1. Parse command-line arguments for configuration and run parameters
     2. Load and validate main and user configuration files
@@ -88,18 +90,18 @@ def main():
     5. Initialize all physics modules with proper configuration
     6. Generate cluster submission scripts if needed
     7. Provide colored terminal feedback on preparation status
-    
+
     Exit Codes:
         0: Successful preparation
         1: Configuration loading failure
         1: Unsupported cluster specified
-    
+
     Raises:
         SystemExit: On configuration errors or invalid cluster selection
     """
     parser = argparse.ArgumentParser(
         description="Prepare CRONOS heavy-ion collision simulation environment",
-        epilog="Example: python prepare_simulations.py --cluster noctua1 --run_dir production/"
+        epilog="Example: python prepare_simulations.py --cluster noctua1 --run_dir production/",
     )
     parser.add_argument(
         "--main_config_path",

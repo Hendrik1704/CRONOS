@@ -79,20 +79,21 @@ MODULE_REGISTRY = {
     "afterburner_toolkit": afterburner_toolkit,
 }
 
+
 def main():
     """Main function for CRONOS simulation execution.
-    
+
     Executes a prepared CRONOS simulation job with comprehensive checkpoint
     support and error handling. The function manages the complete simulation
     workflow from initial conditions through hadronic afterburner.
-    
+
     Features:
     - Checkpoint-based resumption for fault tolerance
     - Memory monitoring and analysis
     - Enhanced error reporting with diagnostic information
     - Support for force-restart to bypass checkpoints
     - Comprehensive logging with colored terminal output
-    
+
     The execution process:
     1. Load configuration files and validate job directory
     2. Initialize checkpoint manager for progress tracking
@@ -100,17 +101,17 @@ def main():
     4. Execute physics modules in sequence for each event
     5. Handle errors with memory analysis and suggestions
     6. Provide diagnostic information for failed simulations
-    
+
     Exit Codes:
         0: Simulation completed successfully
         1: Configuration loading failure or simulation error
-    
+
     Raises:
         SystemExit: On configuration errors or simulation failures
     """
     parser = argparse.ArgumentParser(
         description="Execute prepared CRONOS heavy-ion collision simulation",
-        epilog="Example: python run_simulations.py --job_dir run/job_0/ --force-restart"
+        epilog="Example: python run_simulations.py --job_dir run/job_0/ --force-restart",
     )
     parser.add_argument(
         "--main_config_path",
@@ -150,7 +151,9 @@ def main():
         checkpoint_file = os.path.join(args.job_dir, ".cronos_checkpoint.json")
         if os.path.exists(checkpoint_file):
             os.remove(checkpoint_file)
-            logging.info("Removed existing checkpoint file - starting from beginning")
+            logging.info(
+                "Removed existing checkpoint file - starting from beginning"
+            )
 
     try:
         run_modules(config, MODULE_REGISTRY, args.job_dir, project_root)
@@ -158,28 +161,36 @@ def main():
         exit(0)
     except Exception as e:
         logging.error(f"Simulation failed: {e}")
-        
+
         # Provide helpful diagnostic information
         checkpoint_file = os.path.join(args.job_dir, ".cronos_checkpoint.json")
         if os.path.exists(checkpoint_file):
             logging.info("Checkpoint file exists - you can inspect it with:")
             logging.info(f"  python checkpoint_utils.py inspect {args.job_dir}")
-            logging.info("You can resubmit the job to resume from the last successful checkpoint")
+            logging.info(
+                "You can resubmit the job to resume from the last successful checkpoint"
+            )
         else:
-            logging.info("No checkpoint file found - this appears to be an early failure")
-        
+            logging.info(
+                "No checkpoint file found - this appears to be an early failure"
+            )
+
         # Check for output files to help diagnose the issue
         if os.path.exists(args.job_dir):
             output_files = []
             for root, dirs, files in os.walk(args.job_dir):
                 for file in files:
-                    if file.endswith(('.h5', '.dat', '.txt', '.log')):
+                    if file.endswith((".h5", ".dat", ".txt", ".log")):
                         output_files.append(os.path.join(root, file))
-            
+
             if output_files:
-                logging.info(f"Found {len(output_files)} output files - simulation may have partially succeeded")
-                logging.debug(f"Output files: {output_files[:5]}...")  # Show first 5 files
-        
+                logging.info(
+                    f"Found {len(output_files)} output files - simulation may have partially succeeded"
+                )
+                logging.debug(
+                    f"Output files: {output_files[:5]}..."
+                )  # Show first 5 files
+
         exit(1)
 
 

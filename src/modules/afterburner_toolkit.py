@@ -235,7 +235,7 @@ class afterburner_toolkit(BaseModule):
             f.write(
                 f"read_in_real_mixed_events = {self.config.read_in_real_mixed_events} #\n"
             )
-            f.write(f"randomSeed = {self.config.randomSeed} #\n")
+            f.write(f"randomSeed = {self.full_config.general.random_seed} #\n")
             f.write(f"particle_monval = {self.config.particle_monval} #\n")
             f.write(
                 f"distinguish_isospin = {self.config.distinguish_isospin} #\n"
