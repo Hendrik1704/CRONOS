@@ -9,7 +9,7 @@ cd ..
 echo "Download MUSIC from GitHub:"
 git clone --branch chun_dev --single-branch https://github.com/Hendrik1704/MUSIC
 cd MUSIC
-git checkout e9523630fa9bfe7ed4b05c968bae6918c3e3ef97
+git checkout ef77326527929d8db472fa9a7b0c4f55613c6d6c
 cd EOS
 bash download_hotQCD.sh SMASH_binary
 bash download_hotQCD.sh
@@ -35,7 +35,7 @@ tar xf eigen-3.4.0.tar.gz
 echo "Download hadronic_afterburner_toolkit from GitHub:"
 git clone --depth 1 https://github.com/Hendrik1704/hadronic_afterburner_toolkit.git
 cd hadronic_afterburner_toolkit
-git checkout 98f16a2a016c7acd461fdba35f9746af8f338b96
+git checkout ccfec0e1bba8662d8b5d6544f94cd81be2d11fee
 cd ..
 
 echo "Downloaded all the modules successfully"
