@@ -60,7 +60,13 @@ class Configuration:
         Returns:
             Any: The value associated with the attribute.
         """
-        return self._data[name]
+        try:
+            return self._data[name]
+        except KeyError:
+            # Attribute access should raise AttributeError when missing so that
+            # builtin getattr(obj, name, default) can return the provided default
+            # instead of causing an unexpected KeyError.
+            raise AttributeError(f"Configuration has no attribute '{name}'")
 
     def __setattr__(self, name, value):
         """
