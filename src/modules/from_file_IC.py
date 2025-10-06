@@ -64,7 +64,7 @@ class FromFileIC(BaseModule):
             - Logs setup progress and any missing dependencies
             - Exits with error code 1 if critical dependencies missing
         """
-        if self.config.boost_invariant == 1:
+        if getattr(self.config, "boost_invariant", 1) == 1:
             logging.info(
                 f"[FromFileIC] Boost invariant mode active. Nothing to prepare."
             )
@@ -145,7 +145,7 @@ class FromFileIC(BaseModule):
                     SystemExit: If working directory missing or no .dat files found
                     subprocess.CalledProcessError: If McDipper conversion fails
         """
-        if self.config.boost_invariant == 1:
+        if getattr(self.config, "boost_invariant", 1) == 1:
             logging.info("[FromFileIC] No IC to run, profile saved...")
         else:
             from_file_ic_dir = os.path.join(event_dir, "from_file_IC")
@@ -233,7 +233,7 @@ class FromFileIC(BaseModule):
             "from_file_IC"
         )
 
-        if self.config.boost_invariant == 1:
+        if getattr(self.config, "boost_invariant", 1) == 1:
             src_file = os.path.join(from_file_ic_dir, entries[0])
             dst_file = os.path.join(
                 results_dir, f"output_{current_module_index}.dat"
