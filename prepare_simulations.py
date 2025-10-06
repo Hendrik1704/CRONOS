@@ -50,6 +50,7 @@ import argparse
 from pathlib import Path
 from src.configuration import load_config
 from src.executor import prepare_modules
+from src.check_settings import check_settings
 
 from src.modules.from_file_IC import FromFileIC
 from src.modules.KoMPoST import KoMPoST
@@ -139,6 +140,10 @@ def main():
         logging.error(
             f"Cluster '{args.cluster}' is not supported. Supported clusters: {CLUSTER_OPTIONS}"
         )
+        exit(1)
+    valid_config = check_settings(config)
+    if not valid_config:
+        logging.error("Configuration settings are invalid.")
         exit(1)
 
     project_root = Path(__file__).resolve().parent

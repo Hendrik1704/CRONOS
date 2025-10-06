@@ -382,21 +382,87 @@ class MUSIC(BaseModule):
         """
         logging.info("[MUSIC] Data successfully processed...")
         current_module_index = self.full_config.general.modules.index("MUSIC")
-        src_pattern = os.path.join(event_dir, "MUSIC", "surface_*.dat")
-        matching_files = glob.glob(src_pattern)
+        MUSIC_dir = os.path.join(event_dir, "MUSIC")
+        src_pattern = os.path.join(MUSIC_dir, "surface_*.dat")
+        matching_files = sorted(glob.glob(src_pattern))
 
         if not matching_files:
             logging.error(f"[MUSIC] No files found matching {src_pattern}")
             return
-        if len(matching_files) > 1:
+
+        # If exactly one surface file exists, move it directly and return
+        if len(matching_files) == 1:
+            single_src = matching_files[0]
+            results_dir = os.path.join(event_dir, "results")
+            os.makedirs(results_dir, exist_ok=True)
+            dst_file = os.path.join(
+                results_dir, f"output_{current_module_index}.dat"
+            )
+            shutil.move(single_src, dst_file)
+            try:
+                shutil.rmtree(MUSIC_dir)
+            except Exception:
+                logging.warning(
+                    f"[MUSIC] Failed to remove {MUSIC_dir} - leaving it for inspection"
+                )
+            logging.info(
+                f"[MUSIC] Moved single surface {single_src} to {dst_file}"
+            )
+            return
+
+        # Group files by the first three underscore-separated fields of the filename
+        groups = {}
+        for path in matching_files:
+            name = os.path.basename(path)
+            stem = os.path.splitext(name)[0]
+            parts = stem.split("_")
+            if len(parts) >= 3:
+                key = "_".join(parts[:3])
+            else:
+                key = stem
+            groups.setdefault(key, []).append(path)
+
+        # Create group files by concatenating members of each group (streaming)
+        group_files = []
+        for key in sorted(groups.keys()):
+            group_path = os.path.join(MUSIC_dir, f"{key}.dat")
+            logging.info(
+                f"[MUSIC] Creating group file {group_path} from {len(groups[key])} parts"
+            )
+            # Overwrite if exists
+            with open(group_path, "wb") as out_f:
+                for src in groups[key]:
+                    # Skip if the source is the same as the intended group file
+                    if os.path.abspath(src) == os.path.abspath(group_path):
+                        continue
+                    with open(src, "rb") as in_f:
+                        shutil.copyfileobj(in_f, out_f)
+            group_files.append(group_path)
+
+        # Concatenate all group files into a single combined surface file
+        combined_path = os.path.join(MUSIC_dir, "__combined_surface__.dat")
+        with open(combined_path, "wb") as out_comb:
+            for gf in sorted(group_files):
+                with open(gf, "rb") as in_gf:
+                    shutil.copyfileobj(in_gf, out_comb)
+
+        # Ensure results directory exists
+        results_dir = os.path.join(event_dir, "results")
+        os.makedirs(results_dir, exist_ok=True)
+
+        dst_file = os.path.join(
+            results_dir, f"output_{current_module_index}.dat"
+        )
+
+        # Move the combined file to the standardized results filename
+        shutil.move(combined_path, dst_file)
+
+        # Clean up MUSIC working directory entirely
+        try:
+            shutil.rmtree(MUSIC_dir)
+        except Exception:
             logging.warning(
-                f"[MUSIC] Multiple files found matching {src_pattern}, using the first one."
+                f"[MUSIC] Failed to remove {MUSIC_dir} - leaving it for inspection"
             )
 
-        src_file = matching_files[0]
-        dst_file = os.path.join(
-            event_dir, "results", f"output_{current_module_index}.dat"
-        )
-        shutil.move(src_file, dst_file)
-        shutil.rmtree(os.path.join(event_dir, "MUSIC"))
-        logging.info(f"[MUSIC] Moved {src_file} to {dst_file}")
+        logging.info(f"[MUSIC] Moved combined surface(s) to {dst_file}")

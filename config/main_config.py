@@ -27,6 +27,11 @@ general = {
 
 from_file_IC = {
     "input_path": "data/",
+    "boost_invariant": 0,  # 0: no boost invariance, 1: boost invariance
+    "Nx": 151,  # Number of grid points in x and y direction
+    "Neta": 101,  # Number of grid points in eta direction
+    "dx": 0.1,  # Grid spacing in x and y direction
+    "deta": 0.2,  # Grid spacing in eta direction
 }
 
 KoMPoST = {
@@ -63,6 +68,7 @@ MUSIC = {
     #   -- 92: e only,
     #   -- 93: e, u^\mu, and pi^\munu,
     #   -- 94: full T^\mu\nu and read bulk
+    #   -- 95: full T^\mu\nu and read bulk (3+1D) from file format
     "initialize_with_entropy": 0,  # 0: with energy density
     "s_factor": 1.0,  # normalization factor for initial profile
     "preEqVisFactor": 1.0,  # additional scale factor for initial viscous tensor
@@ -150,6 +156,8 @@ MUSIC = {
 
 iSS = {
     "hydro_mode": 2,  # mode for reading in freeze out information
+    # 1: reads outputs from MUSIC assuming boost-invariant
+    # 2: reads outputs from MUSIC full (3+1)-d
     "afterburner_type": 2,  # 0: PDG_Decay, 1: UrQMD, 2: SMASH
     "turn_on_bulk": 0,  # read in bulk viscous pressure
     "turn_on_rhob": 0,  # read in net baryon chemical potential

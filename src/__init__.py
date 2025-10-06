@@ -1,6 +1,7 @@
 from .configuration import Configuration, load_config
 from .module_base import BaseModule
 from .executor import prepare_modules, run_modules
+from .check_settings import check_settings
 
 from .modules.from_file_IC import FromFileIC
 from .modules.KoMPoST import KoMPoST
@@ -18,6 +19,7 @@ __all__ = [
     "BaseModule",
     "prepare_modules",
     "run_modules",
+    "check_settings",
     "FromFileIC",
     "KoMPoST",
     "EntropyMatching",

@@ -23,6 +23,7 @@ general = {
 
 from_file_IC = {
     "input_path": "input_energy_momentum_tensors/",
+    "boost_invariant": 1,  # 0: no boost invariance, 1: boost invariance
 }
 
 KoMPoST = {
@@ -53,6 +54,7 @@ MUSIC = {
 }
 
 iSS = {
+    "hydro_mode": 1,  # mode for reading in freeze out information
     "afterburner_type": 0,  # 0: no afterburner, 1: UrQMD, 2: SMASH
     "sample_upto_desired_particle_number": 0,  # 1: flag to run sampling until desired
     # particle numbers is reached

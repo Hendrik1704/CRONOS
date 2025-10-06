@@ -60,6 +60,7 @@ import argparse
 import os
 from src.configuration import load_config
 from src.executor import run_modules
+from src.check_settings import check_settings
 
 from src.modules.from_file_IC import FromFileIC
 from src.modules.KoMPoST import KoMPoST
@@ -143,6 +144,10 @@ def main():
         logging.error("Failed to load configuration.")
         exit(1)
     logging.basicConfig(level=config.general.log_level)
+    valid_config = check_settings(config)
+    if not valid_config:
+        logging.error("Configuration settings are invalid.")
+        exit(1)
 
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
