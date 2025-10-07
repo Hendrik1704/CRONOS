@@ -56,6 +56,7 @@ KoMPoST = {
 
 entropy_matching = {
     "nu_eff": 40.0,  # effective degrees of freedom, should match with KoMPoST
+    "matching_type": 0,  # 0: energy matching, 1: entropy matching
 }
 
 MUSIC = {

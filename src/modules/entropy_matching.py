@@ -179,7 +179,7 @@ class EntropyMatching(BaseModule):
                 [
                     "python3",
                     s_matching_script,
-                    "1",
+                    str(self.config.matching_type),
                     str(self.config.nu_eff),
                     "./EOS/hotQCD/hrg_hotqcd_eos_SMASH_binary.dat",
                     f"output_{current_module_index-1}.dat",
