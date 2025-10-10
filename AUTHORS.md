@@ -5,13 +5,12 @@ CRONOS - Collision Runs with Orchestrated Nuclear Observable Simulations is deve
 ## Core Development Team
 
 ### Lead Developer
-- **Hendrik Roch** - *Project Lead & Core Developer*
-  - Framework architecture and design
-  - Module integration system
-  - Checkpoint and configuration management
+- **Hendrik Roch**
   - GitHub: [@Hendrik1704](https://github.com/Hendrik1704)
 
 ## Contributors
+- **Renata Krupczak**
+  - GitHub: [@RenataKrupczak](https://github.com/RenataKrupczak)
 
 We welcome and appreciate contributions from the nuclear physics community. Contributors to CRONOS include:
 
