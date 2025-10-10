@@ -141,10 +141,7 @@ def create_noctua1_submission_script(args):
         script_file.write("module load devel/CMake/3.23.1-GCCcore-11.3.0\n")
         script_file.write("module load lang/Python/3.10.4-GCCcore-11.3.0\n\n")
 
-        script_file.write("pip install h5py\n")
-
         # Implement that each array task runs one of the job_ directories in the run_dir
-        script_file.write("export OMP_NUM_THREADS=1\n")
         script_file.write("cd $SLURM_SUBMIT_DIR\n")
         script_file.write(
             'echo "Running job in directory: job_$SLURM_ARRAY_TASK_ID"\n'

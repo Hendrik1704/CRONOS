@@ -27,7 +27,7 @@ general = {
 
 from_file_IC = {
     "input_path": "data/",
-    "boost_invariant": 0,  # 0: no boost invariance, 1: boost invariance
+    "boost_invariant": 1,  # 0: no boost invariance, 1: boost invariance
     "Nx": 151,  # Number of grid points in x and y direction
     "Neta": 101,  # Number of grid points in eta direction
     "dx": 0.1,  # Grid spacing in x and y direction
@@ -101,7 +101,7 @@ MUSIC = {
     # 91: lattice EOS hotQCD with SMASH
     # 14: lattice EOS hotQCD at finite muB
     # transport coefficients
-    "quest_revert_strength": 10.0,
+    "quest_revert_strength": 1.0,
     "FlagResumTransportCoeff": 0,  # switch to use resummed transport coeff.
     "FlagResetCausality": 0,
     "resumTransCoeffAlpha": 1.5,  # resummed transport coeff. control parameter
