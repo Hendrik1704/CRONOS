@@ -27,7 +27,7 @@ general = {
 
 from_file_IC = {
     "input_path": "data/",
-    "boost_invariant": 1,  # 0: no boost invariance, 1: boost invariance
+    "boost_invariant": 0,  # 0: no boost invariance, 1: boost invariance
     "Nx": 151,  # Number of grid points in x and y direction
     "Neta": 101,  # Number of grid points in eta direction
     "dx": 0.1,  # Grid spacing in x and y direction
@@ -81,8 +81,8 @@ MUSIC = {
     "Grid_size_in_eta": 1,  # number of the grid points in spatial rapidity direction
     "X_grid_size_in_fm": 20.0,  # spatial range along x direction
     "Y_grid_size_in_fm": 20.0,  # spatial range along y direction
-    "Grid_size_in_y": 200,  # number of the grid points in y direction
-    "Grid_size_in_x": 200,  # number of the grid points in x direction
+    "Grid_size_in_y": 201,  # number of the grid points in y direction
+    "Grid_size_in_x": 201,  # number of the grid points in x direction
     "gridPadding": 3,  # grid padding size in the transverse plane (fm)
     "EOS_to_use": 91,  # type of the equation of state
     # 0: ideal gas
