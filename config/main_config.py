@@ -81,8 +81,8 @@ MUSIC = {
     "Grid_size_in_eta": 1,  # number of the grid points in spatial rapidity direction
     "X_grid_size_in_fm": 20.0,  # spatial range along x direction
     "Y_grid_size_in_fm": 20.0,  # spatial range along y direction
-    "Grid_size_in_y": 200,  # number of the grid points in y direction
-    "Grid_size_in_x": 200,  # number of the grid points in x direction
+    "Grid_size_in_y": 201,  # number of the grid points in y direction
+    "Grid_size_in_x": 201,  # number of the grid points in x direction
     "gridPadding": 3,  # grid padding size in the transverse plane (fm)
     "EOS_to_use": 91,  # type of the equation of state
     # 0: ideal gas
@@ -101,7 +101,7 @@ MUSIC = {
     # 91: lattice EOS hotQCD with SMASH
     # 14: lattice EOS hotQCD at finite muB
     # transport coefficients
-    "quest_revert_strength": 10.0,
+    "quest_revert_strength": 1.0,
     "FlagResumTransportCoeff": 0,  # switch to use resummed transport coeff.
     "FlagResetCausality": 0,
     "resumTransCoeffAlpha": 1.5,  # resummed transport coeff. control parameter

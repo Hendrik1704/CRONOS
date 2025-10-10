@@ -18,8 +18,6 @@ module load lib/zlib/1.2.12-GCCcore-11.3.0
 module load tools/binutils/2.38-GCCcore-11.3.0
 module load lang/Python/3.10.4-GCCcore-11.3.0
 
-cd "$SLURM_SUBMIT_DIR/../../external_codes/" || { echo "Directory not found"; exit 1; }
-
 ./ClearFramework.sh || true
 ./GetModulesFromGit.sh   || { echo "Failed to fetch modules"; exit 1; }
 ./CompileFramework.sh    || { echo "Compilation failed"; exit 1; }
