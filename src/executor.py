@@ -8,6 +8,7 @@ import os
 import shutil
 import pprint
 import traceback
+import re
 
 
 def analyze_error(exception, module_name):
@@ -260,8 +261,38 @@ def prepare_modules(args, config, module_registry, project_root):
             "FromFileIC is used, preparing separate job directories for each IC file."
         )
         input_path = config.from_file_IC.input_path
-        ic_files = [f for f in os.listdir(input_path)]
-        ic_files.sort()
+        # List only actual files in the directory (skip subdirectories)
+        all_entries = os.listdir(input_path)
+        file_entries = [
+            f
+            for f in all_entries
+            if os.path.isfile(os.path.join(input_path, f))
+        ]
+
+        # Special-case sorting: filenames like 'Tmunu10_Ns151_NsLong71.dat'
+        # If all files match the pattern ^Tmunu(\d+)_, sort them by the numeric index
+        pattern = re.compile(r"^Tmunu(\d+)_")
+        numeric_matches = []
+        all_match = True if file_entries else False
+        for fname in file_entries:
+            m = pattern.match(fname)
+            if m:
+                try:
+                    numeric_matches.append((int(m.group(1)), fname))
+                except ValueError:
+                    all_match = False
+                    break
+            else:
+                all_match = False
+                break
+
+        if all_match and numeric_matches:
+            ic_files = [
+                fname
+                for _, fname in sorted(numeric_matches, key=lambda x: x[0])
+            ]
+        else:
+            ic_files = sorted(file_entries)
         config.number_of_jobs = len(ic_files)
         config.number_events_per_job = 1  # Each IC file corresponds to one job
         logging.info(f"Found {config.number_of_jobs} IC files in {input_path}.")

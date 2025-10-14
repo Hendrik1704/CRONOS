@@ -12,41 +12,6 @@ CRONOS - Collision Runs with Orchestrated Nuclear Observable Simulations is deve
 - **Renata Krupczak**
   - GitHub: [@RenataKrupczak](https://github.com/RenataKrupczak)
 
-We welcome and appreciate contributions from the nuclear physics community. Contributors to CRONOS include:
-
-### Code Contributors
-*This section will be updated as contributions are received*
-
-### Testing and Bug Reports
-*This section will be updated as contributions are received*
-
-## How to Contribute
-
-We encourage contributions from researchers, students, and developers interested in nuclear physics simulations:
-
-### Ways to Contribute
-1. **Code Contributions**
-   - Bug fixes and improvements
-   - New physics module integrations
-   - Performance optimizations
-   - Testing framework enhancements
-
-2. **Documentation**
-   - User guides and tutorials
-   - API documentation improvements
-   - Example configurations and workflows
-
-3. **Testing and Quality Assurance**
-   - Bug reports and issue identification
-   - Physics validation studies
-   - Performance benchmarking
-
-4. **Community Building**
-   - Answering questions in discussions
-   - Helping new users get started
-   - Sharing use cases and success stories
-
-
 ## Contact and Communication
 
 ### Project Maintainer
