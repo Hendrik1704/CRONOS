@@ -48,7 +48,7 @@ MUSIC = {
 iSS = {
     "hydro_mode": 2,  # mode for reading in freeze out information
     "afterburner_type": 0,  # 0: no afterburner, 1: UrQMD, 2: SMASH
-    #automatic binary file and 3d input read mode in afternurner toolkit
+    # automatic binary file and 3d input read mode in afternurner toolkit
     "sample_upto_desired_particle_number": 0,  # 1: flag to run sampling until desired
     # particle numbers is reached
     "number_of_repeated_sampling": 100,  # number of repeated sampling
