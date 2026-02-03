@@ -4,6 +4,7 @@ from .executor import prepare_modules, run_modules
 from .check_settings import check_settings
 
 from .modules.from_file_IC import FromFileIC
+from .modules.IPGlasma import IPGlasma
 from .modules.KoMPoST import KoMPoST
 from .modules.entropy_matching import EntropyMatching
 from .modules.MUSIC import MUSIC
@@ -21,12 +22,13 @@ __all__ = [
     "run_modules",
     "check_settings",
     "FromFileIC",
+    "IPGlasma",
     "KoMPoST",
     "EntropyMatching",
     "MUSIC",
     "iSS",
     "SMASH",
     "afterburner_toolkit",
-    "colors",
+    "Colors",
     "submission_script_cluster",
 ]

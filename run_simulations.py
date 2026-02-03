@@ -13,7 +13,7 @@ Features:
 - Integration with SLURM job arrays for cluster execution
 
 Physics Workflow:
-1. Initial conditions (KoMPoST or from_file_IC)
+1. Initial conditions (IPGlasma or from_file_IC)
 2. Pre-equilibrium evolution (KoMPoST)
 3. Hydrodynamic evolution (MUSIC)
 4. Particlization (iSS Cooper-Frye)
@@ -63,6 +63,7 @@ from src.executor import run_modules
 from src.check_settings import check_settings
 
 from src.modules.from_file_IC import FromFileIC
+from src.modules.IPGlasma import IPGlasma
 from src.modules.KoMPoST import KoMPoST
 from src.modules.entropy_matching import EntropyMatching
 from src.modules.MUSIC import MUSIC
@@ -72,6 +73,7 @@ from src.modules.afterburner_toolkit import afterburner_toolkit
 
 MODULE_REGISTRY = {
     "from_file_IC": FromFileIC,
+    "IPGlasma": IPGlasma,
     "KoMPoST": KoMPoST,
     "entropy_matching": EntropyMatching,
     "MUSIC": MUSIC,

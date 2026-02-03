@@ -6,7 +6,6 @@ Enables resuming simulations from the last successful module.
 import os
 import json
 import logging
-from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 try:

@@ -34,6 +34,10 @@ from_file_IC = {
     "deta": 0.2,  # Grid spacing in eta direction
 }
 
+IPGlasma = {
+    
+}
+
 KoMPoST = {
     "tIn": 0.2,
     "tOut": 0.8,

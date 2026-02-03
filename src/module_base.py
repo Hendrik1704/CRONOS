@@ -2,8 +2,6 @@ from abc import ABC, abstractmethod
 import time
 import logging
 import psutil
-import os
-import signal
 from functools import wraps
 from .colors import Colors
 

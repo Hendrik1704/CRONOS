@@ -154,7 +154,7 @@ def get_memory_suggestions(memory_info, module_name):
         )
 
     # Module-specific suggestions
-    if module_name.lower() in ["music", "kompost"]:
+    if module_name.lower() in ["ipglasma", "music", "kompost"]:
         suggestions.extend(
             [
                 f"For {module_name}: Try reducing grid size (Ns parameter) or evolution time",
@@ -360,7 +360,7 @@ def run_modules(config, module_registry, job_dir, project_root):
     and advanced memory monitoring for production cluster environments.
 
     Physics Execution Workflow:
-    1. Initial conditions generation (KoMPoST/from_file_IC)
+    1. Initial conditions generation (IPGlasma/from_file_IC)
     2. Pre-equilibrium evolution (KoMPoST)
     3. Hydrodynamic evolution (MUSIC)
     4. Cooper-Frye particlization (iSS)
