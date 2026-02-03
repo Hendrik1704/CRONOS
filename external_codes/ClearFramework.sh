@@ -1,5 +1,6 @@
 #!/bin/bash
 
+rm -rf ipglasma
 rm -rf KoMPoST
 rm -rf MUSIC
 rm -rf iSS

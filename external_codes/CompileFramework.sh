@@ -3,6 +3,9 @@
 # Determine the number of available CPUs
 NUM_CPUS=$(nproc)
 
+echo "Build IP-Glasma code for initial condition generation"
+cd ipglasma && mkdir build && cd build && cmake .. && make -j$NUM_CPUS && make install && cd .. && rm -r build && cd ..
+
 echo "Build KoMPoST code for pre-equilibrium stage"
 cd KoMPoST && make -j$NUM_CPUS && cd ..
 

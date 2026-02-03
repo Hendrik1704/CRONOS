@@ -1,5 +1,12 @@
 #!/bin/bash
 
+echo "Download IP-Glasma from GitHub:"
+git clone --depth 1 https://github.com/chunshen1987/ipglasma
+cd ipglasma
+git checkout bf92fe1758a61acc5cf84dff2428b83570ea81fa
+cd nucleusConfigurations && bash download_nucleusTables.sh
+cd ../..
+
 echo "Download KoMPoST from GitHub:"
 git clone --depth 1 https://github.com/Hendrik1704/KoMPoST.git
 cd KoMPoST
