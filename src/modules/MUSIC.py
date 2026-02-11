@@ -70,6 +70,7 @@ class MUSIC(BaseModule):
             logging.error(
                 f"[MUSIC] Required directory {music_eos_path} does not exist."
             )
+            exit(1)
 
         music_tables_path = os.path.join(
             self.project_root, "external_codes", "MUSIC", "tables"

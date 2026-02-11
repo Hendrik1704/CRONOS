@@ -249,6 +249,22 @@ def prepare_modules(args, config, module_registry, project_root):
         >>> prepare_modules(args, config, registry, Path('/path/to/cronos'))
         # Creates run/job_0/event_0/{KoMPoST,MUSIC,results}/ structure
     """
+
+    # Ensure top-level job/event counters exist, falling back to general settings
+    if hasattr(config, "general"):
+        if not hasattr(config, "number_of_jobs"):
+            try:
+                config.number_of_jobs = config.general.number_of_jobs
+            except AttributeError:
+                config.number_of_jobs = 1
+        if not hasattr(config, "number_events_per_job"):
+            try:
+                config.number_events_per_job = (
+                    config.general.number_events_per_job
+                )
+            except AttributeError:
+                config.number_events_per_job = 1
+
     # Create the run directory if it does not exist and check that it is empty
     if not os.path.exists(args.run_dir):
         os.makedirs(args.run_dir)

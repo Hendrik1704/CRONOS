@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "Download IP-Glasma from GitHub:"
-git clone --depth 1 https://github.com/chunshen1987/ipglasma
+git clone --depth 1 https://github.com/chunshen1987/ipglasma -b ipglasma_jimwlk
 cd ipglasma
 git checkout bf92fe1758a61acc5cf84dff2428b83570ea81fa
 cd nucleusConfigurations && bash download_nucleusTables.sh
