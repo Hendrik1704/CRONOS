@@ -7,7 +7,45 @@ import shutil
 
 class IPGlasma(BaseModule):
 
+    """IP-Glasma initial condition module for the CRONOS framework.
+
+    Wraps the IP-Glasma code to generate fluctuating Glasma initial
+    conditions for hydrodynamic evolution. This module prepares the
+    execution environment, writes the IP-Glasma parameter file from the
+    configuration, runs the external binary with memory monitoring, and
+    collects the relevant output files.
+
+    Typical workflow:
+    1. :meth:`prepare_environment` links the executable, tables and
+       auxiliary input files into an event-specific IPGlasma directory.
+    2. :meth:`prepare_input` creates ``parameters_IPGlasma.ini`` based on
+       the configuration object.
+    3. :meth:`run` executes the IP-Glasma binary in the prepared
+       directory.
+    4. :meth:`fetch_output` moves the produced energy-momentum tensor and
+       auxiliary event-by-event observables into the event ``results``
+       directory and cleans up temporary files.
+    """
+
     def prepare_environment(self, event_dir):
+        """Set up IP-Glasma execution environment for a single event.
+
+        Creates the ``IPGlasma`` subdirectory in the given event
+        directory and establishes symbolic links to all IP-Glasma
+        resources that are required at run time:
+
+        - ``nucleusConfigurations`` (nuclear density profiles)
+        - ``ipglasma`` executable
+        - ``qs2Adj_vs_Tp_vs_Y_200.in`` (Qs table)
+        - ``tables`` and ``utilities`` directories
+
+        Args:
+            event_dir (str): Path to the event-specific directory.
+
+        Raises:
+            SystemExit: If any of the required IP-Glasma components are
+                missing in ``external_codes/ipglasma``.
+        """
         logging.info(f"Preparing IP-Glasma environment in {event_dir}")
         ipglasma_event_dir = os.path.join(event_dir, "IPGlasma")
         os.makedirs(ipglasma_event_dir, exist_ok=True)
@@ -16,7 +54,7 @@ class IPGlasma(BaseModule):
             os.symlink(nucleus_config_path, os.path.join(ipglasma_event_dir, "nucleusConfigurations"))
         else:
             logging.error(f"[IPGlasma] Required directory {nucleus_config_path} does not exist.")
-
+            exit(1)
         ipglasma_exe_path = os.path.join(self.project_root, "external_codes", "ipglasma", "ipglasma")
         if os.path.exists(ipglasma_exe_path):
             os.symlink(ipglasma_exe_path, os.path.join(ipglasma_event_dir, "ipglasma"))
@@ -46,6 +84,20 @@ class IPGlasma(BaseModule):
             exit(1)
 
     def prepare_input(self, event_dir):
+        """Generate IP-Glasma parameter file for the current event.
+
+        Writes ``parameters_IPGlasma.ini`` in the event's ``IPGlasma``
+        directory. All parameters are taken from ``self.config`` and
+        written in the format expected by the IP-Glasma code, including
+        handling of the snapshot list without scientific notation.
+
+        Args:
+            event_dir (str): Path to the event-specific directory that
+                contains the ``IPGlasma`` subdirectory.
+
+        Raises:
+            SystemExit: If the ``IPGlasma`` directory does not exist.
+        """
         IPGlasma_dir = os.path.join(event_dir, "IPGlasma")
         if not os.path.exists(IPGlasma_dir):
             logging.error(
@@ -172,6 +224,16 @@ class IPGlasma(BaseModule):
 
     @time_execution
     def run(self, event_dir):
+        """Execute the IP-Glasma binary for the current event.
+
+        Runs the ``ipglasma`` executable in the event-specific
+        ``IPGlasma`` directory using :func:`run_external_command`, which
+        provides optional memory monitoring and output suppression based
+        on the global configuration.
+
+        Args:
+            event_dir (str): Path to the event-specific directory.
+        """
         logging.info(f"[IPGlasma] run...")
         ipglasma_dir = os.path.join(event_dir, "IPGlasma")
         ipglasma_exe = "ipglasma"  # just the filename
@@ -202,6 +264,26 @@ class IPGlasma(BaseModule):
         logging.info("[IPGlasma] Execution finished.")
 
     def fetch_output(self, event_dir):
+        """Collect IP-Glasma output files and clean up.
+
+        Moves the main IP-Glasma energy-momentum tensor output
+        (``epsilon-u-Hydro-TauHydro-0.dat``) to the event ``results``
+        directory, renaming it to ``output_{module_index}.dat`` so that
+        subsequent modules can locate it consistently.
+
+        In addition, the following auxiliary files are moved unchanged
+        (if present) from the ``IPGlasma`` directory to ``results``:
+
+        - ``NcollList0.dat``
+        - ``NgluonEstimators0.dat``
+        - ``NpartList0.dat``
+
+        After moving the files the temporary ``IPGlasma`` directory is
+        removed.
+
+        Args:
+            event_dir (str): Path to the event-specific directory.
+        """
         logging.info(f"[IPGlasma] Fetching output...")
         current_module_index = self.full_config.general.modules.index("IPGlasma")
 
