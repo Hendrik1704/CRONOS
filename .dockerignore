@@ -1,0 +1,41 @@
+# Ignore Git metadata
+.git
+.gitignore
+.github
+
+# Ignore pre-built local external codes (fetched fresh in container)
+external_codes/ipglasma
+external_codes/KoMPoST
+external_codes/MUSIC
+external_codes/iSS
+external_codes/smash
+external_codes/pythia8315
+external_codes/pythia8315.tgz
+external_codes/eigen-3.4.0
+external_codes/eigen-3.4.0.tar.gz
+external_codes/hadronic_afterburner_toolkit
+
+# Ignore Python caches
+__pycache__
+*.pyc
+*.pyo
+
+# Ignore test artifacts and run directories
+run/
+tests/
+extracted_data/
+assets/
+
+# Ignore docs and CI files
+README.md
+TESTING.md
+AUTHORS.md
+LICENSE
+pytest.ini
+docker/README.md
+
+# Ignore cluster support
+cluster_support/
+
+# Ignore Singularity image files
+*.sif
