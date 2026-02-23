@@ -17,7 +17,7 @@ CRONOS uses **GitHub Actions** for comprehensive automated testing and quality a
 ### 1. Main Test Workflow (`.github/workflows/test.yml`)
 
 **Triggers:**
-- Push to `main`, `development`, or `dev` branches
+- Push to `main` or `devel` branches
 - Pull requests targeting these branches
 - Manual workflow dispatch
 
@@ -38,7 +38,7 @@ CRONOS uses **GitHub Actions** for comprehensive automated testing and quality a
 ### 2. Advanced Testing Workflow (`.github/workflows/advanced-tests.yml`)
 
 **Triggers:**
-- Push to `main`, `development`, or `dev` branches
+- Push to `main` or `devel` branches
 - Pull requests targeting these branches
 - Manual workflow dispatch with test type selection
 
@@ -165,5 +165,36 @@ The workflows provide metrics on:
 - **Coverage Trends**: Monitor code coverage changes
 - **Security Posture**: Track vulnerability remediation
 - **Cross-Platform Compatibility**: Ensure broad compatibility
+
+### 3. Docker Build & Push Workflow (`.github/workflows/docker.yml`)
+
+**Triggers:**
+- Push to `main` or `devel` branches
+- Manual workflow dispatch
+
+**Features:**
+- **Multi-stage Docker Build**: Compiles all C++ external codes and produces a slim runtime image
+- **Docker Hub Publishing**: Pushes to `hendrik1704/cronos` on Docker Hub
+- **Automatic Tagging**: Branch name tags (`main`, `devel`), `latest` (on `main` only), and short SHA
+- **Build Caching**: Uses GitHub Actions cache for faster rebuilds
+
+**Jobs:**
+1. `docker` - Build and push the Docker image
+
+**Required Secrets:**
+
+| Secret | Description |
+|---|---|
+| `DOCKERHUB_USERNAME` | Docker Hub username (`hendrik1704`) |
+| `DOCKERHUB_TOKEN` | Docker Hub access token (create at https://hub.docker.com/settings/security) |
+
+**Image Tags:**
+
+| Branch | Tags |
+|---|---|
+| `main` | `hendrik1704/cronos:main`, `hendrik1704/cronos:latest`, `hendrik1704/cronos:<sha>` |
+| `devel` | `hendrik1704/cronos:devel`, `hendrik1704/cronos:<sha>` |
+
+See [docker/README.md](../docker/README.md) for image usage instructions (local, Docker Hub, Singularity/Apptainer on HPC).
 
 This comprehensive CI/CD setup ensures CRONOS maintains high quality, security, and reliability standards throughout development.

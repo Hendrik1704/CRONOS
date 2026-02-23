@@ -2,9 +2,9 @@ name: CRONOS Test Suite
 
 on:
   push:
-    branches: [ main, development, dev ]
+    branches: [ main, devel ]
   pull_request:
-    branches: [ main, development, dev ]
+    branches: [ main, devel ]
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
