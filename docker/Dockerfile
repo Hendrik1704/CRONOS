@@ -113,8 +113,6 @@ COPY src/               /app/src/
 COPY config/            /app/config/
 COPY utilities/         /app/utilities/
 COPY prepare_simulations.py run_simulations.py /app/
-COPY input_energy_momentum_tensors/    /app/input_energy_momentum_tensors/
-COPY input_energy_momentum_tensors_3D/ /app/input_energy_momentum_tensors_3D/
 
 # Default entrypoint — can be overridden at runtime
 ENTRYPOINT ["python3"]
