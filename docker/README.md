@@ -31,11 +31,11 @@ Images are automatically published on every push to `main` or `devel` via GitHub
 ```bash
 # Prepare simulation
 docker run --rm -v $(pwd)/run:/app/run hendrik1704/cronos:latest \
-    prepare_simulations.py --user_config_path config/user_config_from_file_SMASH_decays.py
+    prepare_simulations.py --user_config_path config/user_config.py
 
 # Run simulation
 docker run --rm -v $(pwd)/run:/app/run hendrik1704/cronos:latest \
-    run_simulations.py --user_config_path config/user_config_from_file_SMASH_decays.py --job_dir run/job_0/
+    run_simulations.py --user_config_path config/user_config.py --job_dir run/job_0/
 ```
 
 Mount additional directories as needed, e.g. custom config files or input data.
