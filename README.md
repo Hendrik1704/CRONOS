@@ -66,6 +66,16 @@ CRONOS is a comprehensive framework designed to facilitate the simulation and an
    - Python 3.10: Some physics module tests may fail due to subprocess handling differences
    - Python 3.11+: Full compatibility with all features and tests
 
+### Docker
+
+A pre-built Docker image with all external C++ codes compiled is available on Docker Hub:
+
+```bash
+docker pull hendrik1704/cronos:latest
+```
+
+The image can also be converted to Singularity/Apptainer for use on HPC clusters. See **[docker/README.md](docker/README.md)** for full usage instructions.
+
 ## Configuration
 
 ### Configuration Files
