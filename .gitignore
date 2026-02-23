@@ -191,6 +191,10 @@ cython_debug/
 # Ruff stuff:
 .ruff_cache/
 
+# External codes — only track .sh scripts, ignore downloaded/cloned code
+external_codes/*
+!external_codes/*.sh
+
 # PyPI configuration file
 .pypirc
 

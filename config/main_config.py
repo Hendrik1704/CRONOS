@@ -6,9 +6,8 @@ general = {
     # Possible choices:
     #   "INFO"  - Show key runtime messages
     #   "DEBUG" - Show all debug messages (verbose)
-    #   "NONE"  - Suppress all log output
     "log_level": "INFO",
-    "module_terminal_output": True,  # If True, show terminal output of each module
+    "module_terminal_output": False,  # If True, show terminal output of each module
     # If False, suppress terminal output of each module
     "cleanup_checkpoints": True,  # If True, delete checkpoint file after successful completion
     # Memory monitoring settings
@@ -121,7 +120,7 @@ IPGlasma = {
     'computeGluonMultiplicity': 0,
     'etaSizeOutput': 1,
     'detaOutput': 0,
-    'writeOutputs': 1,
+    'writeOutputs': 1,          # 1: initial conditions e, u^\mu, \pi^{\mu\nu} for hydro; 4: initial T^{\mu\nu} for KoMPoST
     'writeEvolution': 0,
     'readInitialWilsonLines': 0,
     'writeWilsonLines': 0,
@@ -215,11 +214,19 @@ MUSIC = {
     "Include_Shear_Visc_Yes_1_No_0": 1,  # include shear viscous effect
     "Shear_to_S_ratio": 0.16,  # value of \eta/s
     "T_dependent_Shear_to_S_ratio": 0,  # flag to use temperature dep. \eta/s(T)
+    "shear_viscosity_3_eta_over_s_T_kink_in_GeV": 0.18,
+    "shear_viscosity_3_eta_over_s_low_T_slope_in_GeV": -4.,
+    "shear_viscosity_3_eta_over_s_high_T_slope_in_GeV": 0.,
+    "shear_viscosity_3_eta_over_s_at_kink": 0.12,
     "muB_dependent_Shear_to_S_ratio": 0,  # flag to use temperature dep. \eta/s(T, muB)
     "shear_muBf0p2": 1.0,  # piece-wise eta/s(muB) for muB_dependent_Shear_to_S_ratio == 7
     "shear_muBf0p4": 1.0,  # piece-wise eta/s(muB) for muB_dependent_Shear_to_S_ratio == 7
     "Include_Bulk_Visc_Yes_1_No_0": 0,  # include bulk viscous effect
     "T_dependent_zeta_over_s": 7,  # parameterization of \zeta/s(T)
+    "bulk_viscosity_10_max": 0.123,
+    "bulk_viscosity_10_width_high": 0.08,
+    "bulk_viscosity_10_width_low": 0.03,
+    "bulk_viscosity_10_T_peak": 0.18,
     "Include_second_order_terms": 1,  # include second order non-linear coupling terms
     "Include_vorticity_terms": 0,  # include vorticity coupling terms
     "Include_Rhob_Yes_1_No_0": 0,
@@ -288,7 +295,7 @@ iSS = {
     # 3: use dN_pTdpTdphidy to sample
     #    (overwrites calculate_vn to be 1).
     "sample_upto_desired_particle_number": 0,  # 1: flag to run sampling until desired
-    # particle numbers is reached
+    # particle number is reached
     "number_of_repeated_sampling": 10,  # number of repeated sampling
     "number_of_particles_needed": 100000,  # number of hadrons to sample
     "maximum_sampling_events": 10000,

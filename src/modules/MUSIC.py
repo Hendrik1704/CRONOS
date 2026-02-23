@@ -186,10 +186,34 @@ class MUSIC(BaseModule):
                 f"T_dependent_Shear_to_S_ratio {self.config.T_dependent_Shear_to_S_ratio}\n"
             )
             f.write(
+                f"shear_viscosity_3_eta_over_s_T_kink_in_GeV {self.config.shear_viscosity_3_eta_over_s_T_kink_in_GeV}\n"
+            )
+            f.write(
+                f"shear_viscosity_3_eta_over_s_low_T_slope_in_GeV {self.config.shear_viscosity_3_eta_over_s_low_T_slope_in_GeV}\n"
+            )
+            f.write(
+                f"shear_viscosity_3_eta_over_s_high_T_slope_in_GeV {self.config.shear_viscosity_3_eta_over_s_high_T_slope_in_GeV}\n"
+            )
+            f.write(
+                f"shear_viscosity_3_eta_over_s_at_kink {self.config.shear_viscosity_3_eta_over_s_at_kink}\n"
+            )
+            f.write(
                 f"Include_Bulk_Visc_Yes_1_No_0 {self.config.Include_Bulk_Visc_Yes_1_No_0}\n"
             )
             f.write(
                 f"T_dependent_zeta_over_s {self.config.T_dependent_zeta_over_s}\n"
+            )
+            f.write(
+                f"bulk_viscosity_10_max {self.config.bulk_viscosity_10_max}\n"
+            )
+            f.write(
+                f"bulk_viscosity_10_width_high {self.config.bulk_viscosity_10_width_high}\n"
+            )
+            f.write(
+                f"bulk_viscosity_10_width_low {self.config.bulk_viscosity_10_width_low}\n"
+            )
+            f.write(
+                f"bulk_viscosity_10_T_peak {self.config.bulk_viscosity_10_T_peak}\n"
             )
             f.write(
                 f"Include_second_order_terms {self.config.Include_second_order_terms}\n"
