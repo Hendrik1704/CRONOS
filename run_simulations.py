@@ -58,6 +58,7 @@ Requires: Python 3.8+, psutil, h5py, NumPy
 import logging
 import argparse
 import os
+from pathlib import Path
 from src.configuration import load_config
 from src.executor import run_modules
 from src.check_settings import check_settings
@@ -151,7 +152,9 @@ def main():
         logging.error("Configuration settings are invalid.")
         exit(1)
 
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # Determine CRONOS project root based on this script location.
+    project_root = Path(__file__).resolve().parent
+    logging.info(f"Project root is: {project_root}")
 
     # Handle force restart by removing checkpoint file
     if args.force_restart:

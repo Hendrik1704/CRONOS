@@ -66,10 +66,10 @@ singularity pull cronos.sif docker-daemon://cronos:latest
 
 ```bash
 singularity exec cronos.sif python3 /app/prepare_simulations.py \
-    --user_config_path /app/config/user_config_from_file_SMASH_decays.py
+    --user_config_path /app/config/user_config_ipglasma.py
 
 singularity exec cronos.sif python3 /app/run_simulations.py \
-    --user_config_path /app/config/user_config_from_file_SMASH_decays.py \
+    --user_config_path /app/config/user_config_ipglasma.py \
     --job_dir run/job_0/
 ```
 

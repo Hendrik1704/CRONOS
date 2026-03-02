@@ -149,7 +149,7 @@ def main():
         exit(1)
 
     project_root = Path(__file__).resolve().parent
-    print(f"Project root is: {project_root}")
+    logging.info(f"Project root is: {project_root}")
 
     prepare_modules(args, config, MODULE_REGISTRY, project_root)
 

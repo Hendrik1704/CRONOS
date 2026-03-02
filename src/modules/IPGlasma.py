@@ -347,9 +347,7 @@ class IPGlasma(BaseModule):
         import glob
 
         maxtime = float(self.config.maxtime)
-        candidate = os.path.join(
-            ipglasma_dir, f"Tmunu-t{maxtime}-0.dat"
-        )
+        candidate = os.path.join(ipglasma_dir, f"Tmunu-t{maxtime}-0.dat")
         if os.path.exists(candidate):
             return candidate
         # Fallback: glob for float-formatting differences
@@ -364,9 +362,7 @@ class IPGlasma(BaseModule):
 
     def _find_epsilon_u(self, ipglasma_dir):
         """Return path to the epsilon-u-Hydro output file, or ``None``."""
-        candidate = os.path.join(
-            ipglasma_dir, "epsilon-u-Hydro-TauHydro-0.dat"
-        )
+        candidate = os.path.join(ipglasma_dir, "epsilon-u-Hydro-TauHydro-0.dat")
         if os.path.exists(candidate):
             return candidate
         return None
