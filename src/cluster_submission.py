@@ -199,7 +199,7 @@ def create_wsu_submission_script(args, config):
             f"#SBATCH -e {slurm_logging_dir}/error_%A_%a.log\n"
         )
         script_file.write("#SBATCH -t 48:00:00\n")
-        script_file.write("#SBATCH -p requeue\n")
+        script_file.write("#SBATCH -q requeue\n")
         script_file.write("#SBATCH -N 1\n")
         script_file.write("#SBATCH -n 1\n")
         if memory_mb is not None:
@@ -223,10 +223,10 @@ def create_wsu_submission_script(args, config):
             f'apptainer exec "$SIF_IMAGE" python3 /app/run_simulations.py '
         )
         script_file.write(
-            f"--main_config_path {args.main_config_path} "
+            f"--main_config_path ../{args.main_config_path} "
         )
         script_file.write(
-            f"--user_config_path {args.user_config_path} "
+            f"--user_config_path ../{args.user_config_path} "
         )
         script_file.write(
             "--job_dir job_$SLURM_ARRAY_TASK_ID/\n"

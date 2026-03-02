@@ -76,7 +76,7 @@ The script will:
 ## 5. Memory and requeue behaviour
 
 - The script reads `general["memory_threshold_mb"]` from your config and uses it as the SLURM `--mem` request.
-- The `requeue` partition (or similar) can be used to allow jobs to be preempted and restarted. CRONOS checkpoints each job in `.cronos_checkpoint.json` inside the `job_*` directory.
+- The `requeue` queue (or similar) can be used to allow jobs to be preempted and restarted. CRONOS checkpoints each job in `.cronos_checkpoint.json` inside the `job_*` directory.
 - When a job is requeued and restarted, `run_simulations.py` detects the existing checkpoint and resumes from the last completed module/event.
 
 ## 6. Logs and troubleshooting
