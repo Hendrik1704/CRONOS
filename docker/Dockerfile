@@ -31,6 +31,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         gfortran \
         git \
         wget \
+        curl \
         ca-certificates \
         # IP-Glasma dependencies
         libfftw3-dev \
