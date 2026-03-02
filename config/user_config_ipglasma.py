@@ -11,8 +11,6 @@ general = {
     # List of modules to connect/load.
     "modules": [
         "IPGlasma",
-        "KoMPoST",
-        "entropy_matching",
         "MUSIC",
         "iSS",
         "SMASH",
@@ -38,9 +36,9 @@ IPGlasma = {
     "size": 800,
     "LOutput": 34.,
     "sizeOutput": 340,
-    "writeOutputs": 4, # 1: initial conditions e, u^\mu, \pi^{\mu\nu} for hydro; 4: initial T^{\mu\nu} for KoMPoST
+    "writeOutputs": 1, # 1: initial conditions e, u^\mu, \pi^{\mu\nu} for hydro; 4: initial T^{\mu\nu} for KoMPoST
     "writeWilsonLines": 0,
-    "maxtime": 0.2,
+    "maxtime": 0.4,
     "setWSDeformParams": 0,
     "SubNucleonParamType": 0,
     "SubNucleonParamSet": 0,
@@ -67,37 +65,12 @@ IPGlasma = {
     "saveSnapshots": 0,
 }
 
-KoMPoST = {
-    "tIn": 0.2,
-    "tOut": 1.0,
-    "EtaOverS": 0.16,  # specific shear viscosity
-    "EtaOverSTemperatureScale": 0.0,
-    "NuEffective": 40.0,
-    "EVOLUTION_MODE": 1,  # 0 for free-streaming, 1: for "KoMPoST" EKT evolution
-    "ENERGY_PERTURBATIONS": 1,
-    "MOMENTUM_PERTURBATIONS": 1,
-    "DECOMPOSITION_METHOD": 1,
-    "Regulator": "TwoPass",
-    "normFactor": 1.0,  # scaling of the input Tmunu
-    "afm": 0.1,  # lattice spacing in fm
-    "Ns": 340,  # number of grid points on a square lattice
-    "xSTART": 0,  # The first grid point to include in the x direction
-    "xEND": 339,  # The last grid point to include in the x direction
-    "ySTART": 0,  # The first grid point to include in the y direction
-    "yEND": 339,  # The last grid point to include in the y direction
-}
-
-entropy_matching = {
-    "nu_eff": 40.0,
-    "matching_type": 0,  # 0: energy matching, 1: entropy matching
-}
-
 MUSIC = {
     "beastMode": 1,
-    "Initial_profile": 94,
-    "s_factor": 1.0,
+    "Initial_profile": 9,
+    "s_factor": 0.0335,
     "preEqVisFactor": 1.0,
-    "Initial_time_tau_0": 1.0,
+    "Initial_time_tau_0": 0.4,
     "Delta_Tau": 0.005,
     "boost_invariant":  1,
     "Include_Shear_Visc_Yes_1_No_0": 1,
@@ -128,7 +101,7 @@ iSS = {
 SMASH = {}
 
 afterburner_toolkit = {
-    "ecoOutput": 0,
+    "ecoOutput": 1,
     "analyze_flow": 4,
     "npT": 20,
     "n_rap": 71,
