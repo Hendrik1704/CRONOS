@@ -3,7 +3,7 @@
 set -euo pipefail
 
 echo "Download IP-Glasma from GitHub:"
-git clone --depth 1 https://github.com/chunshen1987/ipglasma -b ipglasma_jimwlk
+git clone https://github.com/chunshen1987/ipglasma -b ipglasma_jimwlk
 cd ipglasma
 git checkout bf92fe1758a61acc5cf84dff2428b83570ea81fa
 cd nucleusConfigurations && bash download_nucleusTables.sh
@@ -17,7 +17,7 @@ fi
 cd ../..
 
 echo "Download KoMPoST from GitHub:"
-git clone --depth 1 https://github.com/Hendrik1704/KoMPoST.git
+git clone https://github.com/Hendrik1704/KoMPoST.git
 cd KoMPoST
 git checkout 3cc99ea40edac68da25eae784e922cac11548297
 cd ..
@@ -39,13 +39,13 @@ fi
 cd ../..
 
 echo "Download iSS from GitHub:"
-git clone --depth 1 https://github.com/chunshen1987/iSS.git
+git clone https://github.com/chunshen1987/iSS.git
 cd iSS
-git checkout 7d39d84ff95925bf3bc0edfaf8aae1ac5a28b387
+git checkout 8b3e43b26dade8252e2671907518a0d111625fd1
 cd ..
 
 echo "Download SMASH from GitHub:"
-git clone --depth 1 https://github.com/smash-transport/smash.git --branch SMASH-3.2.2
+git clone https://github.com/smash-transport/smash.git --branch SMASH-3.2.2
 
 echo "Download Pythia (used for SMASH):"
 wget https://pythia.org/download/pythia83/pythia8315.tgz
@@ -56,7 +56,7 @@ wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz
 tar xf eigen-3.4.0.tar.gz
 
 echo "Download hadronic_afterburner_toolkit from GitHub:"
-git clone --depth 1 https://github.com/Hendrik1704/hadronic_afterburner_toolkit.git
+git clone https://github.com/Hendrik1704/hadronic_afterburner_toolkit.git
 cd hadronic_afterburner_toolkit
 git checkout ccfec0e1bba8662d8b5d6544f94cd81be2d11fee
 cd ..
