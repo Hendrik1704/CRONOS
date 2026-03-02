@@ -75,6 +75,7 @@ MODULE_REGISTRY = {
 CLUSTER_OPTIONS = [
     "local",
     "noctua1",
+    "wsu",
 ]
 
 

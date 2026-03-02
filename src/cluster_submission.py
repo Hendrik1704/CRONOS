@@ -152,6 +152,86 @@ def create_noctua1_submission_script(args):
         )
 
 
+def create_wsu_submission_script(args, config):
+    """Generate SLURM submission script configured for the WSU cluster using Singularity.
+
+    This script assumes that:
+    - You have a CRONOS Singularity image (cronos.sif) accessible from the run directory
+      or via the CRONOS_SIF environment variable.
+    - The container image contains the CRONOS framework under /app.
+
+    The script will run each job_* directory via a Singularity exec
+    call that forwards the configuration paths from the command-line
+    arguments (args.main_config_path, args.user_config_path),
+    analogous to the noctua1 submission script.
+    """
+    run_dir = args.run_dir
+    slurm_logging_dir = "log"
+
+    script_path = f"{run_dir}/submit_job.sh"
+
+    job_dirs = [
+        d
+        for d in os.listdir(run_dir)
+        if os.path.isdir(os.path.join(run_dir, d)) and d.startswith("job_")
+    ]
+    num_jobs_found = len(job_dirs)
+
+    # Try to read memory threshold from configuration; if present, use it
+    # as the SLURM memory request in megabytes.
+    memory_mb = None
+    try:
+        general_cfg = config.general
+        try:
+            memory_mb = general_cfg.memory_threshold_mb
+        except AttributeError:
+            memory_mb = None
+    except AttributeError:
+        memory_mb = None
+
+    with open(script_path, "w") as script_file:
+        script_file.write("#!/bin/bash\n")
+        script_file.write("#SBATCH -J CRONOS\n")
+        script_file.write(
+            f"#SBATCH -o {slurm_logging_dir}/output_%A_%a.log\n"
+        )
+        script_file.write(
+            f"#SBATCH -e {slurm_logging_dir}/error_%A_%a.log\n"
+        )
+        script_file.write("#SBATCH -t 48:00:00\n")
+        script_file.write("#SBATCH -p requeue\n")
+        script_file.write("#SBATCH -N 1\n")
+        script_file.write("#SBATCH -n 1\n")
+        if memory_mb is not None:
+            script_file.write(f"#SBATCH --mem={memory_mb}\n")
+        script_file.write(f"#SBATCH --array=0-{num_jobs_found - 1}\n\n")
+
+        script_file.write("module purge\n")
+        script_file.write("module load singularity\n\n")
+
+        script_file.write("cd $SLURM_SUBMIT_DIR\n")
+        script_file.write(
+            'echo "Running job in directory: job_$SLURM_ARRAY_TASK_ID"\n'
+        )
+
+        script_file.write(
+            'SIF_IMAGE="${CRONOS_SIF:-cronos.sif}"\n'
+        )
+
+        script_file.write(
+            f'singularity exec "$SIF_IMAGE" python3 /app/run_simulations.py '
+        )
+        script_file.write(
+            f"--main_config_path {args.main_config_path} "
+        )
+        script_file.write(
+            f"--user_config_path {args.user_config_path} "
+        )
+        script_file.write(
+            "--job_dir job_$SLURM_ARRAY_TASK_ID/\n"
+        )
+
+
 def submission_script_cluster(args, config):
     """Generate appropriate cluster submission script based on target environment.
 
@@ -221,6 +301,13 @@ def submission_script_cluster(args, config):
         pass
     elif cluster_name == "noctua1":
         create_noctua1_submission_script(args)
+        message = (
+            f"SLURM submission script created for '{cluster_name}' cluster."
+        )
+        colored_message = Colors.green(message, bold=True)
+        logging.info(colored_message)
+    elif cluster_name == "wsu":
+        create_wsu_submission_script(args, config)
         message = (
             f"SLURM submission script created for '{cluster_name}' cluster."
         )
