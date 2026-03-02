@@ -99,8 +99,8 @@ COPY --from=builder /build/external_codes/eigen-3.4.0 /app/external_codes/eigen-
 # iSS
 COPY --from=builder /build/external_codes/iSS /app/external_codes/iSS
 
-# Ensure iSS shared library is found at runtime
-ENV LD_LIBRARY_PATH="/app/external_codes/iSS/lib:${LD_LIBRARY_PATH}"
+# Ensure shared libraries for MUSIC and iSS are found at runtime
+ENV LD_LIBRARY_PATH="/app/external_codes/MUSIC:/app/external_codes/iSS/lib:${LD_LIBRARY_PATH}"
 
 # Pythia (runtime data tables are needed by SMASH)
 COPY --from=builder /build/external_codes/pythia8315 /app/external_codes/pythia8315
