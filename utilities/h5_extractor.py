@@ -825,8 +825,6 @@ class HDF5Extractor:
             f.write(str(data))
         return str(output_path)
 
-        return str(output_path)
-
     def extract_multiple_datasets(
         self, dataset_indices: List[int]
     ) -> List[str]:
