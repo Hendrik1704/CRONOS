@@ -1,10 +1,19 @@
 #!/bin/bash
 
+set -euo pipefail
+
 echo "Download IP-Glasma from GitHub:"
 git clone --depth 1 https://github.com/chunshen1987/ipglasma -b ipglasma_jimwlk
 cd ipglasma
 git checkout bf92fe1758a61acc5cf84dff2428b83570ea81fa
 cd nucleusConfigurations && bash download_nucleusTables.sh
+
+# Basic sanity check: make sure a key nucleus configuration exists
+if [ ! -f "Pb208.bin.in" ]; then
+	echo "ERROR: Failed to download IP-Glasma nucleus configuration tables (Pb208.bin.in missing)." >&2
+	exit 1
+fi
+
 cd ../..
 
 echo "Download KoMPoST from GitHub:"
@@ -20,6 +29,13 @@ git checkout ef77326527929d8db472fa9a7b0c4f55613c6d6c
 cd EOS
 bash download_hotQCD.sh SMASH_binary
 bash download_hotQCD.sh
+
+# Verify hotQCD EOS tables were downloaded correctly
+if [ ! -f "hotQCD/hrg_hotqcd_eos_SMASH_binary.dat" ] || [ ! -f "hotQCD/hrg_hotqcd_eos_binary.dat" ]; then
+	echo "ERROR: Failed to download hotQCD EOS tables for MUSIC (hrg_hotqcd_eos_* files missing)." >&2
+	exit 1
+fi
+
 cd ../..
 
 echo "Download iSS from GitHub:"
