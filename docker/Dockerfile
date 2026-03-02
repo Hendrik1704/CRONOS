@@ -103,8 +103,9 @@ COPY --from=builder /build/external_codes/iSS /app/external_codes/iSS
 # Pythia (runtime data tables and libpythia8 are needed by SMASH)
 COPY --from=builder /build/external_codes/pythia8315 /app/external_codes/pythia8315
 
-# Ensure shared libraries for MUSIC, iSS, and Pythia8 are found at runtime
+# Ensure shared libraries and Pythia8 data are found at runtime
 ENV LD_LIBRARY_PATH="/app/external_codes/MUSIC:/app/external_codes/iSS/lib:/app/external_codes/pythia8315/lib:${LD_LIBRARY_PATH}"
+ENV PYTHIA8DATA="/app/external_codes/pythia8315/share/Pythia8/xmldoc"
 
 # SMASH
 COPY --from=builder /build/external_codes/smash /app/external_codes/smash

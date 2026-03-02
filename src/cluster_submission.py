@@ -153,14 +153,14 @@ def create_noctua1_submission_script(args):
 
 
 def create_wsu_submission_script(args, config):
-    """Generate SLURM submission script configured for the WSU cluster using Singularity.
+    """Generate SLURM submission script configured for the WSU cluster using Apptainer.
 
     This script assumes that:
-    - You have a CRONOS Singularity image (cronos.sif) accessible from the run directory
-      or via the CRONOS_SIF environment variable.
+    - You have a CRONOS Apptainer/Singularity image (cronos.sif) accessible from the
+        run directory or via the CRONOS_SIF environment variable.
     - The container image contains the CRONOS framework under /app.
 
-    The script will run each job_* directory via a Singularity exec
+    The script will run each job_* directory via an Apptainer exec
     call that forwards the configuration paths from the command-line
     arguments (args.main_config_path, args.user_config_path),
     analogous to the noctua1 submission script.
@@ -207,7 +207,8 @@ def create_wsu_submission_script(args, config):
         script_file.write(f"#SBATCH --array=0-{num_jobs_found - 1}\n\n")
 
         script_file.write("module purge\n")
-        script_file.write("module load singularity\n\n")
+        script_file.write("module load gnu9/9.1.0\n")
+        script_file.write("module load apptainer/1.3.0\n\n")
 
         script_file.write("cd $SLURM_SUBMIT_DIR\n")
         script_file.write(
@@ -219,7 +220,7 @@ def create_wsu_submission_script(args, config):
         )
 
         script_file.write(
-            f'singularity exec "$SIF_IMAGE" python3 /app/run_simulations.py '
+            f'apptainer exec "$SIF_IMAGE" python3 /app/run_simulations.py '
         )
         script_file.write(
             f"--main_config_path {args.main_config_path} "

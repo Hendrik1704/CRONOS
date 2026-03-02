@@ -1,14 +1,17 @@
 # CRONOS on WSU Cluster
 
-This document describes how to run CRONOS on the WSU cluster using the Singularity container and the `wsu` cluster option.
+This document describes how to run CRONOS on the WSU cluster using the Apptainer (Singularity-compatible) container and the `wsu` cluster option.
 
-## 1. Build or obtain the Singularity image
+## 1. Load modules and obtain the Apptainer image
 
-On a machine with Singularity/Apptainer and Docker access, build or pull the CRONOS image and create `cronos.sif`. For example:
+On the WSU cluster, first load the required modules and then pull the CRONOS image with Apptainer:
 
 ```bash
+module load gnu9/9.1.0
+module load apptainer/1.3.0
+
 # Example: pull from a registry (adjust to your image name)
-singularity pull cronos.sif docker://hendrik1704/cronos:latest
+apptainer pull cronos.sif docker://hendrik1704/cronos:latest
 ```
 
 Copy `cronos.sif` to a location accessible from the WSU cluster (e.g. your `$HOME` or project space).
@@ -33,9 +36,9 @@ python3 prepare_simulations.py \
   --run_dir run_wsu \
   --cluster wsu
 
-# Alternatively, prepare directly inside the Singularity container
+# Alternatively, prepare directly inside the Apptainer container
 export CRONOS_SIF=/path/to/cronos.sif
-singularity exec "$CRONOS_SIF" python3 /app/prepare_simulations.py \
+apptainer exec "$CRONOS_SIF" python3 /app/prepare_simulations.py \
   --main_config_path config/main_config.py \
   --user_config_path config/user_config_ipglasma.py \
   --run_dir run_wsu \
@@ -44,9 +47,9 @@ singularity exec "$CRONOS_SIF" python3 /app/prepare_simulations.py \
 
 This will create `run_wsu/` with `job_*` subdirectories and a `submit_job.sh` tailored for the WSU cluster.
 
-## 3. Point CRONOS to your Singularity image
+## 3. Point CRONOS to your Apptainer image
 
-The WSU submission script uses the environment variable `CRONOS_SIF` to locate the Singularity image. If `CRONOS_SIF` is not set, it defaults to `cronos.sif` in the submission directory.
+The WSU submission script uses the environment variable `CRONOS_SIF` to locate the Apptainer/Singularity image. If `CRONOS_SIF` is not set, it defaults to `cronos.sif` in the submission directory.
 
 Typical setup:
 
@@ -65,9 +68,9 @@ sbatch submit_job.sh
 ```
 
 The script will:
-- Load the `singularity` module
+- Load the `gnu9/9.1.0` and `apptainer/1.3.0` modules
 - Use `CRONOS_SIF` (or `cronos.sif` if unset)
-- Run `python3 /app/run_simulations.py` inside the container for each `job_$SLURM_ARRAY_TASK_ID`
+- Run `python3 /app/run_simulations.py` inside the Apptainer container for each `job_$SLURM_ARRAY_TASK_ID`
 - Forward your `--main_config_path` and `--user_config_path` to the container
 
 ## 5. Memory and requeue behaviour

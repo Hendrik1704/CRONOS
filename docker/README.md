@@ -46,34 +46,33 @@ Mount additional directories as needed, e.g. custom config files or input data.
 docker run --rm -it --entrypoint /bin/bash hendrik1704/cronos:latest
 ```
 
-## Usage on HPC clusters (Singularity / Apptainer)
+## Usage on HPC clusters (Apptainer / Singularity)
 
 Most HPC clusters do not allow Docker directly but support
-[Singularity](https://sylabs.io/singularity/) or its successor
-[Apptainer](https://apptainer.org/).
+[Apptainer](https://apptainer.org/) (the Singularity-compatible successor).
 
 ### Convert the Docker image to a SIF file
 
 ```bash
 # From Docker Hub (recommended)
-singularity pull cronos.sif docker://hendrik1704/cronos:latest
+apptainer pull cronos.sif docker://hendrik1704/cronos:latest
 
 # Or from a locally built Docker image
-singularity pull cronos.sif docker-daemon://cronos:latest
+apptainer pull cronos.sif docker-daemon://cronos:latest
 ```
 
-### Run with Singularity
+### Run with Apptainer
 
 ```bash
-singularity exec cronos.sif python3 /app/prepare_simulations.py \
+apptainer exec cronos.sif python3 /app/prepare_simulations.py \
     --user_config_path config/user_config_ipglasma.py
 
-singularity exec cronos.sif python3 /app/run_simulations.py \
+apptainer exec cronos.sif python3 /app/run_simulations.py \
     --user_config_path config/user_config_ipglasma.py \
     --job_dir run/job_0/
 ```
 
-> **Tip:** Singularity automatically bind-mounts `$HOME`, `$PWD`, and `/tmp` by default.
+> **Tip:** Apptainer (and Singularity) automatically bind-mount `$HOME`, `$PWD`, and `/tmp` by default.
 > For other directories use `--bind /path/on/host:/path/in/container`.
 
 ## Image details
