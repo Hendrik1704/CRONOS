@@ -22,11 +22,11 @@ Usage:
                                   --user_config_path config/custom_user.py
     
     # Prepare for cluster execution
-    python prepare_simulations.py --cluster noctua1 --run_dir production_run/
+    python prepare_simulations.py --cluster noctua2 --run_dir production_run/
 
 Supported Clusters:
     - local: Local machine execution
-    - noctua1: Paderborn University HPC cluster
+    - noctua2: Paderborn University HPC cluster
     
 Example Directory Structure Created:
     run/
@@ -74,7 +74,7 @@ MODULE_REGISTRY = {
 
 CLUSTER_OPTIONS = [
     "local",
-    "noctua1",
+    "noctua2",
     "wsu",
 ]
 
@@ -105,7 +105,7 @@ def main():
     """
     parser = argparse.ArgumentParser(
         description="Prepare CRONOS heavy-ion collision simulation environment",
-        epilog="Example: python prepare_simulations.py --cluster noctua1 --run_dir production/",
+        epilog="Example: python prepare_simulations.py --cluster noctua2 --run_dir production/",
     )
     parser.add_argument(
         "--main_config_path",

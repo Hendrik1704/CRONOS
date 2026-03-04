@@ -122,12 +122,12 @@ MUSIC = {
 python prepare_simulations.py \
     --main_config_path config/main_config.py \
     --user_config_path config/user_config_from_file_SMASH_scatterings.py \
-    --cluster noctua1 \
+    --cluster noctua2 \
     --run_dir run/
 ```
 
 **Options:**
-- `--cluster`: Target cluster (`local`, `noctua1`, etc.)
+- `--cluster`: Target cluster (`local`, `noctua2`, etc.)
 - `--run_dir`: Output directory for simulation files
 
 ### 2. Submit Jobs

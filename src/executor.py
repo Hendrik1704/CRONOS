@@ -218,7 +218,7 @@ def prepare_modules(args, config, module_registry, project_root):
     Args:
         args (argparse.Namespace): Parsed command-line arguments containing:
             - run_dir (str): Base directory for simulation runs
-            - cluster (str): Target cluster environment (local, noctua1)
+            - cluster (str): Target cluster environment (local, noctua2)
         config (Configuration): Complete CRONOS configuration object with:
             - general.modules (list): Physics modules to include in simulation
             - number_of_jobs (int): Number of job arrays to create

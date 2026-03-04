@@ -6,7 +6,7 @@ arrays. It handles environment setup, module loading, and job array configuratio
 for production simulation workflows.
 
 Supported Clusters:
-    - noctua1: Paderborn University HPC cluster with specific module environment
+    - noctua2: Paderborn University HPC cluster with specific module environment
     - local: Local execution (no submission script generated)
 
 Features:
@@ -47,15 +47,15 @@ import logging
 import os
 
 
-def create_noctua1_submission_script(args):
-    """Generate SLURM submission script specifically configured for Noctua1 cluster.
+def create_noctua2_submission_script(args):
+    """Generate SLURM submission script specifically configured for Noctua2 cluster.
 
     Creates a complete SLURM job array submission script optimized for the
-    Noctua1 HPC system at Paderborn University. Handles environment module
+    Noctua2 HPC system at Paderborn University. Handles environment module
     loading, resource allocation, and job array configuration for CRONOS
     heavy-ion collision simulation workflows.
 
-    Noctua1 Configuration:
+    Noctua2 Configuration:
     - Account: hpc-prf-flucurhi (research group allocation)
     - Partition: normal (standard compute nodes)
     - Resources: 1 node, 1 core per job (serial physics codes)
@@ -68,6 +68,7 @@ def create_noctua1_submission_script(args):
     - Python 3.10.4 with h5py for data processing
     - GSL 2.7 for numerical computations
     - CMake 3.23.1 for build system support
+    - FFTW 3.3.10 for fast Fourier transforms
 
     Args:
         args (argparse.Namespace): Command-line arguments containing:
@@ -85,7 +86,7 @@ def create_noctua1_submission_script(args):
     Generated Script Features:
         - SLURM array job with proper resource requests
         - Separate stdout/stderr logging per array task
-        - Environment module loading for Noctua1 specifications
+        - Environment module loading for Noctua2 specifications
         - Python dependency installation (h5py for data output)
         - OMP thread limitation for reproducible execution
         - Working directory management for relative paths
@@ -139,7 +140,8 @@ def create_noctua1_submission_script(args):
         script_file.write("module load numlib/GSL/2.7-GCC-11.3.0\n")
         script_file.write("module load mpi/OpenMPI/4.1.4-GCC-11.3.0\n")
         script_file.write("module load devel/CMake/3.23.1-GCCcore-11.3.0\n")
-        script_file.write("module load lang/Python/3.10.4-GCCcore-11.3.0\n\n")
+        script_file.write("module load lang/Python/3.10.4-GCCcore-11.3.0\n")
+        script_file.write("module load numlib/FFTW/3.3.10-GCC-12.3.0\n\n")
 
         # Implement that each array task runs one of the job_directories in the run_dir
         script_file.write("cd $SLURM_SUBMIT_DIR\n")
@@ -163,7 +165,7 @@ def create_wsu_submission_script(args, config):
     The script will run each job_* directory via an Apptainer exec
     call that forwards the configuration paths from the command-line
     arguments (args.main_config_path, args.user_config_path),
-    analogous to the noctua1 submission script.
+    analogous to the noctua2 submission script.
     """
     run_dir = args.run_dir
     slurm_logging_dir = "log"
@@ -243,12 +245,12 @@ def submission_script_cluster(args, config):
 
     Supported Environments:
     - 'local': Local machine execution (no script generated)
-    - 'noctua1': Paderborn University HPC cluster
+    - 'noctua2': Paderborn University HPC cluster
     - Future: Extensible to additional cluster environments
 
     Args:
         args (argparse.Namespace): Command-line arguments from prepare_simulations.py:
-            - cluster (str): Target cluster name ('local', 'noctua1', etc.)
+            - cluster (str): Target cluster name ('local', 'noctua2', etc.)
             - run_dir (str): Directory containing prepared job structure
             - Configuration file paths for script generation
         config (Configuration): CRONOS configuration object (currently unused
@@ -265,19 +267,19 @@ def submission_script_cluster(args, config):
             - Logs yellow informational message about local execution
             - No submission script created (direct Python execution expected)
 
-        'noctua1':
-            - Calls create_noctua1_submission_script() for SLURM generation
-            - Creates submit_job.sh with proper Noctua1 configuration
+        'noctua2':
+            - Calls create_noctua2_submission_script() for SLURM generation
+            - Creates submit_job.sh with proper Noctua2 configuration
 
         Unsupported:
             - Logs red error message with supported cluster list
             - Does not create submission script or exit program
 
     Example Usage:
-        >>> args = argparse.Namespace(cluster='noctua1', run_dir='run/')
+        >>> args = argparse.Namespace(cluster='noctua2', run_dir='run/')
         >>> config = load_config('config/main.py', 'config/user.py')
         >>> submission_script_cluster(args, config)
-        # Creates run/submit_job.sh with Noctua1 SLURM configuration
+        # Creates run/submit_job.sh with Noctua2 SLURM configuration
 
     Extension Pattern:
         To add new cluster support:
@@ -300,8 +302,8 @@ def submission_script_cluster(args, config):
         colored_message = Colors.yellow(message, bold=True)
         logging.info(colored_message)
         pass
-    elif cluster_name == "noctua1":
-        create_noctua1_submission_script(args)
+    elif cluster_name == "noctua2":
+        create_noctua2_submission_script(args)
         message = (
             f"SLURM submission script created for '{cluster_name}' cluster."
         )
