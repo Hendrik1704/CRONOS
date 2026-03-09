@@ -155,6 +155,10 @@ python utilities/checkpoint_utils.py inspect run/job_0/
 python utilities/checkpoint_utils.py list run/
 ```
 
+### 4. Handle Simulation Output
+
+See **[utilities/README.md](utilities/README.md)** for a practical workflow to validate per-event outputs, collect them into a merged HDF5 database, prune/combine databases, and compute basic analysis products (Qn vectors, centrality bin lists).
+
 ## Checkpoint System
 
 CRONOS features an advanced checkpoint system for robust simulation management:

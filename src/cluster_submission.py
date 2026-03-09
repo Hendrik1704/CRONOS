@@ -194,12 +194,8 @@ def create_wsu_submission_script(args, config):
     with open(script_path, "w") as script_file:
         script_file.write("#!/bin/bash\n")
         script_file.write("#SBATCH -J CRONOS\n")
-        script_file.write(
-            f"#SBATCH -o {slurm_logging_dir}/output_%A_%a.log\n"
-        )
-        script_file.write(
-            f"#SBATCH -e {slurm_logging_dir}/error_%A_%a.log\n"
-        )
+        script_file.write(f"#SBATCH -o {slurm_logging_dir}/output_%A_%a.log\n")
+        script_file.write(f"#SBATCH -e {slurm_logging_dir}/error_%A_%a.log\n")
         script_file.write("#SBATCH -t 48:00:00\n")
         script_file.write("#SBATCH -q requeue\n")
         script_file.write("#SBATCH -N 1\n")
@@ -217,22 +213,14 @@ def create_wsu_submission_script(args, config):
             'echo "Running job in directory: job_$SLURM_ARRAY_TASK_ID"\n'
         )
 
-        script_file.write(
-            'SIF_IMAGE="${CRONOS_SIF:-cronos.sif}"\n'
-        )
+        script_file.write('SIF_IMAGE="${CRONOS_SIF:-cronos.sif}"\n')
 
         script_file.write(
             f'apptainer exec "$SIF_IMAGE" python3 /app/run_simulations.py '
         )
-        script_file.write(
-            f"--main_config_path ../{args.main_config_path} "
-        )
-        script_file.write(
-            f"--user_config_path ../{args.user_config_path} "
-        )
-        script_file.write(
-            "--job_dir job_$SLURM_ARRAY_TASK_ID/\n"
-        )
+        script_file.write(f"--main_config_path ../{args.main_config_path} ")
+        script_file.write(f"--user_config_path ../{args.user_config_path} ")
+        script_file.write("--job_dir job_$SLURM_ARRAY_TASK_ID/\n")
 
 
 def submission_script_cluster(args, config):
