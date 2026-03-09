@@ -27,6 +27,7 @@ Usage:
 Supported Clusters:
     - local: Local machine execution
     - noctua2: Paderborn University HPC cluster
+    - wsu: Wayne State University HPC cluster
     
 Example Directory Structure Created:
     run/
@@ -47,6 +48,7 @@ Requires: Python 3.8+, NumPy, h5py
 
 import logging
 import argparse
+import shutil
 from pathlib import Path
 from src.configuration import load_config
 from src.executor import prepare_modules
@@ -153,6 +155,29 @@ def main():
     logging.info(f"Project root is: {project_root}")
 
     prepare_modules(args, config, MODULE_REGISTRY, project_root)
+
+    run_dir = Path(args.run_dir)
+    user_config_src = Path(args.user_config_path).expanduser()
+    if not user_config_src.is_absolute():
+        user_config_src = Path.cwd() / user_config_src
+
+    if user_config_src.exists():
+        user_config_dst = run_dir / user_config_src.name
+        try:
+            shutil.copy2(user_config_src, user_config_dst)
+            logging.info(
+                "Copied user parameter file to run directory: %s", user_config_dst
+            )
+        except OSError:
+            logging.exception(
+                "Failed to copy user parameter file '%s' into '%s'",
+                user_config_src,
+                run_dir,
+            )
+    else:
+        logging.warning(
+            "User parameter file not found (not copied): %s", user_config_src
+        )
 
 
 if __name__ == "__main__":
