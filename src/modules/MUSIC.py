@@ -175,6 +175,8 @@ class MUSIC(BaseModule):
             f.write(
                 f"resumTransCoeffAlpha {self.config.resumTransCoeffAlpha}\n"
             )
+            f.write(f"turn_on_bulk_chem {self.config.turn_on_bulk_chem}\n")
+            f.write(f"chem_rate_C {self.config.chem_rate_C}\n")
             f.write(
                 f"Viscosity_Flag_Yes_1_No_0 {self.config.Viscosity_Flag_Yes_1_No_0}\n"
             )
