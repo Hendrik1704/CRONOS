@@ -25,7 +25,7 @@ cd ..
 echo "Download MUSIC from GitHub:"
 git clone --branch chun_dev --single-branch https://github.com/Hendrik1704/MUSIC
 cd MUSIC
-git checkout ef77326527929d8db472fa9a7b0c4f55613c6d6c
+git checkout 954ec73d37eb4bdbd40b71898fee13a04234f9fe
 cd EOS
 bash download_hotQCD.sh SMASH_binary
 bash download_hotQCD.sh
