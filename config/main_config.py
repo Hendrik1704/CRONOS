@@ -26,6 +26,15 @@ general = {
 
 from_file_IC = {
     "input_path": "data/",
+    # Prefix of the initial condition files.
+    # Files are matched against the pattern ^<input_prefix>(N)_ where N is an integer.
+    # All matching files are sorted by N and then assigned to jobs in that order:
+    #   N = 1 -> job_0,  N = 2 -> job_1, etc.
+    # Example patterns (with input_prefix="Tmunu"):
+    #   Tmunu1_Ns301.dat, Tmunu2_Ns301.dat, ...
+    # Example patterns (with input_prefix="Tmunu.PsiPlus_ID"):
+    #   Tmunu.PsiPlus_ID1_someTag.dat, Tmunu.PsiPlus_ID2_otherTag.dat, ...
+    "input_prefix": "Tmunu",
     "boost_invariant": 0,  # 0: no boost invariance, 1: boost invariance
     "Nx": 151,  # Number of grid points in x and y direction
     "Neta": 101,  # Number of grid points in eta direction

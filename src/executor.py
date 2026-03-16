@@ -285,30 +285,37 @@ def prepare_modules(args, config, module_registry, project_root):
             if os.path.isfile(os.path.join(input_path, f))
         ]
 
-        # Special-case sorting: filenames like 'Tmunu10_Ns151_NsLong71.dat'
-        # If all files match the pattern ^Tmunu(\d+)_, sort them by the numeric index
-        pattern = re.compile(r"^Tmunu(\d+)_")
+        # Special-case sorting: filenames like 'Tmunu10_Ns151_NsLong71.dat'.
+        # The IC filename pattern is controlled via config.from_file_IC.input_prefix.
+        # Only files matching the pattern ^<prefix>(\d+)_ are considered as IC files;
+        # all other files in the input directory are ignored.
+        ic_prefix = getattr(config.from_file_IC, "input_prefix", "Tmunu")
+        pattern = re.compile(rf"^{re.escape(ic_prefix)}(\d+)_")
         numeric_matches = []
-        all_match = True if file_entries else False
         for fname in file_entries:
             m = pattern.match(fname)
             if m:
                 try:
                     numeric_matches.append((int(m.group(1)), fname))
                 except ValueError:
-                    all_match = False
-                    break
+                    logging.warning(
+                        f"Ignoring IC file '{fname}' that matches Tmunu pattern but has non-integer index."
+                    )
             else:
-                all_match = False
-                break
+                logging.debug(
+                    f"Ignoring non-IC file '{fname}' in from_file_IC input directory."
+                )
 
-        if all_match and numeric_matches:
-            ic_files = [
-                fname
-                for _, fname in sorted(numeric_matches, key=lambda x: x[0])
-            ]
-        else:
-            ic_files = sorted(file_entries)
+        if not numeric_matches:
+            logging.error(
+                "No valid IC files found in from_file_IC input directory. "
+                f"Expected files named like '{ic_prefix}1_*.dat', '{ic_prefix}2_*.dat', ..."
+            )
+            exit(1)
+
+        ic_files = [
+            fname for _, fname in sorted(numeric_matches, key=lambda x: x[0])
+        ]
         config.number_of_jobs = len(ic_files)
         config.number_events_per_job = 1  # Each IC file corresponds to one job
         logging.info(f"Found {config.number_of_jobs} IC files in {input_path}.")
