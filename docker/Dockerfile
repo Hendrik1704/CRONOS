@@ -42,6 +42,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         # Python (needed at build time for scripts)
         python3 \
         python3-pip \
+        libeigen3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory for external codes
@@ -49,13 +50,27 @@ WORKDIR /build/external_codes
 
 # Copy only the scripts needed to fetch and compile external codes
 COPY external_codes/GetModulesFromGit.sh  ./GetModulesFromGit.sh
-COPY external_codes/CompileFramework.sh   ./CompileFramework.sh
 
 # Clone all external modules
 RUN bash GetModulesFromGit.sh
 
+# Ensure Eigen is discoverable by CMake everywhere
+ENV CMAKE_PREFIX_PATH="/usr/share/eigen3/cmake"
+
 # Compile all external C++ codes
-RUN bash CompileFramework.sh
+RUN cd ipglasma && mkdir build && cd build && cmake .. -DdisableMPI=ON && make -j$(nproc) && make install && cd .. && rm -r build && cd ..
+
+RUN cd KoMPoST && make -j$(nproc) && cd ..
+
+RUN cd MUSIC && mkdir build && cd build && cmake .. -DCMAKE_PREFIX_PATH=/usr/share/eigen3/cmake && make -Bj$(nproc) && make install && cd .. && rm -r build && cd ..
+
+RUN cd iSS && mkdir -p build && cd build && rm -fr * && cmake .. && make -Bj$(nproc) && make install && cd .. && rm -fr build && cd ..
+
+RUN cd pythia8315 && ./configure --cxx-common='-std=c++17 -march=native -O3 -fPIC -pthread' && make -j$(nproc) && cd ..
+
+RUN cd smash && mkdir build && cd build && cmake .. -DTRY_USE_ROOT=OFF -DTRY_USE_HEPMC=OFF -DPythia_CONFIG_EXECUTABLE=../../pythia8315/bin/pythia8-config -DCMAKE_PREFIX_PATH=/usr/share/eigen3/cmake && make smash -j$(nproc) && cd ../..
+
+RUN cd hadronic_afterburner_toolkit && mkdir -p build && cd build && cmake .. -Dlink_with_lib=OFF && make -j$(nproc) && make install && cd ../ebe_scripts && g++ convert_to_binary_SMASH.cpp -lz -o convert_to_binary_SMASH.e && mv convert_to_binary_SMASH.e ../ && g++ concatenate_binary_files.cpp -lz -o concatenate_binary_files.e && mv concatenate_binary_files.e ../ && cd ../..
 
 # ---------------------------------------------------------------------------
 # Stage 2 – Runtime
@@ -94,9 +109,6 @@ COPY --from=builder /build/external_codes/KoMPoST /app/external_codes/KoMPoST
 # MUSIC
 COPY --from=builder /build/external_codes/MUSIC /app/external_codes/MUSIC
 
-# Eigen (headers, needed by some runtime configs)
-COPY --from=builder /build/external_codes/eigen-3.4.0 /app/external_codes/eigen-3.4.0
-
 # iSS
 COPY --from=builder /build/external_codes/iSS /app/external_codes/iSS
 
@@ -104,7 +116,7 @@ COPY --from=builder /build/external_codes/iSS /app/external_codes/iSS
 COPY --from=builder /build/external_codes/pythia8315 /app/external_codes/pythia8315
 
 # Ensure shared libraries and Pythia8 data are found at runtime
-ENV LD_LIBRARY_PATH="/app/external_codes/MUSIC:/app/external_codes/iSS/lib:/app/external_codes/pythia8315/lib:${LD_LIBRARY_PATH}"
+ENV LD_LIBRARY_PATH="/app/external_codes/MUSIC:/app/external_codes/iSS/lib:/app/external_codes/pythia8315/lib"
 ENV PYTHIA8DATA="/app/external_codes/pythia8315/share/Pythia8/xmldoc"
 
 # SMASH
