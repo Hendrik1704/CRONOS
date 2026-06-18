@@ -51,10 +51,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libeigen3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Ensure consistent compiler ABI
-RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc 100 && \
-    update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++ 100
-
 ENV CC=gcc
 ENV CXX=g++
 
