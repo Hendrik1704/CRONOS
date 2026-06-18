@@ -352,4 +352,4 @@ Please feel free to open a Pull Request or create an issue on GitHub.
 
 ## Citation
 
-Currently, there is no official release or publication to cite. Please check back for updates on how to properly cite CRONOS in your research once a release is available.
+To cite the specific version of CRONOS used in your research, please go to the [Zenodo](https://zenodo.org/records/17503591) page for CRONOS and use the provided DOI for accurate referencing.

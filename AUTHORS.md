@@ -15,7 +15,7 @@ CRONOS - Collision Runs with Orchestrated Nuclear Observable Simulations is deve
 ## Contact and Communication
 
 ### Project Maintainer
-- **Hendrik Roch**: hendrik.roch(at)wayne.edu
+- **Hendrik Roch**: hendrik.h.roch(at)jyu.fi
 
 ## License Information
 
