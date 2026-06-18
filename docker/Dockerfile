@@ -15,10 +15,16 @@
 #   singularity pull cronos.sif docker://hendrik1704/cronos:latest
 # =============================================================================
 
+# =============================================================================
+# CRONOS Docker Image — ABI-stable multi-stage build
+# =============================================================================
+
+ARG BASE_IMAGE=ubuntu:22.04
+
 # ---------------------------------------------------------------------------
-# Stage 1 – Builder
+# Base (shared environment for builder + runtime)
 # ---------------------------------------------------------------------------
-FROM ubuntu:22.04 AS builder
+FROM ${BASE_IMAGE} AS base
 
 # Avoid interactive prompts during apt installs
 ENV DEBIAN_FRONTEND=noninteractive
@@ -44,6 +50,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         python3-pip \
         libeigen3-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# Ensure consistent compiler ABI
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc 100 && \
+    update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++ 100
+
+ENV CC=gcc
+ENV CXX=g++
+
+# ---------------------------------------------------------------------------
+# Builder stage
+# ---------------------------------------------------------------------------
+FROM base AS builder
 
 # Set working directory for external codes
 WORKDIR /build/external_codes
@@ -73,11 +91,9 @@ RUN cd smash && mkdir build && cd build && cmake .. -DTRY_USE_ROOT=OFF -DTRY_USE
 RUN cd hadronic_afterburner_toolkit && mkdir -p build && cd build && cmake .. -Dlink_with_lib=OFF && make -j$(nproc) && make install && cd ../ebe_scripts && g++ convert_to_binary_SMASH.cpp -lz -o convert_to_binary_SMASH.e && mv convert_to_binary_SMASH.e ../ && g++ concatenate_binary_files.cpp -lz -o concatenate_binary_files.e && mv concatenate_binary_files.e ../ && cd ../..
 
 # ---------------------------------------------------------------------------
-# Stage 2 – Runtime
+# Runtime stage (IDENTICAL ABI = no GLIBC mismatch possible)
 # ---------------------------------------------------------------------------
-FROM ubuntu:22.04 AS runtime
-
-ENV DEBIAN_FRONTEND=noninteractive
+FROM base AS runtime
 
 # Install only runtime libraries + Python
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -99,21 +115,8 @@ RUN pip3 install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements
 # Create application directory
 WORKDIR /app
 
-# Copy compiled external codes from the builder stage
-# IP-Glasma
-COPY --from=builder /build/external_codes/ipglasma /app/external_codes/ipglasma
-
-# KoMPoST
-COPY --from=builder /build/external_codes/KoMPoST /app/external_codes/KoMPoST
-
-# MUSIC
-COPY --from=builder /build/external_codes/MUSIC /app/external_codes/MUSIC
-
-# iSS
-COPY --from=builder /build/external_codes/iSS /app/external_codes/iSS
-
-# Pythia (runtime data tables and libpythia8 are needed by SMASH)
-COPY --from=builder /build/external_codes/pythia8315 /app/external_codes/pythia8315
+# Copy everything built
+COPY --from=builder /build/external_codes /app/external_codes
 
 # Ensure shared libraries and Pythia8 data are found at runtime
 ENV LD_LIBRARY_PATH="/app/external_codes/MUSIC:/app/external_codes/iSS/lib:/app/external_codes/pythia8315/lib"
