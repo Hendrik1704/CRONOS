@@ -115,9 +115,6 @@ RUN cd hadronic_afterburner_toolkit && mkdir -p build && cd build && \
 # ---------------------------------------------------------------------------
 FROM base AS runtime
 
-RUN useradd -m cronos
-USER cronos
-
 # Install only runtime libraries + Python
 RUN apt-get update && apt-get install -y --no-install-recommends \
         # Runtime libraries for compiled C++ codes
@@ -156,6 +153,9 @@ COPY src/               /app/src/
 COPY config/            /app/config/
 COPY utilities/         /app/utilities/
 COPY prepare_simulations.py run_simulations.py /app/
+
+RUN useradd -m cronos
+USER cronos
 
 # Default entrypoint — can be overridden at runtime
 ENTRYPOINT ["python3"]
