@@ -59,6 +59,9 @@ ENV CXX=g++
 # ---------------------------------------------------------------------------
 FROM base AS builder
 
+ENV CFLAGS="-O2 -march=x86-64 -mtune=generic"
+ENV CXXFLAGS="-O2 -march=x86-64 -mtune=generic"
+
 # Set working directory for external codes
 WORKDIR /build/external_codes
 
@@ -85,7 +88,7 @@ RUN cd iSS && mkdir -p build && cd build && rm -fr * && cmake .. && \
     make -Bj$(nproc) && make install && cd .. && rm -fr build && cd ..
 
 RUN cd pythia8315 && \
-    ./configure --cxx-common='-std=c++17 -march=native -O3 -fPIC -pthread' && \
+    ./configure --cxx-common='-std=c++17 -march=x86-64 -O2 -fPIC -pthread' && \
     make -j$(nproc) && cd ..
 
 RUN cd smash && mkdir build && cd build && \
@@ -93,8 +96,8 @@ RUN cd smash && mkdir build && cd build && \
       -DTRY_USE_ROOT=OFF \
       -DTRY_USE_HEPMC=OFF \
       -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_CXX_FLAGS_RELEASE="-O3 -mtune=generic" \
-      -DCMAKE_C_FLAGS_RELEASE="-O3 -mtune=generic" \
+      -DCMAKE_CXX_FLAGS_RELEASE="-O2 -march=x86-64 -mtune=generic" \
+      -DCMAKE_C_FLAGS_RELEASE="-O2 -march=x86-64 -mtune=generic" \
       -DPythia_CONFIG_EXECUTABLE=../../pythia8315/bin/pythia8-config \
       -DCMAKE_PREFIX_PATH=/usr/share/eigen3/cmake && \
     make smash -j$(nproc) && cd ../..
