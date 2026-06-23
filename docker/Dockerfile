@@ -154,9 +154,6 @@ COPY config/            /app/config/
 COPY utilities/         /app/utilities/
 COPY prepare_simulations.py run_simulations.py /app/
 
-RUN useradd -m cronos
-USER cronos
-
 # Default entrypoint — can be overridden at runtime
 ENTRYPOINT ["python3"]
 CMD ["--help"]
