@@ -230,13 +230,13 @@ def create_wsu_submission_script(args, config):
         script_file.write('    "$SIF_IMAGE" \\\n')
         script_file.write("    python3 /app/run_simulations.py \\\n")
         script_file.write(
-            f"    --main_config_path /work/{args.main_config_path} \\\n"
+            f"    --main_config_path {args.main_config_path} \\\n"
         )
         script_file.write(
-            f"    --user_config_path /work/{args.user_config_path} \\\n"
+            f"    --user_config_path {args.user_config_path} \\\n"
         )
         script_file.write(
-            f'    --job_dir "/work/{args.run_dir}/${{JOB_DIR}}/"\n'
+            f'    --job_dir "{args.run_dir}/${{JOB_DIR}}/"\n'
         )
 
 
