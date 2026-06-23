@@ -94,9 +94,9 @@ RUN cd smash && mkdir build && cd build && \
       -DTRY_USE_HEPMC=OFF \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_CXX_FLAGS_RELEASE="-O3 -mtune=generic" \
-      -DCMAKE_C_FLAGS_RELEASE="-O3 -mtune=generic" && \
-    -DPythia_CONFIG_EXECUTABLE=../../pythia8315/bin/pythia8-config \
-    -DCMAKE_PREFIX_PATH=/usr/share/eigen3/cmake && \
+      -DCMAKE_C_FLAGS_RELEASE="-O3 -mtune=generic" \
+      -DPythia_CONFIG_EXECUTABLE=../../pythia8315/bin/pythia8-config \
+      -DCMAKE_PREFIX_PATH=/usr/share/eigen3/cmake && \
     make smash -j$(nproc) && cd ../..
 
 RUN cd hadronic_afterburner_toolkit && mkdir -p build && cd build && \
