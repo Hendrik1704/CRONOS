@@ -147,7 +147,7 @@ class MUSIC(BaseModule):
                 f"initialize_with_entropy {self.config.initialize_with_entropy}\n"
             )
             f.write(
-                f"Initial_Distribution_input_filename {self.config.Initial_Distribution_input_filename}\n"
+                f"Initial_Distribution_input_filename ../results/{self.config.Initial_Distribution_input_filename}\n"
             )
             f.write(f"s_factor {self.config.s_factor}\n")
             f.write(f"preEqVisFactor {self.config.preEqVisFactor}\n")
@@ -288,7 +288,6 @@ class MUSIC(BaseModule):
                 f"use_eps_for_freeze_out {self.config.use_eps_for_freeze_out}\n"
             )
             f.write(f"T_freeze {self.config.T_freeze}\n")
-            f.write(f"N_freeze_out {self.config.N_freeze_out}\n")
             f.write(f"eps_switch {self.config.eps_switch}\n")
             f.write(f"eps_freeze_max {self.config.eps_freeze_max}\n")
             f.write(f"eps_freeze_min {self.config.eps_freeze_min}\n")
@@ -296,24 +295,6 @@ class MUSIC(BaseModule):
             f.write(f"EndOfData\n")
 
         logging.info("[MUSIC] Input file created successfully.")
-
-        input_Tmunu_file = os.path.join(
-            event_dir,
-            "results",
-            self.config.Initial_Distribution_input_filename,
-        )
-        input_Tmunu_file = os.path.abspath(
-            input_Tmunu_file
-        )  # resolve relative path
-        symlink_path = os.path.join(
-            MUSIC_dir, self.config.Initial_Distribution_input_filename
-        )
-
-        if os.path.exists(symlink_path) or os.path.islink(symlink_path):
-            os.remove(symlink_path)
-
-        os.symlink(input_Tmunu_file, symlink_path)
-        logging.debug(f"Created symlink: {symlink_path} -> {input_Tmunu_file}")
 
         # Copy the music input parameter file to the results directory, iSS needs it
         music_input_param_file = os.path.join(MUSIC_dir, "parameters_MUSIC.ini")
