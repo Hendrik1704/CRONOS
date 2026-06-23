@@ -72,19 +72,40 @@ RUN bash GetModulesFromGit.sh
 ENV CMAKE_PREFIX_PATH="/usr/share/eigen3/cmake"
 
 # Compile all external C++ codes
-RUN cd ipglasma && mkdir build && cd build && cmake .. -DdisableMPI=ON && make -j$(nproc) && make install && cd .. && rm -r build && cd ..
+RUN cd ipglasma && mkdir build && cd build && cmake .. -DdisableMPI=ON && \
+    make -j$(nproc) && make install && cd .. && rm -r build && cd ..
 
 RUN cd KoMPoST && make -j$(nproc) && cd ..
 
-RUN cd MUSIC && mkdir build && cd build && cmake .. -DCMAKE_PREFIX_PATH=/usr/share/eigen3/cmake && make -Bj$(nproc) && make install && cd .. && rm -r build && cd ..
+RUN cd MUSIC && mkdir build && cd build && \
+    cmake .. -DCMAKE_PREFIX_PATH=/usr/share/eigen3/cmake && \
+    make -Bj$(nproc) && make install && cd .. && rm -r build && cd ..
 
-RUN cd iSS && mkdir -p build && cd build && rm -fr * && cmake .. && make -Bj$(nproc) && make install && cd .. && rm -fr build && cd ..
+RUN cd iSS && mkdir -p build && cd build && rm -fr * && cmake .. && \
+    make -Bj$(nproc) && make install && cd .. && rm -fr build && cd ..
 
-RUN cd pythia8315 && ./configure --cxx-common='-std=c++17 -march=native -O3 -fPIC -pthread' && make -j$(nproc) && cd ..
+RUN cd pythia8315 && \
+    ./configure --cxx-common='-std=c++17 -march=native -O3 -fPIC -pthread' && \
+    make -j$(nproc) && cd ..
 
-RUN cd smash && mkdir build && cd build && cmake .. -DTRY_USE_ROOT=OFF -DTRY_USE_HEPMC=OFF -DPythia_CONFIG_EXECUTABLE=../../pythia8315/bin/pythia8-config -DCMAKE_PREFIX_PATH=/usr/share/eigen3/cmake && make smash -j$(nproc) && cd ../..
+RUN cd smash && mkdir build && cd build && \
+    cmake .. \
+      -DTRY_USE_ROOT=OFF \
+      -DTRY_USE_HEPMC=OFF \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_CXX_FLAGS_RELEASE="-O3 -mtune=generic" \
+      -DCMAKE_C_FLAGS_RELEASE="-O3 -mtune=generic" && \
+    -DPythia_CONFIG_EXECUTABLE=../../pythia8315/bin/pythia8-config \
+    -DCMAKE_PREFIX_PATH=/usr/share/eigen3/cmake && \
+    make smash -j$(nproc) && cd ../..
 
-RUN cd hadronic_afterburner_toolkit && mkdir -p build && cd build && cmake .. -Dlink_with_lib=OFF && make -j$(nproc) && make install && cd ../ebe_scripts && g++ convert_to_binary_SMASH.cpp -lz -o convert_to_binary_SMASH.e && mv convert_to_binary_SMASH.e ../ && g++ concatenate_binary_files.cpp -lz -o concatenate_binary_files.e && mv concatenate_binary_files.e ../ && cd ../..
+RUN cd hadronic_afterburner_toolkit && mkdir -p build && cd build && \
+    cmake .. -Dlink_with_lib=OFF && make -j$(nproc) && make install && \
+    cd ../ebe_scripts && \
+    g++ convert_to_binary_SMASH.cpp -lz -o convert_to_binary_SMASH.e && \
+    mv convert_to_binary_SMASH.e ../ && \
+    g++ concatenate_binary_files.cpp -lz -o concatenate_binary_files.e && \
+    mv concatenate_binary_files.e ../ && cd ../..
 
 # ---------------------------------------------------------------------------
 # Runtime stage (IDENTICAL ABI = no GLIBC mismatch possible)
