@@ -213,14 +213,31 @@ def create_wsu_submission_script(args, config):
             'echo "Running job in directory: job_$SLURM_ARRAY_TASK_ID"\n'
         )
 
-        script_file.write('SIF_IMAGE="${CRONOS_SIF:-cronos.sif}"\n')
+        script_file.write('if [ -n "$CRONOS_SIF" ]; then\n')
+        script_file.write('    SIF_IMAGE="$CRONOS_SIF"\n')
+        script_file.write('elif [ -f "../cronos.sif" ]; then\n')
+        script_file.write('    SIF_IMAGE="../cronos.sif"\n')
+        script_file.write('elif [ -f "cronos.sif" ]; then\n')
+        script_file.write('    SIF_IMAGE="cronos.sif"\n')
+        script_file.write("else\n")
+        script_file.write('    echo "Error: Could not find cronos.sif."\n')
+        script_file.write('    echo "Either set CRONOS_SIF or place cronos.sif in the current or parent directory."\n')
+        script_file.write("    exit 1\n")
+        script_file.write("fi\n\n")
 
+        script_file.write("apptainer exec \\\n")
+        script_file.write('    --bind "$SLURM_SUBMIT_DIR/..:/work" \\\n')
+        script_file.write('    "$SIF_IMAGE" \\\n')
+        script_file.write("    python3 /app/run_simulations.py \\\n")
         script_file.write(
-            f'apptainer exec "$SIF_IMAGE" python3 /app/run_simulations.py '
+            f"    --main_config_path /work/{args.main_config_path} \\\n"
         )
-        script_file.write(f"--main_config_path ../{args.main_config_path} ")
-        script_file.write(f"--user_config_path ../{args.user_config_path} ")
-        script_file.write("--job_dir job_$SLURM_ARRAY_TASK_ID/\n")
+        script_file.write(
+            f"    --user_config_path /work/{args.user_config_path} \\\n"
+        )
+        script_file.write(
+            f'    --job_dir "/work/{args.run_dir}/${{JOB_DIR}}/"\n'
+        )
 
 
 def submission_script_cluster(args, config):

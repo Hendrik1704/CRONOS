@@ -2,61 +2,47 @@
 
 This document describes how to run CRONOS on the WSU cluster using the Apptainer (Singularity-compatible) container and the `wsu` cluster option.
 
-## 1. Load modules and obtain the Apptainer image
+## 0. Load modules and obtain the Apptainer image
 
 On the WSU cluster, first load the required modules and then pull the CRONOS image with Apptainer:
 
 ```bash
+module purge
 module load gnu9/9.1.0
 module load apptainer/1.3.0
 
 # Example: pull from a registry (adjust to your image name)
 apptainer pull cronos.sif docker://hendrik1704/cronos:latest
 ```
+Or use the hash of the container image you want to pull, usually `latest` or `devel`.
 
-Copy `cronos.sif` to a location accessible from the WSU cluster (e.g. your `$HOME` or project space).
+Copy `cronos.sif` to a location accessible from the WSU cluster (e.g. the `CRONOS` directory) after pulling it in the next step.
+This directory will be the default where the job submission script looks for the container.
 
-## 2. Clone CRONOS and prepare simulations
+## 1. Clone CRONOS and prepare simulations
 
 On the WSU cluster:
 
 ```bash
-git clone https://github.com/Hendrik1704/CRONOS.git
+git clone https://github.com/Hendrik1704/CRONOS.git -b main
 cd CRONOS
+```
+Have your user configuration ready, e.g. `config/user_config_ipglasma.py`, and adjust it as needed for your simulations.
+The `main_config.py` can should usually not be changed, but you can override any settings in your user config.
 
-# (Optional) create and activate a Python environment if needed
-# module load python
-# python -m venv venv
-# source venv/bin/activate
-
+```bash
 # Prepare a run directory and jobs (host Python)
-python3 prepare_simulations.py \
-  --main_config_path config/main_config.py \
-  --user_config_path config/user_config_ipglasma.py \
-  --run_dir run_wsu \
-  --cluster wsu
-
-# Alternatively, prepare directly inside the Apptainer container
-export CRONOS_SIF=/path/to/cronos.sif
-apptainer exec "$CRONOS_SIF" python3 /app/prepare_simulations.py \
-  --main_config_path config/main_config.py \
-  --user_config_path config/user_config_ipglasma.py \
-  --run_dir run_wsu \
-  --cluster wsu
+apptainer exec \
+    --bind $(pwd):/work \
+    ./cronos.sif \
+    python3 /app/prepare_simulations.py \
+    --main_config_path /work/config/main_config.py \
+    --user_config_path /work/config/user_config_ipglasma.py \
+    --run_dir /work/run_wsu \
+    --cluster wsu
 ```
 
 This will create `run_wsu/` with `job_*` subdirectories and a `submit_job.sh` tailored for the WSU cluster.
-
-## 3. Point CRONOS to your Apptainer image
-
-The WSU submission script uses the environment variable `CRONOS_SIF` to locate the Apptainer/Singularity image. If `CRONOS_SIF` is not set, it defaults to `cronos.sif` in the submission directory.
-
-Typical setup:
-
-```bash
-# In your shell before submitting
-export CRONOS_SIF=/path/to/cronos.sif
-```
 
 ## 4. Submit jobs on WSU
 
@@ -69,9 +55,8 @@ sbatch submit_job.sh
 
 The script will:
 - Load the `gnu9/9.1.0` and `apptainer/1.3.0` modules
-- Use `CRONOS_SIF` (or `cronos.sif` if unset)
 - Run `python3 /app/run_simulations.py` inside the Apptainer container for each `job_$SLURM_ARRAY_TASK_ID`
-- Forward your `--main_config_path` and `--user_config_path` to the container
+- Forward your `--main_config_path` and `--user_config_path` to the container (uses the configs from the `config/` directory)
 
 ## 5. Memory and requeue behaviour
 
@@ -83,5 +68,3 @@ The script will:
 
 - SLURM stdout and stderr for each array task are written to the `log/` directory as `output_<jobid>_<arrayid>.log` and `error_<jobid>_<arrayid>.log`.
 - Inside those logs you will see CRONOS messages about checkpoints, module progress, and any errors from the external codes.
-
-If you need cluster-specific changes (account name, partition, time limit), edit `submit_job.sh` after generation or adjust `create_wsu_submission_script` in `src/cluster_submission.py` accordingly.

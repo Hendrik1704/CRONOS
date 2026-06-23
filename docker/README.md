@@ -14,7 +14,7 @@ Run from the **repository root**:
 docker build -f docker/Dockerfile -t cronos .
 ```
 
-> **Note:** The first build takes a while (~20–40 min) because it clones and compiles all
+> **Note:** The first build takes a while because it clones and compiles all
 > external C++ codes (IP-Glasma, KoMPoST, MUSIC, iSS, SMASH/Pythia, hadronic\_afterburner\_toolkit).
 > Subsequent builds are cached unless the build scripts change.
 
@@ -30,12 +30,21 @@ Images are automatically published on every push to `main` or `devel` via GitHub
 
 ```bash
 # Prepare simulation
-docker run --rm -v $(pwd)/run:/app/run hendrik1704/cronos:latest \
-    prepare_simulations.py --user_config_path config/user_config.py
+docker run --rm \
+    -v $(pwd)/config:/app/config \
+    -v $(pwd)/run:/app/run \
+    hendrik1704/cronos:latest \
+    prepare_simulations.py \
+    --user_config_path config/user_config_ipglasma.py
 
 # Run simulation
-docker run --rm -v $(pwd)/run:/app/run hendrik1704/cronos:latest \
-    run_simulations.py --user_config_path config/user_config.py --job_dir run/job_0/
+docker run --rm \
+    -v $(pwd)/config:/app/config \
+    -v $(pwd)/run:/app/run \
+    hendrik1704/cronos:latest \
+    run_simulations.py \
+    --user_config_path config/user_config_ipglasma.py \
+    --job_dir run/job_0/
 ```
 
 Mount additional directories as needed, e.g. custom config files or input data.
@@ -45,35 +54,47 @@ Mount additional directories as needed, e.g. custom config files or input data.
 ```bash
 docker run --rm -it --entrypoint /bin/bash hendrik1704/cronos:latest
 ```
+Also here, mount additional directories as needed, e.g. custom config files or input data.
 
 ## Usage on HPC clusters (Apptainer / Singularity)
 
 Most HPC clusters do not allow Docker directly but support
 [Apptainer](https://apptainer.org/) (the Singularity-compatible successor).
 
+For more detailed instructions for specific HPC clusters, see the cluster-specific README files in `cluster_support/`.
+
 ### Convert the Docker image to a SIF file
 
 ```bash
 # From Docker Hub (recommended)
 apptainer pull cronos.sif docker://hendrik1704/cronos:latest
+```
+If this causes some issues, you can try this command:
+```bash
+apptainer build \
+  --mksquashfs-args "-processors 2" \
+  cronos.sif docker://hendrik1704/cronos:latest
 
-# Or from a locally built Docker image
-apptainer pull cronos.sif docker-daemon://cronos:latest
 ```
 
 ### Run with Apptainer
 
 ```bash
-apptainer exec cronos.sif python3 /app/prepare_simulations.py \
-    --user_config_path config/user_config_ipglasma.py
+# Prepare simulation
+apptainer exec \
+    --bind $(pwd):/work \
+    ./cronos.sif \
+    python3 /app/prepare_simulations.py \
+    --user_config_path /work/config/user_config_ipglasma.py
 
-apptainer exec cronos.sif python3 /app/run_simulations.py \
-    --user_config_path config/user_config_ipglasma.py \
-    --job_dir run/job_0/
+# Run simulation
+apptainer exec \
+    --bind $(pwd)/:/work \
+    ./cronos.sif \
+    python3 /app/run_simulations.py \
+    --user_config_path /work/config/user_config_ipglasma.py \
+    --job_dir /work/run/job_0
 ```
-
-> **Tip:** Apptainer (and Singularity) automatically bind-mount `$HOME`, `$PWD`, and `/tmp` by default.
-> For other directories use `--bind /path/on/host:/path/in/container`.
 
 ## Image details
 
