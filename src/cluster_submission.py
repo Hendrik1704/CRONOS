@@ -45,6 +45,7 @@ Requires: SLURM workload manager (for cluster execution)
 from .colors import Colors
 import logging
 import os
+from pathlib import Path
 
 
 def create_noctua2_submission_script(args):
@@ -167,15 +168,14 @@ def create_wsu_submission_script(args, config):
     arguments (args.main_config_path, args.user_config_path),
     analogous to the noctua2 submission script.
     """
-    run_dir = args.run_dir
+    run_dir = Path(args.run_dir)
     slurm_logging_dir = "log"
+    script_path = run_dir / "submit_job.sh"
 
-    script_path = f"{run_dir}/submit_job.sh"
-
+    # Detect job directories
     job_dirs = [
-        d
-        for d in os.listdir(run_dir)
-        if os.path.isdir(os.path.join(run_dir, d)) and d.startswith("job_")
+        d for d in run_dir.iterdir()
+        if d.is_dir() and d.name.startswith("job_")
     ]
     num_jobs_found = len(job_dirs)
 
@@ -200,19 +200,24 @@ def create_wsu_submission_script(args, config):
         script_file.write("#SBATCH -q requeue\n")
         script_file.write("#SBATCH -N 1\n")
         script_file.write("#SBATCH -n 1\n")
+
         if memory_mb is not None:
             script_file.write(f"#SBATCH --mem={memory_mb}\n")
+
         script_file.write(f"#SBATCH --array=0-{num_jobs_found - 1}\n\n")
 
         script_file.write("module purge\n")
         script_file.write("module load gnu9/9.1.0\n")
         script_file.write("module load apptainer/1.3.0\n\n")
 
+        # ---- runtime setup ----
         script_file.write("cd $SLURM_SUBMIT_DIR\n")
-        script_file.write(
-            'echo "Running job in directory: job_$SLURM_ARRAY_TASK_ID"\n'
-        )
+        script_file.write('JOB_DIR="job_${SLURM_ARRAY_TASK_ID}"\n')
+        script_file.write('REPO_DIR=$(realpath "$SLURM_SUBMIT_DIR/..")\n\n')
 
+        script_file.write('echo "Running job: ${JOB_DIR}"\n\n')
+
+        # ---- container image selection ----
         script_file.write('if [ -n "$CRONOS_SIF" ]; then\n')
         script_file.write('    SIF_IMAGE="$CRONOS_SIF"\n')
         script_file.write('elif [ -f "../cronos.sif" ]; then\n')
@@ -221,23 +226,24 @@ def create_wsu_submission_script(args, config):
         script_file.write('    SIF_IMAGE="cronos.sif"\n')
         script_file.write("else\n")
         script_file.write('    echo "Error: Could not find cronos.sif."\n')
-        script_file.write('    echo "Either set CRONOS_SIF or place cronos.sif in the current or parent directory."\n')
-        script_file.write("    exit 1\n")
+        script_file.write('    exit 1\n')
         script_file.write("fi\n\n")
 
+        # ---- execution ----
         script_file.write("apptainer exec \\\n")
-        script_file.write('    --bind "$SLURM_SUBMIT_DIR/..:/work" \\\n')
+        script_file.write('    --bind "${REPO_DIR}:/work" \\\n')
         script_file.write('    "$SIF_IMAGE" \\\n')
         script_file.write("    python3 /app/run_simulations.py \\\n")
+
+        # These are already container (/work/...) paths
+        script_file.write(f"        --main_config_path {args.main_config_path} \\\n")
+        script_file.write(f"        --user_config_path {args.user_config_path} \\\n")
+
         script_file.write(
-            f"    --main_config_path {args.main_config_path} \\\n"
+            f'        --job_dir "{args.run_dir}/${{JOB_DIR}}"\n'
         )
-        script_file.write(
-            f"    --user_config_path {args.user_config_path} \\\n"
-        )
-        script_file.write(
-            f'    --job_dir "{args.run_dir}/${{JOB_DIR}}/"\n'
-        )
+
+    os.chmod(script_path, 0o755)
 
 
 def submission_script_cluster(args, config):
