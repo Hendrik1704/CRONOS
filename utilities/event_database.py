@@ -46,7 +46,6 @@ import h5py
 DEFAULT_REQUIRED_DATASETS: tuple[str, ...] = (
     "particle_9999_vndata_eta_-0.5_0.5.dat",
     "particle_9999_vndata_diff_eta_0.5_2.5.dat",
-    "particle_9999_vndata_eta_-2.5_2.5.dat",
     "particle_211_vndata_diff_y_-0.5_0.5.dat",
     "particle_321_vndata_diff_y_-0.5_0.5.dat",
     "particle_2212_vndata_diff_y_-0.5_0.5.dat",

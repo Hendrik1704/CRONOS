@@ -104,11 +104,33 @@ def maybe_link_events(
 ) -> None:
     if method == "none":
         return
+    
+    # Create main bin directory if it doesn't exist
     bin_dir.mkdir(parents=True, exist_ok=True)
+    
     for ev in events:
-        dst = bin_dir / ev.path.name
+        # Extract job index from the event file path (e.g., "job_123")
+        job_index = None
+        parts = ev.path.parts
+        for part in parts:
+            if part.startswith("job_"):
+                job_index = part[4:]
+                break
+        
+        if job_index is None:
+            raise ValueError(
+                f"Could not extract job index from path: {ev.path}"
+            )
+        
+        # Create job-specific subdirectory
+        job_dir = bin_dir / job_index
+        job_dir.mkdir(parents=True, exist_ok=True)
+        
+        dst = job_dir / ev.path.name
+        
         if dst.exists() or dst.is_symlink():
             dst.unlink()
+        
         if method == "symlink":
             os.symlink(ev.path, dst)
         elif method == "copy":
