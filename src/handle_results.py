@@ -114,27 +114,58 @@ def zip_into_hdf5(config, event_dir_results_path, event_id):
     # Pack all files in spvn_dir into a single HDF5 file named event_{event_id}.h5
     hdf5_filename = os.path.join(event_dir_results_path, f"event_{event_id}.h5")
     with h5py.File(hdf5_filename, "w") as hdf5_file:
-        for root, _, files in os.walk(spvn_dir):
-            for file in files:
-                file_path = os.path.join(root, file)
-                dataset_name = os.path.relpath(file_path, spvn_dir)
+        group_temp = hdf5_file.create_group(f"event_{event_id}")
 
-                # Try reading as text first
-                try:
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        data = f.read()
-                    # Store text data as variable-length UTF-8 string in HDF5
-                    dt = h5py.string_dtype(encoding="utf-8")
-                    hdf5_file.create_dataset(dataset_name, data=data, dtype=dt)
-                except UnicodeDecodeError:
-                    # Fallback: read as binary
-                    with open(file_path, "rb") as f:
-                        data = f.read()
-                    # Store binary data as uint8 array
-                    hdf5_file.create_dataset(
-                        dataset_name, data=np.frombuffer(data, dtype="uint8")
-                    )
-                logging.debug(f"Added {file_path} as {dataset_name} in HDF5.")
+        file_list = glob.glob(os.path.join(spvn_dir, "*"))
+
+        for file_path in file_list:
+            file_name = os.path.basename(file_path)
+
+            try:
+                data = np.genfromtxt(file_path, dtype=np.float32)
+
+                dset = group_temp.create_dataset(
+                    file_name,
+                    data=data,
+                    compression="gzip",
+                    compression_opts=9
+                )
+
+                # save header if exists
+                with open(file_path, "r") as f:
+                    first_line = f.readline().strip()
+
+                if first_line.startswith("#"):
+                    dset.attrs["header"] = np.bytes_(first_line)
+
+                continue
+
+            except Exception:
+                pass  # fallback below
+
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    text = f.read()
+
+                dt = h5py.string_dtype(encoding="utf-8")
+
+                group_temp.create_dataset(
+                    file_name,
+                    data=text,
+                    dtype=dt
+                )
+
+            except UnicodeDecodeError:
+                # final fallback: binary
+                with open(file_path, "rb") as f:
+                    data = f.read()
+
+                group_temp.create_dataset(
+                    file_name,
+                    data=np.frombuffer(data, dtype=np.uint8)
+                )
+
+            logging.debug(f"Added {file_path} as {file_name} in HDF5.")
     logging.info(f"Results zipped into {hdf5_filename} successfully.")
 
 
