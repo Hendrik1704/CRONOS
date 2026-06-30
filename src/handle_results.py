@@ -116,7 +116,7 @@ def zip_into_hdf5(config, event_dir_results_path, event_id):
     with h5py.File(hdf5_filename, "w") as hdf5_file:
         group_temp = hdf5_file.create_group(f"event_{event_id}")
 
-        file_list = glob.glob(os.path.join(spvn_dir, "*"))
+        file_list = glob(os.path.join(spvn_dir, "*"))
 
         for file_path in file_list:
             file_name = os.path.basename(file_path)
