@@ -291,6 +291,15 @@ python utilities/h5_extractor.py simulation_results.h5 --extract all --output-di
 # --log-level: Logging verbosity (DEBUG, INFO, WARNING, ERROR)
 ```
 
+### Analysis of HDF5 Outputs
+
+CRONOS provides an analysis script to extract the Qn vectors from the HDF5 output files:
+
+```bash
+python analysis/fetch_Qnch_from_hdf5.py simulation_results.h5
+```
+This script creates a `QnVectors.pickle` file that can be used to compute further observables like flow coefficients and correlations.
+
 ---
 
 ## Testing
