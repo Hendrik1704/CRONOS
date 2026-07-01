@@ -19,9 +19,11 @@ def _import_results_validate_module(project_root: Path):
 def _write_event_h5(path: Path, keys: list[str]):
     path.parent.mkdir(parents=True, exist_ok=True)
     dt = h5py.string_dtype(encoding="utf-8")
+    event_name = path.stem  # e.g. "event_0", "event_good"
     with h5py.File(path, "w") as f:
+        g = f.create_group(event_name)
         for k in keys:
-            f.create_dataset(k, data="x", dtype=dt)
+            g.create_dataset(k, data="x", dtype=dt)
 
 
 @pytest.mark.unit

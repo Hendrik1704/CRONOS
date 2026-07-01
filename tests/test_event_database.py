@@ -40,12 +40,14 @@ def _import_event_database_module(project_root: Path):
 def _write_event_h5(path: Path, *, include_required: bool = True):
     path.parent.mkdir(parents=True, exist_ok=True)
     dt = h5py.string_dtype(encoding="utf-8")
+    event_name = path.stem  # e.g. "event_0"
     with h5py.File(path, "w") as f:
+        g = f.create_group(event_name)
         if include_required:
             for name in DEFAULT_REQUIRED:
-                f.create_dataset(name, data="# header\n0 1 2\n", dtype=dt)
+                g.create_dataset(name, data="# header\n0 1 2\n", dtype=dt)
         else:
-            f.create_dataset("some_other.dat", data="x", dtype=dt)
+            g.create_dataset("some_other.dat", data="x", dtype=dt)
 
 
 @pytest.mark.unit

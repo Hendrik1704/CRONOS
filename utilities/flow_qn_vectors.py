@@ -115,7 +115,19 @@ def _read_text_dataset(h5obj: h5py.File | h5py.Group, key: str) -> str:
     data = ds[()]
     if isinstance(data, (bytes, bytearray)):
         return data.decode("utf-8", errors="replace")
-    return str(data)
+    if isinstance(data, str):
+        return data
+    # Numeric array stored by zip_into_hdf5 (np.genfromtxt / float32).
+    # Reconstruct text, prepending the header attribute if present.
+    buf = io.StringIO()
+    header_attr = ds.attrs.get("header", None)
+    if header_attr is not None:
+        raw = header_attr
+        if isinstance(raw, (bytes, bytearray, np.bytes_)):
+            raw = raw.decode("utf-8", errors="replace")
+        buf.write(str(raw) + "\n")
+    np.savetxt(buf, np.atleast_2d(data))
+    return buf.getvalue()
 
 
 def _load_table(text: str) -> np.ndarray:
@@ -272,9 +284,15 @@ def process_event_file(
     event: EventInput, out_dir: Path, pTmin: float, pTmax: float
 ) -> None:
     with h5py.File(event.path, "r") as h5f:
+        # Navigate into the inner event group if present (new format).
+        event_keys = [
+            k for k in h5f.keys()
+            if k.startswith("event_") and isinstance(h5f[k], h5py.Group)
+        ]
+        h5obj: h5py.Group = h5f[event_keys[0]] if len(event_keys) == 1 else h5f
         process_event_container(
             label=event.label,
-            h5obj=h5f,
+            h5obj=h5obj,
             out_dir=out_dir,
             pTmin=pTmin,
             pTmax=pTmax,

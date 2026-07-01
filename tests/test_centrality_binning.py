@@ -28,8 +28,10 @@ def _write_nch_event(path: Path, *, nch: float, key: str):
         f"0  {nch:.6e}  0.0  0.0  0.0\n"
         "1  0.0  0.0  0.0  0.0\n"
     )
+    event_name = path.stem  # e.g. "event_0"
     with h5py.File(path, "w") as f:
-        f.create_dataset(key, data=text, dtype=dt)
+        g = f.create_group(event_name)
+        g.create_dataset(key, data=text, dtype=dt)
 
 
 @pytest.mark.unit
@@ -41,7 +43,8 @@ def test_extract_nch_single_row_edge_case(tmp_path: Path):
     dt = h5py.string_dtype(encoding="utf-8")
     text = "# n Qn_real Qn_real_err Qn_imag Qn_imag_err\n0  1.23e+02  0  0  0\n"
     with h5py.File(event, "w") as f:
-        f.create_dataset(cb.NCH_KEY, data=text, dtype=dt)
+        g = f.create_group("event_0")
+        g.create_dataset(cb.NCH_KEY, data=text, dtype=dt)
 
     nch = cb._extract_nch_from_event_file(event)
     assert nch == pytest.approx(123.0)

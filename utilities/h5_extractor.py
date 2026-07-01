@@ -11,11 +11,7 @@ This utility provides functionality to:
 Usage:
     python utilities/h5_extractor.py input.h5 --output-dir extracted_data/
     python utilities/h5_extractor.py input.h5 --list-only
-    python utilities/h5_extrac                if is_text_file:
-                f.write(f"# Text data metadata (cleaned from bytes)\n")
-                decoded_text = data.decode('utf-8', errors='replace')
-                cleaned_lines = [line.strip() for line in decoded_text.splitlines()]
-                f.write(f"lines: {len(cleaned_lines)}\n")y input.h5 --extract 1,3,5
+    python utilities/h5_extractor.py input.h5 --extract 1,3,5
 """
 
 import os

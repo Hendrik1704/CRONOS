@@ -40,11 +40,24 @@ class EventNch:
     nch: float
 
 
-def _read_text_dataset(h5f: h5py.File, key: str) -> str:
-    data = h5f[key][()]
+def _read_text_dataset(h5obj: h5py.File | h5py.Group, key: str) -> str:
+    ds = h5obj[key]
+    data = ds[()]
     if isinstance(data, (bytes, bytearray)):
         return data.decode("utf-8", errors="replace")
-    return str(data)
+    if isinstance(data, str):
+        return data
+    # Numeric array stored by zip_into_hdf5 (np.genfromtxt / float32).
+    # Reconstruct text, prepending the header attribute if present.
+    buf = io.StringIO()
+    header_attr = ds.attrs.get("header", None)
+    if header_attr is not None:
+        raw = header_attr
+        if isinstance(raw, (bytes, bytearray, np.bytes_)):
+            raw = raw.decode("utf-8", errors="replace")
+        buf.write(str(raw) + "\n")
+    np.savetxt(buf, np.atleast_2d(data))
+    return buf.getvalue()
 
 
 def _load_table(text: str) -> np.ndarray:
@@ -53,7 +66,13 @@ def _load_table(text: str) -> np.ndarray:
 
 def _extract_nch_from_event_file(event_h5: Path) -> float:
     with h5py.File(event_h5, "r") as h5f:
-        text = _read_text_dataset(h5f, NCH_KEY)
+        # Navigate into the inner event group if present (new format).
+        event_keys = [
+            k for k in h5f.keys()
+            if k.startswith("event_") and isinstance(h5f[k], h5py.Group)
+        ]
+        h5obj: h5py.Group = h5f[event_keys[0]] if len(event_keys) == 1 else h5f
+        text = _read_text_dataset(h5obj, NCH_KEY)
         table = _load_table(text)
 
     # expected columns: n, Qn_real, Qn_real_err, Qn_imag, Qn_imag_err

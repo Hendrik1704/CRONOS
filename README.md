@@ -54,6 +54,7 @@ CRONOS is a comprehensive framework designed to facilitate the simulation and an
    # Submit installation job for your cluster
    sbatch install_[cluster_name].sh
    ```
+   See **[cluster_support/README.md](cluster_support/README.md)** for cluster-specific instructions.
 
 3. **Install Python dependencies:**
    ```bash
@@ -237,6 +238,29 @@ run/
     └── error_[jobid]_[taskid].log
 ```
 
+### HDF5 File Layout
+
+Each per-event HDF5 file (`event_N.h5`) stores all datasets inside a named group:
+
+```
+event_N.h5
+└── event_N/
+    ├── particle_9999_vndata_eta_-0.5_0.5.dat  (compressed float32 array)
+    ├── particle_211_vndata_diff_y_-0.5_0.5.dat
+    ├── ...
+    └── <other output files>
+```
+
+The merged database produced by `event_database.py build` uses the layout:
+
+```
+merged_events.h5
+└── job_N/
+    └── event_M/
+        ├── particle_9999_vndata_eta_-0.5_0.5.dat
+        └── ...
+```
+
 ### Output Files
 - **HDF5 Files**: Compressed simulation results (`event_X.h5`)
 - **Log Files**: Separate stdout/stderr for each job array task
@@ -265,7 +289,9 @@ python utilities/h5_extractor.py simulation_results.h5 --extract all --output-di
 # --output-dir (-o): Output directory [default: extracted_data]
 # --interactive (-i): Interactive dataset selection mode
 # --log-level: Logging verbosity (DEBUG, INFO, WARNING, ERROR)
-```--
+```
+
+---
 
 ## Testing
 

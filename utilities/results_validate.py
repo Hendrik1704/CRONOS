@@ -31,7 +31,6 @@ import h5py
 DEFAULT_REQUIRED_DATASETS: tuple[str, ...] = (
     "particle_9999_vndata_eta_-0.5_0.5.dat",
     "particle_9999_vndata_diff_eta_0.5_2.5.dat",
-    "particle_9999_vndata_eta_-2.5_2.5.dat",
     "particle_211_vndata_diff_y_-0.5_0.5.dat",
     "particle_321_vndata_diff_y_-0.5_0.5.dat",
     "particle_2212_vndata_diff_y_-0.5_0.5.dat",
@@ -75,7 +74,14 @@ def validate_file(file_path: Path, required: Iterable[str]) -> ValidationResult:
     required = tuple(required)
     missing: list[str] = []
     with h5py.File(file_path, "r") as h5f:
-        keys = set(h5f.keys())
+        # Navigate into the inner event group if present (new format: datasets
+        # are stored inside an event_{id} group rather than at the file root).
+        event_keys = [
+            k for k in h5f.keys()
+            if k.startswith("event_") and isinstance(h5f[k], h5py.Group)
+        ]
+        h5obj: h5py.Group = h5f[event_keys[0]] if len(event_keys) == 1 else h5f
+        keys = set(h5obj.keys())
         for name in required:
             if name not in keys:
                 missing.append(name)

@@ -153,8 +153,15 @@ def copy_event_file(
     event_group.attrs["source_file"] = str(src_path)
 
     with h5py.File(src_path, "r") as in_h5:
-        for key in in_h5.keys():
-            in_h5.copy(in_h5[key], event_group, name=key)
+        # New format: datasets are stored inside an event_{id} group.
+        # Navigate into it if present; fall back to the file root.
+        inner: h5py.Group = (
+            in_h5[ref.event_name]
+            if ref.event_name in in_h5 and isinstance(in_h5[ref.event_name], h5py.Group)
+            else in_h5
+        )
+        for key in inner.keys():
+            inner.copy(inner[key], event_group, name=key)
 
 
 def cmd_build(args: argparse.Namespace) -> int:
@@ -187,7 +194,13 @@ def cmd_build(args: argparse.Namespace) -> int:
 
             if args.validate:
                 with h5py.File(src, "r") as in_h5:
-                    ok, missing = has_required_datasets(in_h5, required)
+                    # Navigate into the inner event group if present (new format).
+                    inner: h5py.Group = (
+                        in_h5[ref.event_name]
+                        if ref.event_name in in_h5 and isinstance(in_h5[ref.event_name], h5py.Group)
+                        else in_h5
+                    )
+                    ok, missing = has_required_datasets(inner, required)
                 if not ok:
                     skipped += 1
                     if not args.quiet:

@@ -103,9 +103,10 @@ def test_flow_qn_vectors_from_event_file(tmp_path: Path):
     )
 
     with h5py.File(event_file, "w") as f:
-        _write_text_dataset(f, flow.CH_VNDATA_KEY, vndata_text)
+        g = f.create_group("event_0")
+        _write_text_dataset(g, flow.CH_VNDATA_KEY, vndata_text)
         _write_text_dataset(
-            f, "particle_211_vndata_diff_y_-0.5_0.5.dat", vndata_text
+            g, "particle_211_vndata_diff_y_-0.5_0.5.dat", vndata_text
         )
 
     out_dir = tmp_path / "out"
