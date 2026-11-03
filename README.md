@@ -245,11 +245,13 @@ Each per-event HDF5 file (`event_N.h5`) stores all datasets inside a named group
 ```
 event_N.h5
 └── event_N/
-    ├── particle_9999_vndata_eta_-0.5_0.5.dat  (compressed float32 array)
+    ├── particle_9999_vndata_eta_-0.5_0.5.dat  (compressed float64 array)
     ├── particle_211_vndata_diff_y_-0.5_0.5.dat
     ├── ...
     └── <other output files>
 ```
+
+Numeric text files are stored as float64 arrays. The first `#` comment line of such a file is kept in the dataset attribute `header`; if the file has several comment lines, all of them are kept in the attribute `full_header`.
 
 The merged database produced by `event_database.py build` uses the layout:
 

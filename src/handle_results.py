@@ -99,6 +99,15 @@ def zip_into_hdf5(config, event_dir_results_path, event_id):
         event_dir_results_path (str): Path to event results directory
         event_id (str): Event identifier for output file naming
 
+    Numeric text files are stored as float64 arrays. The first comment line
+    ('#') of such a file is stored in the dataset attribute 'header'; if the
+    file has more than one comment line, all of them (joined by newlines)
+    are additionally stored in the attribute 'full_header'.
+
+    Returns:
+        bool: True if the HDF5 file was written, False if the event failed
+            the quality check and no HDF5 file was written.
+
     Side Effects:
         - Creates event_{event_id}.h5 in event_dir_results_path
         - Logs compression progress and dataset creation details
@@ -109,7 +118,7 @@ def zip_into_hdf5(config, event_dir_results_path, event_id):
         logging.warning(
             f"Event in {event_dir_results_path} is bad, skipping zipping into HDF5."
         )
-        return
+        return False
     spvn_dir = os.path.join(event_dir_results_path, f"spvn_results_{event_id}")
     # Pack all files in spvn_dir into a single HDF5 file named event_{event_id}.h5
     hdf5_filename = os.path.join(event_dir_results_path, f"event_{event_id}.h5")
@@ -122,7 +131,7 @@ def zip_into_hdf5(config, event_dir_results_path, event_id):
             file_name = os.path.basename(file_path)
 
             try:
-                data = np.genfromtxt(file_path, dtype=np.float32)
+                data = np.genfromtxt(file_path, dtype=np.float64)
 
                 dset = group_temp.create_dataset(
                     file_name,
@@ -131,12 +140,18 @@ def zip_into_hdf5(config, event_dir_results_path, event_id):
                     compression_opts=9
                 )
 
-                # save header if exists
+                # save the header lines if they exist
                 with open(file_path, "r") as f:
-                    first_line = f.readline().strip()
+                    header_lines = [
+                        line.strip() for line in f if line.startswith("#")
+                    ]
 
-                if first_line.startswith("#"):
-                    dset.attrs["header"] = np.bytes_(first_line)
+                if header_lines:
+                    dset.attrs["header"] = np.bytes_(header_lines[0])
+                if len(header_lines) > 1:
+                    dset.attrs["full_header"] = np.bytes_(
+                        "\n".join(header_lines)
+                    )
 
                 continue
 
@@ -167,6 +182,15 @@ def zip_into_hdf5(config, event_dir_results_path, event_id):
 
             logging.debug(f"Added {file_path} as {file_name} in HDF5.")
     logging.info(f"Results zipped into {hdf5_filename} successfully.")
+    return True
+
+
+def _output_file_index(file_name):
+    """Return the module index N of an 'output_N.dat' file name."""
+    try:
+        return int(file_name[len("output_") : -len(".dat")])
+    except ValueError:
+        return -1
 
 
 def handle_results(config, event_dir_results_path, event_id):
@@ -176,10 +200,27 @@ def handle_results(config, event_dir_results_path, event_id):
     post-simulation workflow including file cleanup, organization, validation,
     and HDF5 compression based on user configuration settings.
 
+    File retention:
+        - keep_intermediate_results=False: only the last output_N.dat file
+          is kept, all other output_*.dat files are removed.
+        - If the afterburner_toolkit module is used, the last output file is
+          the particle file it analyses (output of the module before it). It
+          is removed unless keep_particle_files is True. Without
+          afterburner_toolkit, keep_particle_files has no effect and the last
+          output file is always kept.
+
+    The function can be called again on a results directory where a
+    previous call was interrupted or failed (files already moved into
+    spvn_results_{event_id}/, files already removed, HDF5 file written).
+
     Args:
         config (Configuration): CRONOS configuration with file retention settings
         event_dir_results_path (str): Path to event results directory
         event_id (str): Event identifier for directory naming and logging
+
+    Returns:
+        bool: True if event_{event_id}.h5 was written, False if the event
+            failed the quality check (no HDF5 file is written in that case).
 
     Side Effects:
         - Removes intermediate files based on configuration
@@ -193,25 +234,46 @@ def handle_results(config, event_dir_results_path, event_id):
     )
 
     # Check if the afterburner_toolkit module is used
-    afterburner_toolkit_used = "afterburner_toolkit" in config.general.modules
-    keep_particle_files = (
-        config.general.keep_particle_files and afterburner_toolkit_used
-    )
+    modules = list(config.general.modules)
+    afterburner_toolkit_used = "afterburner_toolkit" in modules
+    keep_particle_files = config.general.keep_particle_files
     logging.debug(
         f"Configuration 'keep_particle_files': {keep_particle_files}, afterburner_toolkit used: {afterburner_toolkit_used}"
     )
 
-    # Find all filenames with output_*.dat pattern
+    spvn_dir_name = f"spvn_results_{event_id}"
+    spvn_dir = os.path.join(event_dir_results_path, spvn_dir_name)
+    hdf5_name = f"event_{event_id}.h5"
+
+    # Find all filenames with output_*.dat pattern, also those already moved
+    # into the spvn_results directory by a previous (interrupted) call
+    def is_output_file(f):
+        return f.startswith("output_") and f.endswith(".dat")
+
     all_output_files = [
-        f
-        for f in os.listdir(event_dir_results_path)
-        if f.startswith("output_") and f.endswith(".dat")
+        f for f in os.listdir(event_dir_results_path) if is_output_file(f)
     ]
+    if os.path.isdir(spvn_dir):
+        all_output_files += [
+            f
+            for f in os.listdir(spvn_dir)
+            if is_output_file(f) and f not in all_output_files
+        ]
     logging.debug(f"All output files found: {all_output_files}")
+
     # Determine the last module's output file
-    last_output_file = (
-        sorted(all_output_files)[-1] if all_output_files else None
-    )
+    if afterburner_toolkit_used:
+        # The particle file analysed by the afterburner_toolkit
+        particle_file_index = modules.index("afterburner_toolkit") - 1
+        last_output_file = f"output_{particle_file_index}.dat"
+    else:
+        last_output_file = (
+            max(all_output_files, key=_output_file_index)
+            if all_output_files
+            else None
+        )
+
+    files_to_remove = []
     if not save_intermediate:
         if last_output_file:
             logging.info(
@@ -219,28 +281,29 @@ def handle_results(config, event_dir_results_path, event_id):
             )
         else:
             logging.warning("No output files found to keep.")
+        files_to_remove += [
+            f for f in all_output_files if f != last_output_file
+        ]
 
-        # Remove all other output files except the last one
-        for f in all_output_files:
-            if f != last_output_file:
-                file_path = os.path.join(event_dir_results_path, f)
+    if afterburner_toolkit_used and not keep_particle_files:
+        # Remove also the particle file analysed by the afterburner_toolkit
+        files_to_remove.append(last_output_file)
+
+    for f in files_to_remove:
+        for directory in (event_dir_results_path, spvn_dir):
+            file_path = os.path.join(directory, f)
+            if os.path.exists(file_path):
                 os.remove(file_path)
-                logging.debug(f"Removed intermediate file: {file_path}")
+                logging.debug(f"Removed output file: {file_path}")
 
-    if not keep_particle_files and last_output_file:
-        # Remove also the last output_*.dat file
-        file_path = os.path.join(event_dir_results_path, last_output_file)
-        os.remove(file_path)
-        logging.debug(f"Removed particle file: {file_path}")
-
-    spvn_dir = os.path.join(event_dir_results_path, f"spvn_results_{event_id}")
     os.makedirs(spvn_dir, exist_ok=True)
     for f in os.listdir(event_dir_results_path):
-        # Move all files to the spvn_results directory
-        if f != f"spvn_results_{event_id}":
+        # Move all files to the spvn_results directory (except an HDF5
+        # file left over from a previous, interrupted call)
+        if f not in (spvn_dir_name, hdf5_name):
             src_path = os.path.join(event_dir_results_path, f)
             dst_path = os.path.join(spvn_dir, f)
             os.rename(src_path, dst_path)
             logging.debug(f"Moved {src_path} to {dst_path}")
 
-    zip_into_hdf5(config, event_dir_results_path, event_id)
+    return zip_into_hdf5(config, event_dir_results_path, event_id)
