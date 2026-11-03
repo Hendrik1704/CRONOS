@@ -5,6 +5,14 @@ import subprocess
 import shutil
 
 
+
+def _link(target, link_path):
+    """Create a symlink, replacing an existing link (setup is repeated
+    after an interrupted cleanup of the module directory)."""
+    if os.path.islink(link_path) or os.path.exists(link_path):
+        os.remove(link_path)
+    os.symlink(target, link_path)
+
 class afterburner_toolkit(BaseModule):
     """Analysis toolkit module for flow and correlation measurements.
 
@@ -61,7 +69,7 @@ class afterburner_toolkit(BaseModule):
             event_dir (str): Path to event-specific directory where afterburner_toolkit will execute.
 
         Raises:
-            SystemExit: If any required afterburner_toolkit components are missing.
+            FileNotFoundError: If any required afterburner_toolkit components are missing.
 
         Side Effects:
             - Creates symbolic links to analysis executables and data
@@ -82,15 +90,14 @@ class afterburner_toolkit(BaseModule):
             "EOS",
         )
         if os.path.exists(afterburner_toolkit_EOS_path):
-            os.symlink(
+            _link(
                 afterburner_toolkit_EOS_path,
                 os.path.join(event_dir, "afterburner_toolkit", "EOS"),
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[afterburner_toolkit] Required directory {afterburner_toolkit_EOS_path} does not exist."
             )
-            exit(1)
 
         # Check if SMASH is in the module list
         if "SMASH" in self.full_config.general.modules:
@@ -102,7 +109,7 @@ class afterburner_toolkit(BaseModule):
                 "convert_to_binary_SMASH.e",
             )
             if os.path.exists(smash_converter_path):
-                os.symlink(
+                _link(
                     smash_converter_path,
                     os.path.join(
                         event_dir,
@@ -111,10 +118,9 @@ class afterburner_toolkit(BaseModule):
                     ),
                 )
             else:
-                logging.error(
+                raise FileNotFoundError(
                     f"[afterburner_toolkit] Required executable {smash_converter_path} does not exist."
                 )
-                exit(1)
         else:
             logging.debug(
                 "[afterburner_toolkit] SMASH module not found in configuration. Skipping SMASH converter linking."
@@ -128,7 +134,7 @@ class afterburner_toolkit(BaseModule):
             "hadronic_afterburner_tools.e",
         )
         if os.path.exists(afterburner_toolkit_exe_path):
-            os.symlink(
+            _link(
                 afterburner_toolkit_exe_path,
                 os.path.join(
                     event_dir,
@@ -137,10 +143,9 @@ class afterburner_toolkit(BaseModule):
                 ),
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[afterburner_toolkit] Required executable {afterburner_toolkit_exe_path} does not exist."
             )
-            exit(1)
 
     def prepare_input(self, event_dir):
         """Generate afterburner_toolkit configuration and establish particle input links.
@@ -176,6 +181,10 @@ class afterburner_toolkit(BaseModule):
             The toolkit can analyze both SMASH OSCAR format and binary
             particle formats, adapting automatically to the input type.
         """
+        # The links may be missing after an interrupted cleanup of the
+        # module directory (fetch_output removes it), so set them up again
+        os.makedirs(os.path.join(event_dir, "afterburner_toolkit"), exist_ok=True)
+        self.prepare_environment(event_dir)
         logging.info(f"[afterburner_toolkit] Create input file...")
         current_module_index = self.full_config.general.modules.index(
             "afterburner_toolkit"
@@ -184,10 +193,9 @@ class afterburner_toolkit(BaseModule):
 
         afterburner_toolkit_dir = os.path.join(event_dir, "afterburner_toolkit")
         if not os.path.exists(afterburner_toolkit_dir):
-            logging.error(
+            raise FileNotFoundError(
                 f"[afterburner_toolkit] Required directory {afterburner_toolkit_dir} does not exist."
             )
-            exit(1)
 
         input_file = os.path.join(
             event_dir, "results", self.config.input_filename
@@ -426,13 +434,14 @@ class afterburner_toolkit(BaseModule):
                         f"[afterburner_toolkit] Moved converted file to {os.path.join(results_dir, 'particle_list.dat')}"
                     )
                 else:
-                    logging.error(
+                    raise FileNotFoundError(
                         f"[afterburner_toolkit] Converted file {converted_file} does not exist."
                     )
             except subprocess.CalledProcessError as e:
                 logging.error(
                     f"[afterburner_toolkit] Converter execution failed: {e}"
                 )
+                raise
             finally:
                 os.chdir(cwd)
         else:
@@ -450,7 +459,7 @@ class afterburner_toolkit(BaseModule):
                     f"[afterburner_toolkit] Copied input file to {dst_file}"
                 )
             else:
-                logging.error(
+                raise FileNotFoundError(
                     f"[afterburner_toolkit] Input file {src_file} does not exist."
                 )
 
@@ -472,6 +481,7 @@ class afterburner_toolkit(BaseModule):
             )
         except subprocess.CalledProcessError as e:
             logging.error(f"[afterburner_toolkit] Execution failed: {e}")
+            raise
         finally:
             os.chdir(cwd)
 
@@ -535,7 +545,8 @@ class afterburner_toolkit(BaseModule):
             s = os.path.join(results_dir, item)
             d = os.path.join(dst_dir, item)
             if os.path.isdir(s):
-                shutil.copytree(s, d, False, None)
+                # a rerun after an interrupted fetch_output may find d
+                shutil.copytree(s, d, dirs_exist_ok=True)
             else:
                 shutil.copy2(s, d)
         shutil.rmtree(afterburner_toolkit_dir)

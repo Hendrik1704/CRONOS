@@ -273,6 +273,10 @@ class HDF5Extractor:
                     f"\n{Colors.YELLOW}Operation cancelled by user.{Colors.RESET}"
                 )
                 return []
+            except EOFError:
+                # stdin closed or not interactive: nothing more to read.
+                print(f"\n{Colors.YELLOW}No input available.{Colors.RESET}")
+                return []
             except Exception as e:
                 print(
                     f"{Colors.RED}Error parsing input: {e}. Please try again.{Colors.RESET}"
@@ -348,12 +352,25 @@ class HDF5Extractor:
                 data = dataset[:]
             attributes = dict(dataset.attrs) if dataset.attrs else {}
 
+            storage = attributes.get("storage")
+            if isinstance(storage, (bytes, np.bytes_)):
+                storage = storage.decode()
+            if storage == "raw_bytes":
+                # A file stored byte for byte (e.g. a particle list with
+                # comment lines between the events)
+                output_path = self.output_dir / safe_name
+                with open(output_path, "wb") as f:
+                    f.write(np.asarray(data, dtype=np.uint8).tobytes())
+                return str(output_path)
+
             # Analyze attributes for format hints
             format_hint = self._detect_native_format(
                 dataset_info, attributes, data
             )
 
-            if format_hint == "config":
+            if format_hint == "numeric_table":
+                return self._save_as_numeric_table(data, safe_name, attributes)
+            elif format_hint == "config":
                 return self._save_as_config_file(data, safe_name, attributes)
             elif format_hint == "particle_data":
                 return self._save_as_particle_file(data, safe_name, attributes)
@@ -392,6 +409,16 @@ class HDF5Extractor:
                 if name.endswith((".py", ".cpp", ".c", ".h", ".sh"))
                 else "config"
             )
+
+        # Numeric tables written by CRONOS (src/handle_results.py parses each
+        # text file with np.genfromtxt and keeps its '#' line as 'header').
+        if (
+            isinstance(data, np.ndarray)
+            and data.dtype.kind == "f"
+            and data.ndim in (1, 2)
+            and ("header" in attributes or name.endswith(".dat"))
+        ):
+            return "numeric_table"
 
         # Check for configuration files
         if "config" in name or name.endswith(".py") or name.endswith(".conf"):
@@ -483,6 +510,48 @@ class HDF5Extractor:
                     f.write(str(data.item()))
                 else:
                     np.savetxt(f, data, fmt="%g")
+
+        return str(output_path)
+
+    def _save_as_numeric_table(
+        self, data: np.ndarray, safe_name: str, attributes: Dict
+    ) -> str:
+        """Restore a numeric text table stored by CRONOS.
+
+        Writes the stored 'header' attribute (if any) followed by the rows.
+        Values are written with the shortest representation that round-trips
+        the stored dtype, so no precision is lost.
+        """
+        if safe_name.endswith(".dat"):
+            output_path = self.output_dir / safe_name
+        else:
+            output_path = self.output_dir / f"{safe_name}.dat"
+
+        # The full leading comment block if stored, else the first line
+        header = attributes.get("full_header", attributes.get("header"))
+        if isinstance(header, (bytes, np.bytes_)):
+            header = header.decode("utf-8", errors="replace")
+
+        if data.ndim == 1:
+            # np.genfromtxt returns 1-D arrays both for a single-row table
+            # and for a single column; CRONOS stores which one it was. For
+            # older files, a header naming as many columns as there are
+            # values identifies the single-row case.
+            layout = attributes.get("table_layout")
+            if isinstance(layout, (bytes, np.bytes_)):
+                layout = layout.decode()
+            if layout is None:
+                first_header_line = str(header).splitlines()[0] if header else ""
+                n_header_cols = len(first_header_line.lstrip("#").split())
+                is_row = data.size > 1 and n_header_cols == data.size
+            else:
+                is_row = layout == "row"
+            data = data.reshape(1, -1) if is_row else data.reshape(-1, 1)
+
+        with open(output_path, "w") as f:
+            if header:
+                f.write(str(header).rstrip("\n") + "\n")
+            np.savetxt(f, data, fmt="%s")
 
         return str(output_path)
 
@@ -907,9 +976,9 @@ def main():
         description="Extract datasets from HDF5 files into human-readable formats",
         epilog="Examples:\n"
         "  %(prog)s data.h5 --list-only\n"
-        "  %(prog)s data.h5 --extract 0,2,5 --format csv\n"
+        "  %(prog)s data.h5 --extract 0,2,5\n"
         "  %(prog)s data.h5 --interactive\n"
-        "  %(prog)s data.h5 --extract all --format json --output-dir results/",
+        "  %(prog)s data.h5 --extract all --output-dir results/",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
@@ -979,9 +1048,14 @@ def main():
                     return 1
         elif args.interactive:
             selected_indices = extractor.get_user_selection()
-        else:
+        elif sys.stdin.isatty():
             # Default to interactive mode if no extraction specified
             selected_indices = extractor.get_user_selection()
+        else:
+            print(
+                f"\n{Colors.YELLOW}stdin is not interactive; use --extract "
+                f"or --list-only.{Colors.RESET}"
+            )
 
         if not selected_indices:
             print(

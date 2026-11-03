@@ -13,13 +13,14 @@ Typical usage:
 
 Exit codes:
     0: all files OK
-    2: some files missing required datasets
+    2: some files missing required datasets or unreadable
 """
 
 from __future__ import annotations
 
 import argparse
 import glob
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -51,6 +52,30 @@ DEFAULT_REQUIRED_DATASETS: tuple[str, ...] = (
 class ValidationResult:
     file_path: Path
     missing: tuple[str, ...]
+    error: str | None = None
+
+
+def glob_in_directory(directory: Path, pattern: str) -> list[str]:
+    """Glob `pattern` relative to `directory` (absolute patterns are used as is).
+
+    A relative pattern that starts with `directory` itself, as in
+    `run/ --pattern 'run/job_*/event_*.h5'`, is used as given.
+    """
+    if os.path.isabs(pattern):
+        return glob.glob(pattern, recursive=True)
+    # A pattern that already starts with the directory, as in
+    # `run/ --pattern 'run/job_*/event_*.h5'`, is used as given; any other
+    # pattern only matches inside the directory
+    paths = [str(directory)]
+    try:
+        paths.append(os.path.relpath(str(directory)))
+    except ValueError:  # e.g. another drive on Windows
+        pass
+    prefixes = tuple(os.path.normpath(path) + os.sep for path in paths)
+    if os.path.normpath(pattern).startswith(prefixes):
+        return glob.glob(pattern, recursive=True)
+    in_dir = os.path.join(glob.escape(str(directory)), pattern)
+    return glob.glob(in_dir, recursive=True)
 
 
 def iter_event_files(inputs: Sequence[str], pattern: str | None) -> list[Path]:
@@ -62,7 +87,7 @@ def iter_event_files(inputs: Sequence[str], pattern: str | None) -> list[Path]:
                 raise ValueError(
                     "When an input is a directory you must provide --pattern"
                 )
-            files.extend(Path(x) for x in glob.glob(pattern, recursive=True))
+            files.extend(Path(x) for x in glob_in_directory(p, pattern))
         else:
             files.append(p)
     # normalize + de-dup
@@ -101,8 +126,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--pattern",
         default=None,
         help=(
-            "Glob pattern used when an input is a directory, e.g. "
-            "'run/job_*/event_*.h5'"
+            "Glob pattern used when an input is a directory, relative to "
+            "that directory, e.g. 'job_*/event_*.h5'"
         ),
     )
     parser.add_argument(
@@ -124,14 +149,21 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"Missing file: {fpath}", file=sys.stderr)
             bad.append(ValidationResult(fpath, tuple(args.required)))
             continue
-        res = validate_file(fpath, args.required)
-        if res.missing:
+        try:
+            res = validate_file(fpath, args.required)
+        except Exception as e:
+            # Truncated/corrupt HDF5 files must not abort the whole scan.
+            res = ValidationResult(fpath, tuple(args.required), error=str(e))
+        if res.missing or res.error is not None:
             bad.append(res)
 
     print(f"Checked {len(event_files)} file(s).")
     if bad:
-        print(f"{len(bad)} file(s) missing required datasets:")
+        print(f"{len(bad)} file(s) missing required datasets or unreadable:")
         for res in bad:
+            if res.error is not None:
+                print(f"- {res.file_path}: unreadable ({res.error})")
+                continue
             missing_str = ", ".join(res.missing)
             print(f"- {res.file_path}: {missing_str}")
         return 2

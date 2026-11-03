@@ -21,6 +21,15 @@ Notes:
   blobs), matching your preference to not change simulation outputs.
 - Validation is shallow by default (checks dataset presence), but catches the
   most common broken/partial events.
+- `build` appends to an existing database, so it can be rerun when more jobs
+  have finished. The job is taken from the `job_<N>` directory closest to the
+  event file. An event file is never merged over a different event that is
+  already stored under the same `/job_<N>/event_<M>` group; such files are
+  skipped (and not deleted). Rerunning on the same unchanged source file
+  (same path, size and modification time) keeps the stored event.
+- Exit codes: `build` returns 2 if any file was skipped; `prune` returns 2 if
+  it deleted at least one event group and 0 otherwise (always 0 with
+  --dry-run).
 
 Additional subcommands:
     # Remove unstable/broken events from an existing database:
@@ -84,9 +93,11 @@ def discover_event_files(pattern: str) -> list[Path]:
 
 
 def event_ref_from_path(p: Path) -> EventRef:
-    # Infer job/event from path conventions.
+    # Infer job/event from path conventions. Use the job_# directory closest
+    # to the event file (normally its parent), so that a job_# component
+    # further up the path (e.g. a scratch dir named job_123) is ignored.
     job_match = None
-    for part in p.parts:
+    for part in reversed(p.parent.parts):
         m = _JOB_RE.fullmatch(part)
         if m:
             job_match = m
@@ -146,22 +157,55 @@ def copy_event_file(
 ) -> None:
     # Ensure groups exist.
     job_group = out_h5.require_group(ref.job_name)
+    stat = src_path.stat()
     if ref.event_name in job_group:
-        # If it already exists, remove it to avoid partial state.
-        del job_group[ref.event_name]
-    event_group = job_group.create_group(ref.event_name)
-    event_group.attrs["source_file"] = str(src_path)
+        attrs = job_group[ref.event_name].attrs
+        existing_src = attrs.get("source_file", "")
+        if not existing_src:
+            # No source attributes: an incomplete copy (e.g. the process was
+            # killed), which is replaced
+            print(f"REPAIR {ref.group_path}: incomplete earlier copy")
+            del job_group[ref.event_name]
+            return copy_event_file(src_path, out_h5, ref)
+        if existing_src == str(src_path) and (
+            "source_size" not in attrs
+            or (
+                attrs["source_size"] == stat.st_size
+                and attrs["source_mtime"] == stat.st_mtime
+            )
+        ):
+            # The same file was merged before (databases written before
+            # size and mtime were recorded only store the path)
+            return
+        # A different event file (or a new file at a reused path, e.g. a
+        # run directory prepared again) maps to the same group: never
+        # overwrite.
+        raise ValueError(
+            f"{ref.group_path} already exists in the database "
+            f"(from {existing_src or 'an unknown source'})"
+        )
 
     with h5py.File(src_path, "r") as in_h5:
-        # New format: datasets are stored inside an event_{id} group.
-        # Navigate into it if present; fall back to the file root.
-        inner: h5py.Group = (
-            in_h5[ref.event_name]
-            if ref.event_name in in_h5 and isinstance(in_h5[ref.event_name], h5py.Group)
-            else in_h5
-        )
-        for key in inner.keys():
-            inner.copy(inner[key], event_group, name=key)
+        event_group = job_group.create_group(ref.event_name)
+        try:
+            # New format: datasets are stored inside an event_{id} group.
+            # Navigate into it if present; fall back to the file root.
+            inner: h5py.Group = (
+                in_h5[ref.event_name]
+                if ref.event_name in in_h5 and isinstance(in_h5[ref.event_name], h5py.Group)
+                else in_h5
+            )
+            for key in inner.keys():
+                inner.copy(inner[key], event_group, name=key)
+            # The source attributes mark the group as complete, so they are
+            # only written after all datasets were copied
+            event_group.attrs["source_file"] = str(src_path)
+            event_group.attrs["source_size"] = stat.st_size
+            event_group.attrs["source_mtime"] = stat.st_mtime
+        except BaseException:
+            # Do not leave a partially copied event behind (also on Ctrl+C).
+            del job_group[ref.event_name]
+            raise
 
 
 def cmd_build(args: argparse.Namespace) -> int:
@@ -181,26 +225,52 @@ def cmd_build(args: argparse.Namespace) -> int:
         )
         return 2
 
+    # Append to an existing database so that incremental builds (e.g. after
+    # earlier sources were removed with --delete-source) keep previous events.
+    if out_path.exists():
+        try:
+            with h5py.File(out_path, "r") as h5f:
+                is_db = bool(h5f.attrs.get("cronos_event_database", False))
+        except OSError as e:
+            print(f"Cannot open existing output {out_path}: {e}", file=sys.stderr)
+            return 2
+        if not is_db:
+            print(
+                f"Refusing to append to {out_path}: not a CRONOS event database",
+                file=sys.stderr,
+            )
+            return 2
+
     included = 0
     skipped = 0
 
-    with h5py.File(out_path, "w") as out_h5:
+    with h5py.File(out_path, "a") as out_h5:
         out_h5.attrs["cronos_event_database"] = True
         out_h5.attrs["source_pattern"] = args.pattern
         out_h5.attrs["required_datasets"] = list(required)
 
         for src in event_files:
-            ref = event_ref_from_path(src)
+            try:
+                ref = event_ref_from_path(src)
+            except ValueError as e:
+                skipped += 1
+                print(f"SKIP {src} ({e})", file=sys.stderr)
+                continue
 
             if args.validate:
-                with h5py.File(src, "r") as in_h5:
-                    # Navigate into the inner event group if present (new format).
-                    inner: h5py.Group = (
-                        in_h5[ref.event_name]
-                        if ref.event_name in in_h5 and isinstance(in_h5[ref.event_name], h5py.Group)
-                        else in_h5
-                    )
-                    ok, missing = has_required_datasets(inner, required)
+                try:
+                    with h5py.File(src, "r") as in_h5:
+                        # Navigate into the inner event group if present (new format).
+                        inner: h5py.Group = (
+                            in_h5[ref.event_name]
+                            if ref.event_name in in_h5 and isinstance(in_h5[ref.event_name], h5py.Group)
+                            else in_h5
+                        )
+                        ok, missing = has_required_datasets(inner, required)
+                except Exception as e:
+                    skipped += 1
+                    print(f"SKIP {src} (unreadable: {e})", file=sys.stderr)
+                    continue
                 if not ok:
                     skipped += 1
                     if not args.quiet:
@@ -293,11 +363,11 @@ def cmd_combine(args: argparse.Namespace) -> int:
             )
             return 2
 
-    def resolve_conflict(name: str, existing: set[str]) -> str:
+    def resolve_conflict(name: str, existing: Iterable[str], what: str) -> str:
         if name not in existing:
             return name
         if args.on_conflict == "error":
-            raise ValueError(f"Conflict on top-level group '{name}'")
+            raise ValueError(f"Conflict on {what} '{name}'")
         if args.on_conflict == "overwrite":
             return name
         # rename
@@ -306,31 +376,54 @@ def cmd_combine(args: argparse.Namespace) -> int:
             i += 1
         return f"{name}__{i}"
 
-    written_roots = 0
-    with h5py.File(out_path, "w") as out_h5:
-        out_h5.attrs["cronos_event_database"] = True
-        out_h5.attrs["combined_from"] = [str(p) for p in input_paths]
+    def copy_group(src: h5py.Group, name: str, dst: h5py.Group, what: str):
+        # Copy src[name] into dst, applying the --on-conflict policy.
+        target_name = resolve_conflict(name, dst.keys(), what)
+        if args.on_conflict == "overwrite" and target_name in dst:
+            del dst[target_name]
+        src.copy(src[name], dst, name=target_name)
+        if not args.quiet:
+            src_disp = f"{in_path}:{src[name].name}"
+            dst_disp = f"{out_path}:{dst.name.rstrip('/')}/{target_name}"
+            print(f"ADD  {src_disp} -> {dst_disp}")
 
-        existing_top = set(out_h5.keys())
-        for in_path in input_paths:
-            with h5py.File(in_path, "r") as in_h5:
-                for top_name in in_h5.keys():
-                    target_name = resolve_conflict(top_name, existing_top)
-                    if (
-                        args.on_conflict == "overwrite"
-                        and target_name in out_h5
-                    ):
-                        del out_h5[target_name]
-                        existing_top.discard(target_name)
-                    in_h5.copy(in_h5[top_name], out_h5, name=target_name)
-                    existing_top.add(target_name)
-                    written_roots += 1
-                    if not args.quiet:
-                        src_disp = f"{in_path}:{top_name}"
-                        dst_disp = f"{out_path}:{target_name}"
-                        print(f"ADD  {src_disp} -> {dst_disp}")
+    # Job groups (/job_N) are merged at the event level, so that events of
+    # the same job coming from different databases end up in the same job
+    # group; only colliding event groups are renamed (event_M__K), which keeps
+    # them visible to iter_event_groups(). Other top-level objects are copied
+    # as a whole.
+    written = 0
+    try:
+        with h5py.File(out_path, "w") as out_h5:
+            out_h5.attrs["cronos_event_database"] = True
+            out_h5.attrs["combined_from"] = [str(p) for p in input_paths]
 
-    print(f"Wrote {out_path} (copied {written_roots} top-level group(s))")
+            for in_path in input_paths:
+                with h5py.File(in_path, "r") as in_h5:
+                    for top_name in in_h5.keys():
+                        is_job = _JOB_RE.fullmatch(top_name) and isinstance(
+                            in_h5[top_name], h5py.Group
+                        )
+                        if not is_job:
+                            copy_group(in_h5, top_name, out_h5, "top-level group")
+                            written += 1
+                            continue
+                        job_out = out_h5.require_group(top_name)
+                        for ev_name in in_h5[top_name].keys():
+                            copy_group(
+                                in_h5[top_name],
+                                ev_name,
+                                job_out,
+                                f"event group '/{top_name}'",
+                            )
+                            written += 1
+    except ValueError as e:
+        print(f"ERROR {e} (use --on-conflict rename/overwrite)", file=sys.stderr)
+        # Do not leave a partially combined database behind
+        out_path.unlink(missing_ok=True)
+        return 2
+
+    print(f"Wrote {out_path} (copied {written} group(s))")
     return 0
 
 
@@ -381,7 +474,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     p_prune = sub.add_parser(
         "prune",
         help=(
-            "Check an existing merged database and delete unstable/broken event groups"
+            "Check an existing merged database and delete unstable/broken "
+            "event groups. Exits with 2 if any group was deleted."
         ),
     )
     p_prune.add_argument(
@@ -420,8 +514,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         choices=("error", "overwrite", "rename"),
         default="rename",
         help=(
-            "What to do if two inputs contain the same top-level group name. "
-            "'rename' (default) appends __N, 'overwrite' keeps the last one, 'error' stops."
+            "What to do if two inputs contain the same event group "
+            "(/job_N/event_M) or the same other top-level group. "
+            "'rename' (default) appends __N to the later one (e.g. "
+            "/job_0/event_0__1), 'overwrite' keeps the last one, 'error' stops."
         ),
     )
     p_combine.add_argument(

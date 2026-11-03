@@ -3,6 +3,12 @@ from src.handle_results import handle_results
 from src.colors import Colors
 from src.cluster_submission import submission_script_cluster
 from src.checkpoint_manager import CheckpointManager
+from src.configuration import snapshot_config_paths
+import errno
+try:
+    import fcntl
+except ImportError:  # not available on Windows
+    fcntl = None
 import logging
 import os
 import shutil
@@ -47,7 +53,6 @@ def analyze_error(exception, module_name):
         ...         print(f"Memory issue: {analysis['enhanced_message']}")
     """
     error_str = str(exception).lower()
-    error_type = type(exception).__name__
 
     # Memory-related error patterns
     memory_patterns = [
@@ -72,7 +77,7 @@ def analyze_error(exception, module_name):
 
     is_memory_related = (
         isinstance(exception, MemoryError)
-        or error_type in ["MemoryError", "OSError"]
+        or (isinstance(exception, OSError) and exception.errno == errno.ENOMEM)
         or any(pattern in error_str for pattern in memory_patterns)
     )
 
@@ -190,6 +195,32 @@ def get_memory_suggestions(memory_info, module_name):
     return suggestions
 
 
+def snapshot_configs(args):
+    """Copy the main and user configuration files into the run directory.
+
+    The jobs of a run use these copies (see
+    src.configuration.snapshot_config_paths), so that editing the original
+    configuration files after the preparation does not change queued jobs.
+
+    Args:
+        args (argparse.Namespace): Arguments with run_dir, main_config_path
+            and user_config_path.
+    """
+    snapshot_paths = snapshot_config_paths(args.run_dir)
+    source_paths = (
+        getattr(args, "main_config_path", None),
+        getattr(args, "user_config_path", None),
+    )
+    for source_path, snapshot_path in zip(source_paths, snapshot_paths):
+        if source_path is None:
+            logging.warning(
+                f"No configuration path given, not creating {snapshot_path}"
+            )
+            continue
+        shutil.copy2(source_path, snapshot_path)
+        logging.info(f"Copied configuration {source_path} to {snapshot_path}")
+
+
 def prepare_modules(args, config, module_registry, project_root):
     """Prepare the complete CRONOS simulation environment with directory structure and module initialization.
 
@@ -236,6 +267,8 @@ def prepare_modules(args, config, module_registry, project_root):
 
     Side Effects:
         - Creates complete directory structure in args.run_dir
+        - Copies the main and user configuration into args.run_dir and
+          creates args.run_dir/log for the SLURM log files
         - Calls prepare_environment() on each module instance
         - Copies initial condition files for FromFileIC mode
         - Generates cluster submission scripts via submission_script_cluster()
@@ -265,13 +298,28 @@ def prepare_modules(args, config, module_registry, project_root):
             except AttributeError:
                 config.number_events_per_job = 1
 
+    IC_from_file = "from_file_IC" in config.general.modules
+    if not IC_from_file and (
+        config.number_of_jobs < 1 or config.number_events_per_job < 1
+    ):
+        logging.error(
+            "number_of_jobs and number_events_per_job must be at least 1 "
+            f"(got {config.number_of_jobs} and "
+            f"{config.number_events_per_job})."
+        )
+        exit(1)
+
     # Create the run directory if it does not exist and check that it is empty
     if not os.path.exists(args.run_dir):
         os.makedirs(args.run_dir)
     elif os.listdir(args.run_dir):
         logging.error(f"Run directory {args.run_dir} is not empty.")
         exit(1)
-    IC_from_file = "from_file_IC" in config.general.modules
+
+    snapshot_configs(args)
+    # Directory for the SLURM log files of the submission scripts
+    os.makedirs(os.path.join(args.run_dir, "log"), exist_ok=True)
+
     if IC_from_file:
         logging.info(
             "FromFileIC is used, preparing separate job directories for each IC file."
@@ -375,7 +423,56 @@ def prepare_modules(args, config, module_registry, project_root):
     logging.info(colored_message)
 
 
-def run_modules(config, module_registry, job_dir, project_root):
+def _directory_index(name, prefix):
+    """Return N for a directory name '<prefix>_N', None if it does not match."""
+    match = re.fullmatch(rf"{prefix}_(\d+)", name)
+    return int(match.group(1)) if match else None
+
+
+def check_force_restart_possible(job_dir, modules):
+    """Check whether a job can be restarted from the first module.
+
+    The module directories (and e.g. the IC file copied by from_file_IC) are
+    created at preparation time and removed by the modules' fetch_output, and
+    the event directory of a finished event is removed. A restart from the
+    first module is only possible if all of them still exist.
+
+    Args:
+        job_dir (str): Path to the job directory.
+        modules (list of str): Modules of the simulation chain.
+
+    Returns:
+        list of str: Descriptions of the problems; empty if a restart is
+            possible.
+    """
+    if not os.path.isdir(job_dir):
+        return [f"Job directory '{job_dir}' does not exist"]
+    entries = sorted(os.listdir(job_dir))
+    problems = [
+        f"Event '{f}' was already finished and its event directory removed"
+        for f in entries
+        if f.startswith("event_") and f.endswith(".h5")
+    ]
+    event_dirs = [
+        d
+        for d in entries
+        if d.startswith("event_") and os.path.isdir(os.path.join(job_dir, d))
+    ]
+    if not event_dirs and not problems:
+        problems.append(f"No event directories found in '{job_dir}'")
+    for event_dir in event_dirs:
+        for sub_dir in list(modules) + ["results"]:
+            if not os.path.isdir(os.path.join(job_dir, event_dir, sub_dir)):
+                problems.append(
+                    f"Directory '{event_dir}/{sub_dir}' from the preparation "
+                    "is missing"
+                )
+    return problems
+
+
+def run_modules(
+    config, module_registry, job_dir, project_root, force_restart=False
+):
     """Execute complete CRONOS simulation with checkpoint support and comprehensive error handling.
 
     This function orchestrates the execution of heavy-ion collision simulations
@@ -420,12 +517,23 @@ def run_modules(config, module_registry, job_dir, project_root):
             - External code executable locations
             - Configuration file resolution
             - Resource and data file access
+        force_restart (bool): If True, delete an existing checkpoint (after
+            acquiring the job lock) and start every event from the first
+            module. Use check_force_restart_possible() first.
 
     Raises:
         SystemExit: If job directory doesn't exist or configuration is invalid
-        MemoryError: If system runs out of memory during simulation
-        subprocess.CalledProcessError: If external physics code fails
-        Exception: Any module execution error (logged with enhanced analysis)
+        RuntimeError: If another process is running the same job directory,
+            or if at least one event failed. A failing event (exception or
+            exit() in a module, or failing result handling) is recorded in
+            the checkpoint and the remaining events are still processed; the
+            job is only marked completed if all events are finished.
+
+    Random Seeds:
+        If general.random_seed is not -1, event M of job N uses the seed
+        random_seed + N * general.number_events_per_job + M. The value of
+        config.general.random_seed is changed during each event and restored
+        afterwards.
 
     Side Effects:
         - Creates/updates .cronos_checkpoint.json with progress tracking
@@ -457,6 +565,53 @@ def run_modules(config, module_registry, job_dir, project_root):
         logging.error(f"Job directory '{job_dir}' does not exist.")
         exit(1)
 
+    # Make sure that no other process runs this job directory at the same time
+    lock_path = os.path.join(job_dir, ".cronos.lock")
+    with open(lock_path, "w") as lock_file:
+        try:
+            if fcntl is None:
+                raise OSError("file locks are not available on this platform")
+            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise RuntimeError(
+                f"Job directory '{job_dir}' is already being run by another "
+                f"CRONOS process (lock file '{lock_path}' is locked)."
+            )
+        except OSError as e:
+            logging.warning(
+                f"Could not lock '{lock_path}' ({e}); the file system may not "
+                "support file locks. Continuing without a lock."
+            )
+
+        if force_restart:
+            checkpoint_file = os.path.join(job_dir, ".cronos_checkpoint.json")
+            if os.path.exists(checkpoint_file):
+                os.remove(checkpoint_file)
+                logging.info(
+                    "Removed existing checkpoint file - starting from beginning"
+                )
+
+        _run_modules_locked(
+            config, module_registry, job_dir, project_root, force_restart
+        )
+
+
+def _remove_event_directory(event_dir_path):
+    """Remove a finished event directory; failures are only logged."""
+    try:
+        shutil.rmtree(event_dir_path)
+        logging.info(f"Removed event directory {event_dir_path}")
+    except Exception as e:
+        logging.error(f"Failed to remove event directory: {e}")
+        logging.warning(
+            "Event directory cleanup failed, but the event is finished"
+        )
+
+
+def _run_modules_locked(
+    config, module_registry, job_dir, project_root, force_restart=False
+):
+    """Run all unfinished events of a job (see run_modules)."""
     # Initialize checkpoint manager
     checkpoint_manager = CheckpointManager(job_dir)
 
@@ -467,6 +622,19 @@ def run_modules(config, module_registry, job_dir, project_root):
         )
         logging.info(colored_msg)
         logging.info(checkpoint_manager.get_summary())
+
+    # Per-event random seeds: base seed + global event index
+    base_seed = getattr(config.general, "random_seed", -1)
+    events_per_job = getattr(config.general, "number_events_per_job", 1)
+    job_index = _directory_index(os.path.basename(job_dir), "job")
+    if base_seed != -1 and job_index is None:
+        logging.warning(
+            f"Could not determine the job index from '{job_dir}' (expected "
+            "a directory named job_N); using job index 0 for the seeds."
+        )
+        job_index = 0
+
+    failed_events = []
 
     # loop over the event directories in the job directory
     for event_dir in os.listdir(job_dir):
@@ -494,16 +662,21 @@ def run_modules(config, module_registry, job_dir, project_root):
             event_dir, all_modules
         )
 
-        if start_index >= len(all_modules):
-            colored_msg = Colors.green(f"[CHECKPOINT] {resume_reason}")
-            logging.info(colored_msg)
-            continue
-
         if start_index > 0:
             colored_msg = Colors.yellow(f"[CHECKPOINT] {resume_reason}")
             logging.info(colored_msg)
 
-        # Process modules starting from resume point
+        if base_seed != -1:
+            event_index = _directory_index(event_dir, "event") or 0
+            config.general.random_seed = (
+                base_seed + job_index * events_per_job + event_index
+            )
+            logging.info(
+                f"Using random seed {config.general.random_seed} for {event_dir}"
+            )
+
+        # Process modules starting from resume point (if all modules are
+        # completed, only the result handling below is (re-)run)
         modules_to_process = all_modules[start_index:]
 
         try:
@@ -533,6 +706,32 @@ def run_modules(config, module_registry, job_dir, project_root):
                     event_id=event_id,
                 )
 
+                module_dir = os.path.join(event_dir_path, module_name)
+                module_output = os.path.join(
+                    event_dir_path,
+                    "results",
+                    f"output_{all_modules.index(module_name)}.dat",
+                )
+                if not force_restart and os.path.exists(module_output):
+                    # fetch_output moves output_N.dat into results/ as its
+                    # last output, before it removes the module directory,
+                    # so the module finished
+                    # but the job was killed before the checkpoint was saved
+                    logging.info(
+                        f"[CHECKPOINT] {module_name} output already in "
+                        f"results/, marking it as completed"
+                    )
+                    shutil.rmtree(module_dir, ignore_errors=True)
+                    checkpoint_manager.mark_module_completed(
+                        event_dir, module_name
+                    )
+                    continue
+                if not os.path.isdir(module_dir):
+                    # The directory was removed by an interrupted
+                    # fetch_output; set it up again as prepare_modules does
+                    os.makedirs(module_dir)
+                    module_instance.prepare_environment(event_dir_path)
+
                 # Execute module phases
                 module_instance.prepare_input(event_dir_path)
                 module_instance.run(event_dir_path)
@@ -541,7 +740,11 @@ def run_modules(config, module_registry, job_dir, project_root):
                 # Mark module as completed in checkpoint
                 checkpoint_manager.mark_module_completed(event_dir, module_name)
 
-        except Exception as e:
+        except (Exception, SystemExit) as e:
+            # Modules may call exit(), which raises SystemExit
+            if isinstance(e, SystemExit):
+                e = RuntimeError(f"module called exit({e.code})")
+
             # Determine which module was actually running when failure occurred
             current_module = "unknown"
             for i, module_name in enumerate(modules_to_process):
@@ -586,8 +789,9 @@ def run_modules(config, module_registry, job_dir, project_root):
             # Log more detailed error information
             logging.error(f"Full traceback:\n{traceback.format_exc()}")
 
-            # Re-raise the exception to maintain original behavior
-            raise
+            # Continue with the next event, the job fails at the end
+            failed_events.append(event_dir)
+            continue
 
         # Handle results and cleanup only if all modules completed successfully
         try:
@@ -618,11 +822,28 @@ def run_modules(config, module_registry, job_dir, project_root):
 
             # Handle results processing
             try:
-                handle_results(config, event_dir_results_path, event_id)
+                hdf5_written = handle_results(
+                    config, event_dir_results_path, event_id
+                )
                 logging.info("Results handling completed successfully")
             except Exception as e:
                 logging.error(f"Results handling failed: {e}")
                 raise
+
+            if not hdf5_written:
+                # The event failed the quality check: a known outcome, not
+                # an error. Do not retry it and do not write an HDF5 file.
+                logging.warning(
+                    Colors.yellow(
+                        f"{event_dir} failed the quality check, no HDF5 "
+                        "output is written for it"
+                    )
+                )
+                checkpoint_manager.mark_event_bad(
+                    event_dir, "Event failed the quality check"
+                )
+                _remove_event_directory(event_dir_path)
+                continue
 
             # Move the h5 file to the job directory
             hdf5_filename = os.path.join(
@@ -630,45 +851,23 @@ def run_modules(config, module_registry, job_dir, project_root):
             )
             hdf5_destination = os.path.join(job_dir, f"event_{event_id}.h5")
 
-            if os.path.exists(hdf5_filename):
-                try:
-                    shutil.move(hdf5_filename, hdf5_destination)
-                    logging.info(f"Moved {hdf5_filename} to {job_dir}")
-                except Exception as e:
-                    logging.error(f"Failed to move HDF5 file: {e}")
-                    raise
+            if not os.path.exists(hdf5_filename):
+                raise FileNotFoundError(
+                    f"Expected output file '{hdf5_filename}' not found"
+                )
+            try:
+                shutil.move(hdf5_filename, hdf5_destination)
+                logging.info(f"Moved {hdf5_filename} to {job_dir}")
+            except Exception as e:
+                logging.error(f"Failed to move HDF5 file: {e}")
+                raise
 
-                # Remove the event directory after moving the h5 file
-                try:
-                    shutil.rmtree(event_dir_path)
-                    logging.info(f"Removed event directory {event_dir_path}")
-                except Exception as e:
-                    logging.error(f"Failed to remove event directory: {e}")
-                    # Don't raise here - file was moved successfully
-                    logging.warning(
-                        "Event directory cleanup failed, but simulation completed successfully"
-                    )
-            else:
-                # Check if there are any expected output files
-                result_files = [
-                    f
-                    for f in os.listdir(event_dir_results_path)
-                    if f.endswith((".h5", ".dat", ".txt"))
-                ]
-                if result_files:
-                    logging.warning(
-                        f"HDF5 file '{hdf5_filename}' not found, but other result files exist: {result_files}"
-                    )
-                else:
-                    logging.error(
-                        f"No output files found in results directory: {event_dir_results_path}"
-                    )
-                    raise FileNotFoundError(
-                        f"Expected output file '{hdf5_filename}' not found and no alternative results exist"
-                    )
-
-            # Mark event as completed in checkpoint (only if we got this far)
+            # Mark event as completed in checkpoint before removing the event
+            # directory, so that an interruption cannot lose the event
             checkpoint_manager.mark_event_completed(event_dir)
+
+            # Remove the event directory after moving the h5 file
+            _remove_event_directory(event_dir_path)
 
         except Exception as e:
             # Mark the event as failed if result processing fails
@@ -679,7 +878,32 @@ def run_modules(config, module_registry, job_dir, project_root):
                 f"[ERROR] Result processing failed for {event_dir}: {e}"
             )
             logging.error(colored_msg)
-            raise
+            logging.error(f"Full traceback:\n{traceback.format_exc()}")
+            failed_events.append(event_dir)
+
+    # Restore the base seed
+    if base_seed != -1:
+        config.general.random_seed = base_seed
+
+    # Events whose HDF5 file was moved before the event was marked completed
+    for event_dir in checkpoint_manager.get_incomplete_events():
+        event_dir_path = os.path.join(job_dir, event_dir)
+        if not os.path.isdir(event_dir_path) and os.path.exists(
+            os.path.join(job_dir, f"{event_dir}.h5")
+        ):
+            checkpoint_manager.mark_event_completed(event_dir)
+
+    unfinished_events = sorted(
+        set(failed_events) | set(checkpoint_manager.get_incomplete_events())
+    )
+    if unfinished_events:
+        message = (
+            f"{len(unfinished_events)} event(s) in '{job_dir}' did not "
+            f"finish: {', '.join(unfinished_events)}. Resubmit the job to "
+            "retry them (finished events are skipped)."
+        )
+        logging.error(Colors.red(f"[ERROR] {message}", bold=True))
+        raise RuntimeError(message)
 
     # Mark entire job as completed
     checkpoint_manager.mark_job_completed()

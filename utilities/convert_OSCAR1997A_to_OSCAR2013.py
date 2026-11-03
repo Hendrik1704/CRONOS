@@ -202,16 +202,9 @@ def convert_oscar_streaming(
                 if current_event_particles:
                     num_events += 1
 
-                    # Extract multiplicity from first particle line (if available)
+                    # The boundary line is the header of the NEXT event, so
+                    # use the number of particles actually written.
                     multiplicity = len(current_event_particles)
-                    if current_event_particles:
-                        # Use the PDG_ID from the event boundary as multiplicity indicator
-                        try:
-                            parts = re.split(r"\s+", line.strip())
-                            if len(parts) > 1:
-                                multiplicity = int(parts[1])
-                        except (ValueError, IndexError):
-                            pass
 
                     # Write event header
                     outfile.write(f"# event {num_events} out {multiplicity}\n")

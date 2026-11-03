@@ -2,7 +2,7 @@
 
 [![CRONOS Test Suite](https://github.com/Hendrik1704/CRONOS/actions/workflows/test.yml/badge.svg)](https://github.com/Hendrik1704/CRONOS/actions/workflows/test.yml)
 [![Advanced Tests](https://github.com/Hendrik1704/CRONOS/actions/workflows/advanced-tests.yml/badge.svg)](https://github.com/Hendrik1704/CRONOS/actions/workflows/advanced-tests.yml)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Tests Passing](https://img.shields.io/badge/tests-passing-brightgreen.svg)](#testing)
 
@@ -33,7 +33,7 @@ CRONOS is a comprehensive framework designed to facilitate the simulation and an
 ## Installation
 
 ### Prerequisites
-- Python 3.11+
+- Python 3.10+
 - GCC compiler
 - CMake
 - MPI (for parallel execution)
@@ -61,11 +61,7 @@ CRONOS is a comprehensive framework designed to facilitate the simulation and an
    pip install -r requirements.txt
    ```
    
-   **Note:** CRONOS requires Python 3.11 or newer for full compatibility. 
-   
-   **Compatibility Details:**
-   - Python 3.10: Some physics module tests may fail due to subprocess handling differences
-   - Python 3.11+: Full compatibility with all features and tests
+   **Note:** CRONOS requires Python 3.10 or newer (tested with 3.10, 3.11 and 3.12).
 
 ### Docker
 
@@ -131,12 +127,19 @@ python prepare_simulations.py \
 - `--cluster`: Target cluster (`local`, `noctua2`, etc.)
 - `--run_dir`: Output directory for simulation files
 
+The main and user configuration are copied into the run directory (`run/main_config.py`, `run/user_config.py`). All jobs of the run use these copies, so editing the original configuration files after the preparation does not change the prepared or queued jobs.
+
+With a fixed `random_seed` (not `-1`), event `M` of job `N` uses the seed `random_seed + N * number_events_per_job + M`, so every event of a run gets a different seed.
+
 ### 2. Submit Jobs
 
 #### Local Execution
 ```bash
 python run_simulations.py --job_dir run/job_0/
 ```
+Without `--main_config_path`/`--user_config_path`, the configuration copies in the parent directory of the job directory (`run/`) are used.
+
+If an event fails, the failure is recorded in the checkpoint, the remaining events of the job are still run, and the job exits with an error at the end. Events failing the afterburner_toolkit quality check are not an error: they are skipped (no HDF5 file) and not retried.
 
 #### Cluster Execution
 ```bash
@@ -186,6 +189,8 @@ python run_simulations.py --job_dir run/job_0/  # Automatic resume
 python run_simulations.py --job_dir run/job_0/ --force-restart
 ```
 
+A forced restart is only possible while the prepared module directories of all events of the job still exist (modules remove their directory when they finish, and finished events are removed). Otherwise `--force-restart` refuses to run; prepare a new run directory with `prepare_simulations.py` instead.
+
 ## Memory Monitoring
 
 CRONOS includes comprehensive real-time memory monitoring for all physics modules:
@@ -229,6 +234,9 @@ The system generates warnings when:
 ### File Structure
 ```
 run/
+├── main_config.py          # Copy of the main configuration used by the jobs
+├── user_config.py          # Copy of the user configuration used by the jobs
+├── submit_job.sh           # SLURM submission script (cluster runs)
 ├── job_0/
 │   ├── event_0.h5          # Final HDF5 output
 │   └── .cronos_checkpoint.json
@@ -245,11 +253,13 @@ Each per-event HDF5 file (`event_N.h5`) stores all datasets inside a named group
 ```
 event_N.h5
 └── event_N/
-    ├── particle_9999_vndata_eta_-0.5_0.5.dat  (compressed float32 array)
+    ├── particle_9999_vndata_eta_-0.5_0.5.dat  (compressed float64 array)
     ├── particle_211_vndata_diff_y_-0.5_0.5.dat
     ├── ...
     └── <other output files>
 ```
+
+Numeric text files are stored as float64 arrays. The first `#` comment line of such a file is kept in the dataset attribute `header`; if the file has several comment lines, all of them are kept in the attribute `full_header`.
 
 The merged database produced by `event_database.py build` uses the layout:
 
@@ -313,7 +323,7 @@ CRONOS includes a comprehensive testing suite with tests covering all framework 
 
 ### 🚀 **Automated CI/CD**
 - **GitHub Actions**: Automated testing on every push and pull request
-- **Python Matrix**: Tests across Python 3.11, 3.12
+- **Python Matrix**: Tests across Python 3.10, 3.11, 3.12
 - **Multi-Platform**: Ubuntu, Windows, macOS compatibility testing
 - **Security Scanning**: Automated vulnerability detection
 - **Coverage Reports**: Integrated code coverage analysis

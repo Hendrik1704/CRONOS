@@ -318,6 +318,36 @@ class TestCheckpointManager:
         status = manager.get_event_status("event_0")
         assert status["current_module"] == "KoMPoST"
 
+    def test_get_resume_point_failed_result_processing(self):
+        """All modules done but result processing failed: not completed."""
+        manager = CheckpointManager(self.job_dir)
+        modules = ["KoMPoST", "MUSIC"]
+        for module in modules:
+            manager.mark_module_completed("event_0", module)
+        manager.mark_module_failed("event_0", "result_processing", "boom")
+
+        resume_idx, reason = manager.get_resume_point("event_0", modules)
+
+        assert resume_idx == len(modules)
+        assert "result processing" in reason
+        assert manager.should_skip_event("event_0") is False
+        assert manager.get_incomplete_events() == ["event_0"]
+
+    def test_mark_event_bad(self):
+        """A bad event is finished (not retried) and listed as bad."""
+        manager = CheckpointManager(self.job_dir)
+        manager.mark_module_failed("event_1", "MUSIC", "Test failure")
+        manager.mark_event_bad("event_0", "quality check")
+
+        assert manager.should_skip_event("event_0") is True
+        assert manager.get_event_status("event_0")["bad"] is True
+        assert manager.get_incomplete_events() == ["event_1"]
+
+        reloaded = CheckpointManager(self.job_dir)
+        assert reloaded.checkpoint_data["bad_events"] == ["event_0"]
+        assert "event_0" in reloaded.checkpoint_data["completed_events"]
+        assert "Bad events" in reloaded.get_summary()
+
 
 if __name__ == "__main__":
     pytest.main([__file__])

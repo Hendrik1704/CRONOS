@@ -323,6 +323,51 @@ class CheckpointManager:
         )
         logging.info(colored_msg)
 
+    def mark_event_bad(self, event_id: str, reason: str = None):
+        """Mark an event as finished but bad (failed the quality check).
+
+        A bad event is a known outcome, not an error: it counts as done (it is
+        not retried on resubmission) but produces no HDF5 output. It is added
+        to both completed_events and bad_events.
+
+        Args:
+            event_id (str): Event identifier (e.g., "event_0").
+            reason (str, optional): Why the event is considered bad.
+        """
+        event_status = self.get_event_status(event_id)
+        event_status["completed"] = True
+        event_status["bad"] = True
+        event_status["failed"] = False
+        event_status["current_module"] = None
+        event_status["error_message"] = reason
+
+        self.checkpoint_data["events"][event_id] = event_status
+        for key in ("completed_events", "bad_events"):
+            if event_id not in self.checkpoint_data.setdefault(key, []):
+                self.checkpoint_data[key].append(event_id)
+
+        self._save_checkpoint()
+
+        colored_msg = Colors.yellow(
+            f"[CHECKPOINT] Event {event_id} finished but failed the quality "
+            "check (no HDF5 output)",
+            bold=True,
+        )
+        logging.warning(colored_msg)
+
+    def get_incomplete_events(self) -> List[str]:
+        """Return the events recorded in the checkpoint that are not finished.
+
+        Returns:
+            list of str: Event identifiers that are neither completed nor
+                marked as bad.
+        """
+        return [
+            event_id
+            for event_id, status in self.checkpoint_data["events"].items()
+            if not status["completed"]
+        ]
+
     def mark_job_completed(self):
         """Mark the entire job as completed successfully with all events finished.
 
@@ -363,6 +408,10 @@ class CheckpointManager:
         - Resume from failed module if failure occurred
         - Resume from next module after last completed module
         - Start from beginning if no progress recorded
+
+        If all modules are completed but the event is not (e.g. the result
+        processing failed or the job was killed during it), len(all_modules)
+        is returned and the caller has to (re-)run the result processing.
 
         Args:
             event_id (str): Event identifier to analyze (e.g., "event_0").
@@ -412,7 +461,10 @@ class CheckpointManager:
 
         resume_idx = last_completed_idx + 1
         if resume_idx >= len(all_modules):
-            return len(all_modules), f"All modules completed for {event_id}"
+            return (
+                len(all_modules),
+                f"All modules completed for {event_id}, result processing pending",
+            )
 
         last_module = (
             all_modules[last_completed_idx]
@@ -472,13 +524,20 @@ class CheckpointManager:
         """
         total_events = len(self.checkpoint_data["events"])
         completed_events = len(self.checkpoint_data["completed_events"])
+        bad_events = len(self.checkpoint_data.get("bad_events", []))
 
         summary = [
             f"Checkpoint Summary for {os.path.basename(self.job_dir)}:",
             f"  Total events: {total_events}",
             f"  Completed events: {completed_events}",
-            f"  Job completed: {self.checkpoint_data['job_completed']}",
         ]
+        if bad_events:
+            summary.append(
+                f"  Bad events (failed quality check, no output): {bad_events}"
+            )
+        summary.append(
+            f"  Job completed: {self.checkpoint_data['job_completed']}"
+        )
 
         # Show status of incomplete events
         for event_id, status in self.checkpoint_data["events"].items():

@@ -237,6 +237,7 @@ def run_subprocess_with_memory_monitoring(
     check = kwargs.pop("check", False)
     capture_output = kwargs.pop("capture_output", False)
     text = kwargs.pop("text", False)
+    timeout = kwargs.pop("timeout", None)
 
     # Handle capture_output for Popen
     if capture_output:
@@ -261,11 +262,11 @@ def run_subprocess_with_memory_monitoring(
     try:
         # Wait for process to complete and capture output if needed
         if capture_output:
-            stdout, stderr = process.communicate()
+            stdout, stderr = process.communicate(timeout=timeout)
             return_code = process.returncode
         else:
             stdout, stderr = None, None
-            return_code = process.wait()
+            return_code = process.wait(timeout=timeout)
         end_time = time.time()
 
         # Stop monitoring
@@ -303,8 +304,22 @@ def run_subprocess_with_memory_monitoring(
         logging.warning(
             f"[{module_name}] Subprocess interrupted, terminating..."
         )
-        process.terminate()
         memory_stats["monitoring_active"] = False
+        process.terminate()
+        try:
+            process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+        raise
+
+    except subprocess.TimeoutExpired:
+        logging.error(
+            f"[{module_name}] Subprocess exceeded timeout of {timeout}s, killing..."
+        )
+        memory_stats["monitoring_active"] = False
+        process.kill()
+        process.wait()
         raise
 
     except Exception as e:

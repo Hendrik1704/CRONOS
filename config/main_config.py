@@ -35,7 +35,7 @@ from_file_IC = {
     # Example patterns (with input_prefix="Tmunu.PsiPlus_ID"):
     #   Tmunu.PsiPlus_ID1_someTag.dat, Tmunu.PsiPlus_ID2_otherTag.dat, ...
     "input_prefix": "Tmunu",
-    "boost_invariant": 0,  # 0: no boost invariance, 1: boost invariance
+    "boost_invariant": 1,  # 0: no boost invariance, 1: boost invariance
     "Nx": 151,  # Number of grid points in x and y direction
     "Neta": 101,  # Number of grid points in eta direction
     "dx": 0.1,  # Grid spacing in x and y direction
@@ -265,13 +265,11 @@ MUSIC = {
     "freeze_Ncell_x_step": 1,
     "freeze_Ncell_y_step": 1,
     "freeze_Ncell_eta_step": 1,
-    "freeze_eps_flag": 0,
-    "N_freeze_out": 1,
     "use_eps_for_freeze_out": 0,  # flag to use energy density as criteria to
     # find freeze-out surface
     # 0: use temperature, 1: use energy density
     "T_freeze": 0.155,  # freeze out temperature
-    "N_freeze_out": 1,
+    "N_freeze_out": 1,  # number of freeze-out surfaces (iSS needs exactly 1)
     "eps_switch": 0.18,
     "eps_freeze_max": 0.18,
     "eps_freeze_min": 0.18,
@@ -280,10 +278,13 @@ MUSIC = {
 }
 
 iSS = {
-    "hydro_mode": 2,  # mode for reading in freeze out information
+    "hydro_mode": 1,  # mode for reading in freeze out information
     # 1: reads outputs from MUSIC assuming boost-invariant
     # 2: reads outputs from MUSIC full (3+1)-d
+    # (must match MUSIC boost_invariant, see src/check_settings.py)
     "afterburner_type": 2,  # 0: PDG_Decay, 1: UrQMD, 2: SMASH
+    # MUSIC EOS_to_use 9 forces 1 (UrQMD), 91 forces 2 (SMASH). Use 2 (SMASH)
+    # only with the SMASH module, iSS skips resonance decays for it.
     "turn_on_bulk": 0,  # read in bulk viscous pressure
     "turn_on_rhob": 0,  # read in net baryon chemical potential
     "turn_on_diff": 0,  # read in baryon diffusion current
