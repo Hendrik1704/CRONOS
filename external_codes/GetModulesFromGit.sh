@@ -48,7 +48,7 @@ echo "Download SMASH from GitHub:"
 git clone https://github.com/smash-transport/smash.git --branch SMASH-3.2.2
 
 echo "Download Pythia (used for SMASH):"
-wget https://pythia.org/download/pythia83/pythia8315.tgz
+wget https://pythia.org/releases/pythia83/pythia8315.tgz
 tar xf pythia8315.tgz
 
 echo "Download stable Eigen library version 3.4.0:"
