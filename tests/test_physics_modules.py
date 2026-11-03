@@ -824,12 +824,16 @@ class TestMUSICRunAndOutput(TestPhysicsModuleBase):
                 module.run(self.event_dir)
         assert "freeze-out surface is not closed" in caplog.text
 
-    @patch("src.modules.MUSIC.run_external_command")
-    def test_run_with_terminal_output_skips_completion_check(
-        self, mock_run_command
-    ):
-        self.make_module(terminal_output=True).run(self.event_dir)
-        assert "stdout" not in mock_run_command.call_args.kwargs
+    def test_run_with_terminal_output_still_checks_completion(self, capsys):
+        """The output is printed afterwards, and the check still runs."""
+        module = self.make_module(terminal_output=True)
+        with patch(
+            "src.modules.MUSIC.run_external_command",
+            side_effect=write_music_output("\u266b 1 MB Done time step"),
+        ):
+            with pytest.raises(RuntimeError):
+                module.run(self.event_dir)
+        assert "Done time step" in capsys.readouterr().out
 
     def test_fetch_output_raises_without_surface(self):
         module = self.make_module()

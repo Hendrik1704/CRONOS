@@ -183,3 +183,32 @@ def test_zip_into_hdf5_precision_and_headers(tmp_path):
         single = f["event_0/single_header.dat"]
         assert single.attrs["header"] == b"# only header"
         assert "full_header" not in single.attrs
+
+
+def test_file_with_many_comment_lines_is_packed(tmp_path):
+    """E.g. the SMASH particle list has comment lines for every event."""
+    import h5py
+
+    results = tmp_path / "results"
+    results.mkdir()
+    lines = ["#!OSCAR2013 particle_lists t x y z", "# Units: fm"]
+    for event in range(2000):
+        lines += [f"# event {event} out 1", "1 2 3 4", f"# event {event} end"]
+    (results / "output_0.dat").write_text("\n".join(lines) + "\n")
+    config = Configuration(
+        {
+            "general": {
+                "modules": ["IPGlasma"],
+                "keep_intermediate_results": False,
+                "keep_particle_files": False,
+            }
+        }
+    )
+
+    assert handle_results(config, str(results), "0")
+
+    with h5py.File(results / "event_0.h5") as f:
+        dset = f["event_0"]["output_0.dat"]
+        assert dset.shape == (2000, 4)
+        full_header = dset.attrs["full_header"].decode()
+        assert full_header.count("\n") == 2  # only the leading block

@@ -25,7 +25,8 @@ Notes:
   have finished. The job is taken from the `job_<N>` directory closest to the
   event file. An event file is never merged over a different event that is
   already stored under the same `/job_<N>/event_<M>` group; such files are
-  skipped (and not deleted). Rerunning on the same source file replaces it.
+  skipped (and not deleted). Rerunning on the same unchanged source file
+  (same path, size and modification time) keeps the stored event.
 - Exit codes: `build` returns 2 if any file was skipped; `prune` returns 2 if
   it deleted at least one event group and 0 otherwise (always 0 with
   --dry-run).
@@ -156,21 +157,30 @@ def copy_event_file(
 ) -> None:
     # Ensure groups exist.
     job_group = out_h5.require_group(ref.job_name)
+    stat = src_path.stat()
     if ref.event_name in job_group:
-        existing_src = job_group[ref.event_name].attrs.get("source_file", "")
-        if existing_src != str(src_path):
-            # A different event file maps to the same group: never overwrite.
-            raise ValueError(
-                f"{ref.group_path} already exists in the database "
-                f"(from {existing_src or 'an unknown source'})"
-            )
+        attrs = job_group[ref.event_name].attrs
+        existing_src = attrs.get("source_file", "")
+        if (
+            existing_src == str(src_path)
+            and attrs.get("source_size") == stat.st_size
+            and attrs.get("source_mtime") == stat.st_mtime
+        ):
+            # The same file was merged before: nothing to do.
+            return
+        # A different event file (or a new file at a reused path, e.g. a
+        # run directory prepared again) maps to the same group: never
+        # overwrite.
+        raise ValueError(
+            f"{ref.group_path} already exists in the database "
+            f"(from {existing_src or 'an unknown source'})"
+        )
 
     with h5py.File(src_path, "r") as in_h5:
-        if ref.event_name in job_group:
-            # The same source file is merged again: replace its group.
-            del job_group[ref.event_name]
         event_group = job_group.create_group(ref.event_name)
         event_group.attrs["source_file"] = str(src_path)
+        event_group.attrs["source_size"] = stat.st_size
+        event_group.attrs["source_mtime"] = stat.st_mtime
         try:
             # New format: datasets are stored inside an event_{id} group.
             # Navigate into it if present; fall back to the file root.
@@ -398,6 +408,8 @@ def cmd_combine(args: argparse.Namespace) -> int:
                             written += 1
     except ValueError as e:
         print(f"ERROR {e} (use --on-conflict rename/overwrite)", file=sys.stderr)
+        # Do not leave a partially combined database behind
+        out_path.unlink(missing_ok=True)
         return 2
 
     print(f"Wrote {out_path} (copied {written} group(s))")

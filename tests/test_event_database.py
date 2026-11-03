@@ -1,4 +1,5 @@
 import importlib.util
+import os
 from pathlib import Path
 
 import sys
@@ -279,6 +280,8 @@ def test_combine_error_policy_reports_event_conflict(tmp_path: Path):
         ]
     )
     assert rc == 2
+    # No partially combined database is left behind
+    assert not (tmp_path / "combined.h5").exists()
 
 
 def _build(event_database, pattern: str, out: Path, *extra: str) -> int:
@@ -396,3 +399,26 @@ def test_build_validate_skips_unreadable_file(tmp_path: Path):
     assert broken.exists()
     with h5py.File(out, "r") as f:
         assert list(f["job_0"].keys()) == ["event_0"]
+
+
+@pytest.mark.unit
+def test_build_never_overwrites_an_event_from_a_reused_run_path(tmp_path: Path):
+    """A run directory prepared again at the same path holds new events."""
+    project_root = Path(__file__).resolve().parents[1]
+    event_database = _import_event_database_module(project_root)
+
+    e0 = tmp_path / "run" / "job_0" / "event_0.h5"
+    pattern = str(tmp_path / "run" / "job_*" / "event_*.h5")
+    out = tmp_path / "merged.h5"
+    _write_event_h5(e0)
+    assert _build(event_database, pattern, out, "--delete-source") == 0
+    with h5py.File(out, "r") as f:
+        first_mtime = f["job_0"]["event_0"].attrs["source_mtime"]
+
+    # New run in the same directory: a different file at the same path
+    _write_event_h5(e0)
+    os.utime(e0, (first_mtime + 10, first_mtime + 10))
+    assert _build(event_database, pattern, out, "--delete-source") == 2
+    assert e0.exists()  # skipped, so not deleted
+    with h5py.File(out, "r") as f:
+        assert f["job_0"]["event_0"].attrs["source_mtime"] == first_mtime

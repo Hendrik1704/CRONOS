@@ -372,6 +372,8 @@ def test_wsu_script_host_paths(tmp_path):
     assert f'--job_dir "{run_dir}/${{JOB_DIR}}"' in script
     assert f'--main_config_path "{run_dir}/main_config.py"' in script
     assert f'--bind "{run_dir}"' in script
+    # The repository may be the container's /app, which is not on the host
+    assert ":/work" not in script
 
 
 def test_wsu_script_container_paths(tmp_path):

@@ -102,7 +102,8 @@ def zip_into_hdf5(config, event_dir_results_path, event_id):
     Numeric text files are stored as float64 arrays. The first comment line
     ('#') of such a file is stored in the dataset attribute 'header'; if the
     file has more than one comment line, all of them (joined by newlines)
-    are additionally stored in the attribute 'full_header'.
+    are additionally stored in the attribute 'full_header' (only the leading
+    block of comment lines).
 
     Returns:
         bool: True if the HDF5 file was written, False if the event failed
@@ -141,10 +142,15 @@ def zip_into_hdf5(config, event_dir_results_path, event_id):
                 )
 
                 # save the header lines if they exist
+                # Only the leading comment block: files like the SMASH
+                # particle list have comment lines for every event, which
+                # would exceed the 64 kB attribute size limit of HDF5
+                header_lines = []
                 with open(file_path, "r") as f:
-                    header_lines = [
-                        line.strip() for line in f if line.startswith("#")
-                    ]
+                    for line in f:
+                        if not line.startswith("#"):
+                            break
+                        header_lines.append(line.strip())
 
                 if header_lines:
                     dset.attrs["header"] = np.bytes_(header_lines[0])
@@ -156,7 +162,9 @@ def zip_into_hdf5(config, event_dir_results_path, event_id):
                 continue
 
             except Exception:
-                pass  # fallback below
+                # fallback below; drop a dataset created before the failure
+                if file_name in group_temp:
+                    del group_temp[file_name]
 
             try:
                 with open(file_path, "r", encoding="utf-8") as f:

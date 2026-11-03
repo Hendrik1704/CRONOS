@@ -294,10 +294,14 @@ def create_wsu_submission_script(args, config):
 
         # ---- execution ----
         script_file.write("apptainer exec \\\n")
-        script_file.write(
-            f'    --bind "${{REPO_DIR}}:{CONTAINER_WORK_DIR}" \\\n'
-        )
-        if not run_dir_in_container:
+        if run_dir_in_container:
+            # The run directory and configs were prepared under /work
+            script_file.write(
+                f'    --bind "${{REPO_DIR}}:{CONTAINER_WORK_DIR}" \\\n'
+            )
+        else:
+            # All paths are absolute; only the run directory is needed (the
+            # repository may be the container's /app, which is not on the host)
             script_file.write(f'    --bind "{run_dir}" \\\n')
         script_file.write('    "$SIF_IMAGE" \\\n')
         script_file.write("    python3 /app/run_simulations.py \\\n")

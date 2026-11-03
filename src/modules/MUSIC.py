@@ -5,7 +5,8 @@ import subprocess
 import shutil
 import glob
 
-# MUSIC's stdout is written here when module_terminal_output is False. It must
+# MUSIC's stdout is written here (and printed afterwards with
+# module_terminal_output). It must
 # not end in .dat, because MUSIC removes *.dat from its working directory.
 MUSIC_LOG_FILE = "MUSIC.log"
 # Messages MUSIC prints when the hydro evolution ends normally (Evolve::EvolveIt
@@ -373,13 +374,14 @@ class MUSIC(BaseModule):
         try:
             os.chdir(MUSIC_dir)
 
+            # MUSIC's output is always kept in a log file, since the
+            # completion check needs it
             kwargs = {"check": True}
-            if not self.full_config.general.module_terminal_output:
-                log_path = os.path.join(os.getcwd(), MUSIC_LOG_FILE)
-                log_file = open(log_path, "w")
-                kwargs["stdout"] = log_file
-                kwargs["stderr"] = subprocess.STDOUT
-                logging.debug(f"[MUSIC] Writing MUSIC output to {log_path}")
+            log_path = os.path.join(os.getcwd(), MUSIC_LOG_FILE)
+            log_file = open(log_path, "w")
+            kwargs["stdout"] = log_file
+            kwargs["stderr"] = subprocess.STDOUT
+            logging.debug(f"[MUSIC] Writing MUSIC output to {log_path}")
             run_external_command(
                 [f"./{MUSIC_exe}", ini_file],
                 memory_threshold_mb=self.full_config.general.memory_threshold_mb,
@@ -394,11 +396,10 @@ class MUSIC(BaseModule):
                 log_file.close()
             os.chdir(cwd)
 
-        if log_path is None:
-            logging.debug(
-                "[MUSIC] Output went to the terminal, completion check skipped."
-            )
-        elif not music_evolution_finished(log_path):
+        if self.full_config.general.module_terminal_output:
+            with open(log_path, errors="replace") as f:
+                print(f.read(), end="")
+        if not music_evolution_finished(log_path):
             raise RuntimeError(
                 f"[MUSIC] MUSIC exited without finishing the hydro evolution, "
                 f"see {log_path}"

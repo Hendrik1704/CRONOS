@@ -48,7 +48,7 @@ python utilities/event_database.py build \
   --validate
 ```
 
-`build` appends to an existing database, so it can simply be rerun when more jobs have finished. The job number is taken from the `job_<N>` directory that contains the event file. An event file is never merged over a *different* event already stored under the same `/job_<N>/event_<M>` group: such files are reported as `SKIP`, are not deleted, and the exit code is `2`. Rerunning `build` on the same source files replaces their groups.
+`build` appends to an existing database, so it can simply be rerun when more jobs have finished. The job number is taken from the `job_<N>` directory that contains the event file. An event file is never merged over a *different* event already stored under the same `/job_<N>/event_<M>` group: such files are reported as `SKIP`, are not deleted, and the exit code is `2`. Rerunning `build` on the same, unchanged source files (same path, size and modification time) leaves their groups as they are; a new file at a reused path (e.g. a run directory prepared again) counts as a different event.
 
 To save disk space, you can delete per-event files after they were successfully copied. Only do this after all steps that need the per-event files (steps 1, 6 and 7 of this workflow, in particular centrality binning with `--link`):
 
