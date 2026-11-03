@@ -23,7 +23,7 @@ CRONOS is a comprehensive framework designed to facilitate the simulation and an
 ### Supported Modules
 
 - **Initial Conditions**: `from_file_IC` (load from external files)
-- **IPGlasma**: `IPGlasma` (Initial conditions from IP-Glasma model)
+- **IPGlasma**: `IPGlasma` (Initial conditions from IP-Glasma 2.0; parameter names follow IP-Glasma 2.0)
 - **Pre-equilibrium**: `KoMPoST` (Kinetic Theory based pre-equilibrium evolution)
 - **Entropy Matching**: `entropy_matching` (smooth transition between modules)
 - **Hydrodynamics**: `MUSIC` (3+1D relativistic hydrodynamics)

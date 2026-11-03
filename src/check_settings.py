@@ -1,5 +1,7 @@
 import logging
 
+from src.modules.IPGlasma import RENAMED_PARAMETERS, REPLACED_PARAMETERS
+
 
 def check_settings(config):
     """
@@ -50,6 +52,34 @@ def check_settings(config):
             logging.error(
                 "Incompatible 'boost_invariant' settings: MUSIC and iSS."
             )
+            valid = False
+
+    if "IPGlasma" in active_modules and hasattr(config, "IPGlasma"):
+        # IP-Glasma 2.0 renamed or replaced many parameters; an old name in a
+        # user config would otherwise be ignored silently
+        for key in config.IPGlasma.to_dict():
+            if key in RENAMED_PARAMETERS:
+                logging.error(
+                    f"IPGlasma parameter '{key}' was renamed to "
+                    f"'{RENAMED_PARAMETERS[key]}' in IP-Glasma 2.0."
+                )
+                valid = False
+            elif key in REPLACED_PARAMETERS:
+                logging.error(
+                    f"IPGlasma parameter '{key}' is not supported by "
+                    f"IP-Glasma 2.0: {REPLACED_PARAMETERS[key]}."
+                )
+                valid = False
+        # The next module needs the matching IP-Glasma output file
+        if "KoMPoST" in active_modules and config.IPGlasma.writeTmunu != 1:
+            logging.error("KoMPoST after IPGlasma requires 'writeTmunu' = 1.")
+            valid = False
+        elif (
+            "KoMPoST" not in active_modules
+            and "MUSIC" in active_modules
+            and config.IPGlasma.writeHydro != 1
+        ):
+            logging.error("MUSIC after IPGlasma requires 'writeHydro' = 1.")
             valid = False
 
     # Add more checks as needed for other configuration sections
