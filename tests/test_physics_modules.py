@@ -1,4 +1,5 @@
 import pytest
+import sys
 import os
 import tempfile
 import shutil
@@ -276,7 +277,7 @@ class TestKoMPoST(TestPhysicsModuleBase):
             assert "0.2" in content  # tau0
             assert "WriteTmunuBackup = 0" in content
 
-    @patch("src.modules.KoMPoST.run_external_command")
+    @patch.object(sys.modules["src.modules.KoMPoST"], "run_external_command")
     def test_run_method(self, mock_run_command):
         """Test KoMPoST run method."""
         config = Configuration({"shear_viscosity": 0.08})
@@ -382,7 +383,7 @@ class TestMUSIC:
         assert os.path.exists(os.path.join(music_dir, "EOS"))
         assert os.path.exists(os.path.join(music_dir, "tables"))
 
-    @patch("src.modules.MUSIC.run_external_command")
+    @patch.object(sys.modules["src.modules.MUSIC"], "run_external_command")
     def test_run_method(self, mock_run_command):
         """Test MUSIC run method."""
         config = Configuration({"tau0": 0.6})
@@ -450,7 +451,7 @@ class TestSMASH:
 
         # The error is raised before any link is created
 
-    @patch("src.modules.SMASH.run_external_command")
+    @patch.object(sys.modules["src.modules.SMASH"], "run_external_command")
     def test_run_method(self, mock_run_command):
         """Test SMASH run method."""
         config = Configuration({"End_Time": 200.0})
@@ -515,7 +516,7 @@ class TestiSS:
 
         # The error is raised before any link is created
 
-    @patch("src.modules.iSS.run_external_command")
+    @patch.object(sys.modules["src.modules.iSS"], "run_external_command")
     def test_run_method(self, mock_run_command):
         """Test iSS run method."""
         config = Configuration({"number_of_particles_needed": 100000})
@@ -770,8 +771,8 @@ class TestMUSICRunAndOutput(TestPhysicsModuleBase):
         with open(os.path.join(self.event_dir, "MUSIC", name), "w") as f:
             f.write(content)
 
-    @patch(
-        "src.modules.MUSIC.run_external_command", side_effect=failing_command
+    @patch.object(
+        sys.modules["src.modules.MUSIC"], "run_external_command", side_effect=failing_command
     )
     def test_run_reraises_failure(self, mock_run_command):
         with pytest.raises(subprocess.CalledProcessError):
@@ -789,8 +790,8 @@ class TestMUSICRunAndOutput(TestPhysicsModuleBase):
     )
     def test_run_raises_without_completion_message(self, lines):
         module = self.make_module()
-        with patch(
-            "src.modules.MUSIC.run_external_command",
+        with patch.object(
+            sys.modules["src.modules.MUSIC"], "run_external_command",
             side_effect=write_music_output(*lines),
         ):
             with pytest.raises(RuntimeError, match="without finishing"):
@@ -802,8 +803,8 @@ class TestMUSICRunAndOutput(TestPhysicsModuleBase):
 
     def test_run_accepts_completion_message(self):
         module = self.make_module()
-        with patch(
-            "src.modules.MUSIC.run_external_command",
+        with patch.object(
+            sys.modules["src.modules.MUSIC"], "run_external_command",
             side_effect=write_music_output(
                 "\u266b 1 MB Done time step", "\u266b 120.5 MB Finished."
             ),
@@ -813,8 +814,8 @@ class TestMUSICRunAndOutput(TestPhysicsModuleBase):
     def test_run_fails_when_maximum_time_is_reached(self, caplog):
         """The freeze-out surface is not closed, so the event fails."""
         module = self.make_module()
-        with patch(
-            "src.modules.MUSIC.run_external_command",
+        with patch.object(
+            sys.modules["src.modules.MUSIC"], "run_external_command",
             side_effect=write_music_output(
                 "\u266b 1 MB Done time step",
                 "\033[1m\033[33m! Maximum allowed time reached.\033[0m",
@@ -827,8 +828,8 @@ class TestMUSICRunAndOutput(TestPhysicsModuleBase):
     def test_run_with_terminal_output_still_checks_completion(self, capsys):
         """The output is printed afterwards, and the check still runs."""
         module = self.make_module(terminal_output=True)
-        with patch(
-            "src.modules.MUSIC.run_external_command",
+        with patch.object(
+            sys.modules["src.modules.MUSIC"], "run_external_command",
             side_effect=write_music_output("\u266b 1 MB Done time step"),
         ):
             with pytest.raises(RuntimeError):
@@ -951,8 +952,8 @@ class TestFromFileIC3D(TestPhysicsModuleBase):
 class TestModuleFailuresPropagate(TestPhysicsModuleBase):
     """Failed external codes must raise so the executor marks the event failed."""
 
-    @patch(
-        "src.modules.KoMPoST.run_external_command", side_effect=failing_command
+    @patch.object(
+        sys.modules["src.modules.KoMPoST"], "run_external_command", side_effect=failing_command
     )
     def test_kompost_run(self, mock_run_command):
         os.makedirs(os.path.join(self.event_dir, "KoMPoST"))
@@ -975,7 +976,7 @@ class TestModuleFailuresPropagate(TestPhysicsModuleBase):
         with pytest.raises(subprocess.CalledProcessError):
             module.run(self.event_dir)
 
-    @patch("src.modules.iSS.run_external_command", side_effect=failing_command)
+    @patch.object(sys.modules["src.modules.iSS"], "run_external_command", side_effect=failing_command)
     def test_iss_run(self, mock_run_command):
         os.makedirs(os.path.join(self.event_dir, "iSS"))
         full_config = Configuration({"general": general_config(["iSS"])})
@@ -983,8 +984,8 @@ class TestModuleFailuresPropagate(TestPhysicsModuleBase):
         with pytest.raises(subprocess.CalledProcessError):
             module.run(self.event_dir)
 
-    @patch(
-        "src.modules.SMASH.run_external_command", side_effect=failing_command
+    @patch.object(
+        sys.modules["src.modules.SMASH"], "run_external_command", side_effect=failing_command
     )
     def test_smash_run(self, mock_run_command):
         os.makedirs(os.path.join(self.event_dir, "SMASH"))
@@ -993,8 +994,8 @@ class TestModuleFailuresPropagate(TestPhysicsModuleBase):
         with pytest.raises(subprocess.CalledProcessError):
             module.run(self.event_dir)
 
-    @patch(
-        "src.modules.SMASH.run_external_command", side_effect=failing_command
+    @patch.object(
+        sys.modules["src.modules.SMASH"], "run_external_command", side_effect=failing_command
     )
     def test_smash_converter(self, mock_run_command):
         os.makedirs(os.path.join(self.event_dir, "SMASH"))
@@ -1015,8 +1016,8 @@ class TestModuleFailuresPropagate(TestPhysicsModuleBase):
         config = Configuration({"input_filename": "output_1.dat"})
         return afterburner_toolkit(config, full_config, self.project_root, "0")
 
-    @patch(
-        "src.modules.afterburner_toolkit.run_external_command",
+    @patch.object(
+        sys.modules["src.modules.afterburner_toolkit"], "run_external_command",
         side_effect=failing_command,
     )
     def test_afterburner_converter(self, mock_run_command):
@@ -1025,22 +1026,22 @@ class TestModuleFailuresPropagate(TestPhysicsModuleBase):
             module.run(self.event_dir)
         mock_run_command.assert_called_once()  # the analysis did not run
 
-    @patch("src.modules.afterburner_toolkit.run_external_command")
+    @patch.object(sys.modules["src.modules.afterburner_toolkit"], "run_external_command")
     def test_afterburner_converter_without_output(self, mock_run_command):
         module = self.make_afterburner(["SMASH", "afterburner_toolkit"])
         with pytest.raises(FileNotFoundError):
             module.run(self.event_dir)
         mock_run_command.assert_called_once()
 
-    @patch("src.modules.afterburner_toolkit.run_external_command")
+    @patch.object(sys.modules["src.modules.afterburner_toolkit"], "run_external_command")
     def test_afterburner_without_input(self, mock_run_command):
         module = self.make_afterburner(["iSS", "afterburner_toolkit"])
         with pytest.raises(FileNotFoundError):
             module.run(self.event_dir)
         mock_run_command.assert_not_called()
 
-    @patch(
-        "src.modules.afterburner_toolkit.run_external_command",
+    @patch.object(
+        sys.modules["src.modules.afterburner_toolkit"], "run_external_command",
         side_effect=failing_command,
     )
     def test_afterburner_run(self, mock_run_command):
@@ -1096,8 +1097,8 @@ class TestModuleResume(TestPhysicsModuleBase):
             {"general": general_config(["iSS", "SMASH"])}
         )
         module = SMASH(Configuration({}), full_config, self.project_root, "0")
-        with patch(
-            "src.modules.SMASH.run_external_command", side_effect=run_smash
+        with patch.object(
+            sys.modules["src.modules.SMASH"], "run_external_command", side_effect=run_smash
         ):
             module.run(self.event_dir)
         module.fetch_output(self.event_dir)
@@ -1114,8 +1115,8 @@ class TestModuleResume(TestPhysicsModuleBase):
             {"Delta_Time": 0.1, "End_Time": 100.0, "No_Collisions": 1}
         )
         module = SMASH(config, full_config, self.project_root, "0")
-        with patch(
-            "src.modules.SMASH.run_external_command",
+        with patch.object(
+            sys.modules["src.modules.SMASH"], "run_external_command",
             return_value={"return_code": 0, "stdout": "7\n"},
         ):
             module.prepare_input(self.event_dir)

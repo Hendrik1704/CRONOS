@@ -221,6 +221,52 @@ def test_killed_during_result_handling_is_resumed(tmp_path):
     assert (job_dir / "event_0.h5").exists()
 
 
+
+def test_killed_after_fetch_output_is_resumed(tmp_path):
+    """Output moved and directory removed, but no checkpoint saved."""
+    run_dir = _prepare(tmp_path, _config(number_events_per_job=1))
+    job_dir = run_dir / "job_0"
+    config = _config(number_events_per_job=1)
+    original = CheckpointManager.mark_module_completed
+
+    def killed_after_module_a(self, event_id, module_name):
+        if module_name == "ModuleA":
+            raise KeyboardInterrupt
+        original(self, event_id, module_name)
+
+    with patch.object(
+        CheckpointManager, "mark_module_completed", killed_after_module_a
+    ):
+        with pytest.raises(KeyboardInterrupt):
+            run_modules(config, REGISTRY, str(job_dir), str(tmp_path))
+    assert not (job_dir / "event_0" / "ModuleA").exists()
+
+    CALLS.clear()
+    run_modules(config, REGISTRY, str(job_dir), str(tmp_path))
+    # ModuleA is not run again, ModuleB runs on its output
+    assert [call[0] for call in CALLS] == ["ModuleB"]
+    assert (job_dir / "event_0.h5").exists()
+
+
+def test_module_directory_is_set_up_again_after_interrupted_cleanup(tmp_path):
+    """Directory removed before the output was written: run it again."""
+    run_dir = _prepare(tmp_path, _config(number_events_per_job=1))
+    job_dir = run_dir / "job_0"
+    config = _config(number_events_per_job=1)
+
+    def interrupted_fetch_output(self, event_dir):
+        os.rmdir(os.path.join(event_dir, self.name))
+        raise KeyboardInterrupt
+
+    with patch.object(ModuleB, "fetch_output", interrupted_fetch_output):
+        with pytest.raises(KeyboardInterrupt):
+            run_modules(config, REGISTRY, str(job_dir), str(tmp_path))
+
+    CALLS.clear()
+    run_modules(config, REGISTRY, str(job_dir), str(tmp_path))
+    assert [call[0] for call in CALLS] == ["ModuleB"]
+    assert (job_dir / "event_0.h5").exists()
+
 def test_bad_event_is_marked_and_not_retried(tmp_path):
     run_dir = _prepare(tmp_path)
     job_dir = run_dir / "job_0"

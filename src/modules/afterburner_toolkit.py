@@ -533,7 +533,8 @@ class afterburner_toolkit(BaseModule):
             s = os.path.join(results_dir, item)
             d = os.path.join(dst_dir, item)
             if os.path.isdir(s):
-                shutil.copytree(s, d, False, None)
+                # a rerun after an interrupted fetch_output may find d
+                shutil.copytree(s, d, dirs_exist_ok=True)
             else:
                 shutil.copy2(s, d)
         shutil.rmtree(afterburner_toolkit_dir)

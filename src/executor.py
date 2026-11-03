@@ -697,6 +697,31 @@ def _run_modules_locked(config, module_registry, job_dir, project_root):
                     event_id=event_id,
                 )
 
+                module_dir = os.path.join(event_dir_path, module_name)
+                module_output = os.path.join(
+                    event_dir_path,
+                    "results",
+                    f"output_{all_modules.index(module_name)}.dat",
+                )
+                if os.path.exists(module_output):
+                    # fetch_output moves the output into results/ before it
+                    # removes the module directory, so the module finished
+                    # but the job was killed before the checkpoint was saved
+                    logging.info(
+                        f"[CHECKPOINT] {module_name} output already in "
+                        f"results/, marking it as completed"
+                    )
+                    shutil.rmtree(module_dir, ignore_errors=True)
+                    checkpoint_manager.mark_module_completed(
+                        event_dir, module_name
+                    )
+                    continue
+                if not os.path.isdir(module_dir):
+                    # The directory was removed by an interrupted
+                    # fetch_output; set it up again as prepare_modules does
+                    os.makedirs(module_dir)
+                    module_instance.prepare_environment(event_dir_path)
+
                 # Execute module phases
                 module_instance.prepare_input(event_dir_path)
                 module_instance.run(event_dir_path)

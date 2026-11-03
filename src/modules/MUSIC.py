@@ -471,11 +471,14 @@ class MUSIC(BaseModule):
         if len(matching_files) == 1:
             shutil.move(matching_files[0], dst_file)
         else:
-            # Concatenate the per-thread parts into the results file
-            with open(dst_file, "wb") as out_f:
+            # Concatenate the per-thread parts into the results file; write
+            # a temporary file first, so that output_N.dat is only ever
+            # complete (resume treats an existing output as finished)
+            with open(dst_file + ".tmp", "wb") as out_f:
                 for src in matching_files:
                     with open(src, "rb") as in_f:
                         shutil.copyfileobj(in_f, out_f)
+            os.replace(dst_file + ".tmp", dst_file)
 
         # Clean up MUSIC working directory entirely
         try:

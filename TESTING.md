@@ -282,7 +282,7 @@ CRONOS includes comprehensive **automated testing workflows** that run on every 
 
 #### **Main Test Workflow** (`.github/workflows/test.yml`)
 - ✅ **Triggers**: Push to `main`/`development` branches, pull requests
-- ✅ **Python Matrix**: Tests across Python 3.11, 3.12
+- ✅ **Python Matrix**: Tests across Python 3.10, 3.11, 3.12
 - ✅ **Full Test Suite**: Complete test coverage with reporting
 - ✅ **Security Scanning**: Automated vulnerability detection
 - ✅ **Minimal Installation Test**: Validates core dependencies
@@ -294,8 +294,7 @@ CRONOS includes comprehensive **automated testing workflows** that run on every 
 - 🌐 **Cross-Platform**: Ubuntu, Windows, macOS compatibility
 
 **Python Version Compatibility:**
-- **Python 3.11+**: Full compatibility with all tests passing
-- **Python 3.10**: Partial compatibility - physics module `test_run_method` tests may fail due to subprocess handling differences
+- **Python 3.10+**: Full compatibility with all tests passing (the Docker image and the noctua2 module use Python 3.10)
 - **Python 3.9 and older**: Not supported due to dependency compatibility issues
 
 #### **Workflow Features**
