@@ -112,7 +112,7 @@ IPGlasma = {
     'jacobianMass': 0.35,
     'useFluctuatingX': 1,
     'sqrtS': 200.,
-    'projectileX': 0.01,  # Bjorken x of the projectile (useFluctuatingX 0 or JIMWLK)
+    'projectileX': 0.01,  # Bjorken x of the projectile (useFluctuatingX 0 or JIMWLK; with JIMWLK it must be below jimwlkInitialX)
     'targetX': 0.01,  # Bjorken x of the target (useFluctuatingX 0 or JIMWLK)
     'xQsFactor': 1,
     'runningCoupling': 0,
@@ -132,7 +132,6 @@ IPGlasma = {
     'LOutput': 30,
     'sizeOutput': 512,
     'writeWilsonLines': 0,
-    'writeOutputsToHDF5': 0,
     'useJIMWLK': 0,  # requires useFluctuatingX 0; evolves from jimwlkInitialX to projectileX/targetX
     'jimwlkMu0': 0.28,
     'jimwlkLambdaQCD': 0.040,
@@ -142,7 +141,7 @@ IPGlasma = {
     'jimwlkDs': 0.005,
     'jimwlkInitialX': 0.01,
     'jimwlkSaveSnapshots': 0,
-    'jimwlkXSnapshotList': [5e-3, 2e-3, 0.0001, 0.00005, 0.00001]
+    'jimwlkXSnapshotList': [5e-3, 2e-3, 1e-3, 5e-4],  # x of the Wilson-line snapshots (jimwlkSaveSnapshots 1)
 }
 
 KoMPoST = {

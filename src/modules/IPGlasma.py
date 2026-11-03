@@ -4,102 +4,34 @@ import os
 import subprocess
 import shutil
 
-# IP-Glasma 2.0 input parameters written from the IPGlasma configuration
-IPGLASMA_PARAMETERS = [
-    "runEvolution",
-    "size",
-    "L",
-    "Ny",
-    "g",
-    "maxTime",
-    "timeStepsPerLatticeSpacing",
-    "inverseQsForMaxTime",
-    "projectile",
-    "target",
-    "sigmaNN",
-    "useNucleus",
-    "readInitialWilsonLines",
-    "bMin",
-    "bMax",
-    "sampleBFromLinearDistribution",
-    "rotateReactionPlane",
-    "g2muGeV",
-    "useSmoothNucleus",
-    "useFixedNpart",
-    "nucleiToAverage",
-    "gaussianWounding",
-    "nucleonPositionsFromFile",
-    "polarizationProjectile",
-    "polarizationTarget",
-    "polarizationProjectileJz",
-    "polarizationTargetJz",
-    "lightNucleusOption",
-    "useInputWSParams",
-    "radiusWS",
-    "diffusenessWS",
-    "beta2",
-    "beta3",
-    "beta4",
-    "gamma",
-    "deltaRnp",
-    "deltaAnp",
-    "forceDMin",
-    "dMin",
-    "nucleonModel",
-    "subNucleonParamType",
-    "subNucleonParamSet",
-    "m",
-    "BG",
-    "protonAnisotropy",
-    "BGq",
-    "BGqVar",
-    "dqMin",
-    "omega",
-    "Nq",
-    "NqFluc",
-    "shiftConstituentQuarkProtonOrigin",
-    "QsMuRatio",
-    "smearQs",
-    "smearingWidth",
-    "UVDamp",
-    "minimumQs2ST",
-    "nucleusQsTableFileName",
-    "rapidity",
-    "usePseudoRapidity",
-    "jacobianMass",
-    "useFluctuatingX",
-    "sqrtS",
-    "projectileX",
-    "targetX",
-    "xQsFactor",
-    "runningCoupling",
-    "mu0",
-    "c",
-    "nFlavors",
-    "LambdaQCD",
-    "runWithQs",
-    "runningCouplingQsFactor",
-    "runWithLocalQs",
-    "runWithKt",
-    "computeGluonMultiplicity",
-    "computeEccentricities",
-    "writeHydro",
-    "writeJazma",
-    "writeTmunu",
-    "LOutput",
-    "sizeOutput",
-    "writeWilsonLines",
-    "writeOutputsToHDF5",
-    "useJIMWLK",
-    "jimwlkMu0",
-    "jimwlkLambdaQCD",
-    "jimwlkC",
-    "jimwlkMass",
-    "jimwlkAlphaS",
-    "jimwlkDs",
-    "jimwlkInitialX",
-    "jimwlkSaveSnapshots",
-]
+# Parameters set by CRONOS instead of the IPGlasma configuration
+CRONOS_CONTROLLED_PARAMETERS = {
+    "seed": "set from general.random_seed",
+    "useSeedList": "always 0",
+    "writeTmunuBinary": "always 0, KoMPoST reads the text T^munu file",
+    "writeOutputsToHDF5": "always 0, the outputs are needed as files",
+}
+
+
+def format_ipglasma_value(value):
+    """Format a configuration value for the IP-Glasma 2.0 input file.
+
+    IP-Glasma 2.0 only accepts 0 or 1 for on/off parameters, a
+    comma-separated list for list parameters and ``none`` for an empty list.
+
+    Args:
+        value: Value from the IPGlasma configuration.
+
+    Returns:
+        str: The value in input-file syntax.
+    """
+    if isinstance(value, bool):
+        return str(int(value))
+    if isinstance(value, (list, tuple)):
+        if not value:
+            return "none"
+        return ",".join(repr(float(v)) for v in value)
+    return str(value)
 
 
 class IPGlasma(BaseModule):
@@ -221,9 +153,9 @@ class IPGlasma(BaseModule):
         """Generate IP-Glasma parameter file for the current event.
 
         Writes ``parameters_IPGlasma.ini`` in the event's ``IPGlasma``
-        directory. All parameters are taken from ``self.config`` and
-        written in the format expected by the IP-Glasma code, including
-        handling of the snapshot list without scientific notation.
+        directory. Every parameter of ``self.config`` is written, so that
+        IP-Glasma checks all of them; the parameters in
+        ``CRONOS_CONTROLLED_PARAMETERS`` are set by CRONOS.
 
         Args:
             event_dir (str): Path to the event-specific directory that
@@ -241,22 +173,17 @@ class IPGlasma(BaseModule):
         ini_file = os.path.join(IPGlasma_dir, "parameters_IPGlasma.ini")
 
         with open(ini_file, "w") as f:
-            # IP-Glasma 2.0 rejects unknown keys and requires all keys
-            # that are not optional; keys of switched-off features are
-            # ignored
-            for key in IPGLASMA_PARAMETERS:
-                f.write(f"{key} {self.config[key]}\n")
+            # Write every key, so that IP-Glasma 2.0, which rejects unknown
+            # keys and requires all keys that are not optional, checks them
+            for key, value in self.config.to_dict().items():
+                if key not in CRONOS_CONTROLLED_PARAMETERS:
+                    f.write(f"{key} {format_ipglasma_value(value)}\n")
             f.write("useSeedList 0\n")
             # seed -1 draws a random seed
             f.write(f"seed {self.full_config.general.random_seed}\n")
             # KoMPoST reads the text T^munu file
             f.write("writeTmunuBinary 0\n")
-            snapshot = self.config.jimwlkXSnapshotList
-            if isinstance(snapshot, list):
-                varStr = ",".join(f"{float(var):.7f}" for var in snapshot)
-            else:
-                varStr = f"{float(snapshot):.7f}"
-            f.write(f"jimwlkXSnapshotList {varStr}\n")
+            f.write("writeOutputsToHDF5 0\n")
             f.write("EndOfFile")
 
         logging.info("[IPGlasma] Input file created successfully.")
@@ -281,14 +208,18 @@ class IPGlasma(BaseModule):
         logging.info("[IPGlasma] Running IP-Glasma...")
 
         cwd = os.getcwd()
+        log_file = None
         try:
             os.chdir(ipglasma_dir)
 
             run_kwargs = {}
             if not self.full_config.general.module_terminal_output:
-                run_kwargs["stdout"] = subprocess.DEVNULL
-                run_kwargs["stderr"] = subprocess.DEVNULL
-                logging.debug("[IPGlasma] Running with suppressed output...")
+                # Keep the output in a log file, IP-Glasma reports input
+                # errors on stdout
+                log_file = open("ipglasma.log", "w")
+                run_kwargs["stdout"] = log_file
+                run_kwargs["stderr"] = subprocess.STDOUT
+                logging.debug("[IPGlasma] Writing output to ipglasma.log...")
             run_external_command(
                 [f"./{ipglasma_exe}", ini_file],
                 memory_threshold_mb=self.full_config.general.memory_threshold_mb,
@@ -298,8 +229,19 @@ class IPGlasma(BaseModule):
         except subprocess.CalledProcessError as e:
             # IP-Glasma 2.0 returns 1 for an invalid input file
             logging.error(f"[IPGlasma] Execution failed: {e}")
+            if log_file is not None:
+                log_file.close()
+                with open("ipglasma.log") as f:
+                    tail = f.readlines()[-20:]
+                logging.error(
+                    "[IPGlasma] Last lines of "
+                    f"{os.path.join(ipglasma_dir, 'ipglasma.log')}:\n"
+                    + "".join(tail)
+                )
             raise
         finally:
+            if log_file is not None:
+                log_file.close()
             os.chdir(cwd)
 
         logging.info("[IPGlasma] Execution finished.")
@@ -313,7 +255,8 @@ class IPGlasma(BaseModule):
         import glob
 
         maxtime = float(self.config.maxTime)
-        candidate = os.path.join(ipglasma_dir, f"Tmunu-t{maxtime}-0.dat")
+        # IP-Glasma writes the time like C++ streams do, e.g. 0.4 or 1
+        candidate = os.path.join(ipglasma_dir, f"Tmunu-t{maxtime:g}-0.dat")
         if os.path.exists(candidate):
             return candidate
         # Fallback: glob for float-formatting differences
