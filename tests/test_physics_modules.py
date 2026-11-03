@@ -2,6 +2,7 @@ import pytest
 import os
 import tempfile
 import shutil
+import subprocess
 from unittest.mock import Mock, patch, MagicMock
 from src.configuration import Configuration
 from src.modules.from_file_IC import FromFileIC
@@ -456,6 +457,29 @@ class TestKoMPoST3D(TestPhysicsModuleBase):
             "./KoMPoST.exe",
             "parameters_KoMPoST3D.ini",
         ]
+
+    @patch("src.modules.KoMPoST3D.run_external_command")
+    def test_run_raises_when_kompost3d_fails(self, mock_run_command):
+        """A failed run (e.g. out of memory) is not passed on silently."""
+        mock_run_command.side_effect = subprocess.CalledProcessError(
+            137, ["./KoMPoST.exe"]
+        )
+        full_config = Configuration(
+            {
+                "general": {
+                    "modules": ["KoMPoST3D"],
+                    "memory_threshold_mb": 1000,
+                    "module_terminal_output": False,
+                }
+            }
+        )
+        os.makedirs(os.path.join(self.event_dir, "KoMPoST3D"))
+        module = KoMPoST3D(
+            self._config(), full_config, self.project_root, "event_0"
+        )
+
+        with pytest.raises(subprocess.CalledProcessError):
+            module.run(self.event_dir)
 
     def test_fetch_output(self):
         """Test fetch_output moves the pimunuNS output to results."""

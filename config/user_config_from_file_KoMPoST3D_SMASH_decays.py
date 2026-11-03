@@ -49,8 +49,9 @@ entropy_matching = {
     "nu_eff": 40.0,  # effective degrees of freedom, should match with KoMPoST3D's NuEffective
 }
 
-# MUSIC reads the grid (Nx, Ny, Neta, dx, deta) from the KoMPoST-3D output header,
-# the values below match it: X_grid_size_in_fm = (Ns-1)*afm, Eta_grid_size = (Neta-1)*deta
+# MUSIC only reads Nx, Ny, dx and dy from the KoMPoST-3D output header. The eta grid
+# and the grid extent must match KoMPoST3D (checked by check_settings):
+# Grid_size_in_eta = Neta, Eta_grid_size = (Neta-1)*deta, X/Y_grid_size_in_fm = (Ns-1)*afm
 MUSIC = {
     "hydro_mode": 2,  # mode for reading in freeze out information
     "boost_invariant": 0,  # 0: no boost invariance, 1: boost invariance

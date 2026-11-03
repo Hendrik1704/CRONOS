@@ -234,6 +234,7 @@ class KoMPoST3D(BaseModule):
             )
         except subprocess.CalledProcessError as e:
             logging.error(f"[KoMPoST3D] Execution failed: {e}")
+            raise
         finally:
             os.chdir(cwd)
 
