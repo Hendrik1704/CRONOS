@@ -88,6 +88,54 @@ def check_if_event_is_good(config, event_dir_results_path, event_id):
     return True
 
 
+def _has_interleaved_comments(file_path):
+    """Check whether a text file has comment lines after its first data row."""
+    try:
+        with open(file_path, "r", errors="replace") as f:
+            seen_data = False
+            for line in f:
+                content = line.strip()
+                if not content:
+                    continue
+                if content.startswith("#"):
+                    if seen_data:
+                        return True
+                else:
+                    seen_data = True
+    except OSError:
+        return False
+    return False
+
+
+def _store_raw_bytes(group, name, file_path, block_size=1 << 20):
+    """Store a file byte for byte as a gzip-compressed uint8 dataset.
+
+    The file is copied in blocks, so large particle lists do not have to
+    fit into memory. The attribute 'storage' = 'raw_bytes' tells readers
+    (e.g. utilities/h5_extractor.py) to write the bytes back unchanged.
+    """
+    size = os.path.getsize(file_path)
+    dset = group.create_dataset(
+        name,
+        shape=(size,),
+        dtype=np.uint8,
+        chunks=(min(block_size, max(size, 1)),),
+        compression="gzip",
+        compression_opts=4,
+    )
+    with open(file_path, "rb") as f:
+        offset = 0
+        while True:
+            block = f.read(block_size)
+            if not block:
+                break
+            dset[offset : offset + len(block)] = np.frombuffer(
+                block, dtype=np.uint8
+            )
+            offset += len(block)
+    dset.attrs["storage"] = np.bytes_("raw_bytes")
+
+
 def zip_into_hdf5(config, event_dir_results_path, event_id):
     """Compress event results into HDF5 format with automatic content detection.
 
@@ -131,6 +179,13 @@ def zip_into_hdf5(config, event_dir_results_path, event_id):
         for file_path in file_list:
             file_name = os.path.basename(file_path)
 
+            if _has_interleaved_comments(file_path):
+                # e.g. the SMASH particle list with '# event N out/end' lines
+                # between the events, which a numeric table would lose
+                _store_raw_bytes(group_temp, file_name, file_path)
+                logging.debug(f"Added {file_path} as raw bytes in HDF5.")
+                continue
+
             try:
                 data = np.genfromtxt(file_path, dtype=np.float64)
 
@@ -157,9 +212,7 @@ def zip_into_hdf5(config, event_dir_results_path, event_id):
                     # column; keep which one it was for the extraction
                     with open(file_path, "r") as f:
                         n_rows = sum(
-                            1
-                            for line in f
-                            if line.strip() and not line.startswith("#")
+                            1 for line in f if line.split("#", 1)[0].strip()
                         )
                     dset.attrs["table_layout"] = np.bytes_(
                         "row" if n_rows == 1 else "column"

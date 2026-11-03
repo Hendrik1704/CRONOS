@@ -28,12 +28,15 @@ from src.module_base import BaseModule
 CALLS = []
 # Behaviour switches of the fake modules: {(module name, event_id): action}
 FAILURES = {}
+# Calls of prepare_environment: (module name, event directory name)
+PREPARED = []
 
 
 class FakeModule(BaseModule):
     name = None
 
     def prepare_environment(self, event_dir):
+        PREPARED.append((self.name, os.path.basename(event_dir)))
         os.makedirs(os.path.join(event_dir, self.name), exist_ok=True)
 
     def prepare_input(self, event_dir):
@@ -73,9 +76,11 @@ REGISTRY = {"ModuleA": ModuleA, "ModuleB": ModuleB}
 def reset_fakes():
     CALLS.clear()
     FAILURES.clear()
+    PREPARED.clear()
     yield
     CALLS.clear()
     FAILURES.clear()
+    PREPARED.clear()
 
 
 def _config(random_seed=42, number_of_jobs=2, number_events_per_job=2):
@@ -266,7 +271,9 @@ def test_module_directory_is_set_up_again_after_interrupted_cleanup(tmp_path):
             run_modules(config, REGISTRY, str(job_dir), str(tmp_path))
 
     CALLS.clear()
+    PREPARED.clear()
     run_modules(config, REGISTRY, str(job_dir), str(tmp_path))
+    assert PREPARED == [("ModuleB", "event_0")]
     assert [call[0] for call in CALLS] == ["ModuleB"]
     assert (job_dir / "event_0.h5").exists()
 
@@ -422,8 +429,10 @@ def test_wsu_script_host_paths(tmp_path):
     assert f'--job_dir "{run_dir}/${{JOB_DIR}}"' in script
     assert f'--main_config_path "{run_dir}/main_config.py"' in script
     assert f'--bind "{run_dir}"' in script
-    # The repository may be the container's /app, which is not on the host
+    # The module directories link into the host repository, which is
+    # bound at its own path (no /work mount in host mode)
     assert ":/work" not in script
+    assert '--bind "${REPO_DIR}"' in script
 
 
 def test_wsu_script_container_paths(tmp_path):

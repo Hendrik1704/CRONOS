@@ -386,14 +386,15 @@ class iSS(BaseModule):
         dst_file = os.path.join(
             event_dir, "results", f"output_{current_module_index}.dat"
         )
-        shutil.move(src_file, dst_file)
-        shutil.rmtree(os.path.join(event_dir, "iSS"))
-        logging.info(f"[iSS] Moved {src_file} to {dst_file}")
-
-        # remove the MUSIC parameter file in results
+        # remove the MUSIC parameter file in results first: output_N.dat is
+        # published last, so that its existence shows that iSS finished
         music_param_file = os.path.join(
             event_dir, "results", "parameters_MUSIC.ini"
         )
         if os.path.exists(music_param_file):
             os.remove(music_param_file)
             logging.info(f"[iSS] Removed {music_param_file}")
+
+        shutil.move(src_file, dst_file)
+        shutil.rmtree(os.path.join(event_dir, "iSS"))
+        logging.info(f"[iSS] Moved {src_file} to {dst_file}")

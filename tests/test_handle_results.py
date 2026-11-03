@@ -207,8 +207,9 @@ def test_file_with_many_comment_lines_is_packed(tmp_path):
 
     assert handle_results(config, str(results), "0")
 
+    # The comment lines between the events are kept: the file is stored
+    # byte for byte (no attribute size limit involved)
     with h5py.File(results / "event_0.h5") as f:
         dset = f["event_0"]["output_0.dat"]
-        assert dset.shape == (2000, 4)
-        full_header = dset.attrs["full_header"].decode()
-        assert full_header.count("\n") == 2  # only the leading block
+        assert dset.attrs["storage"].decode() == "raw_bytes"
+        assert dset[()].tobytes().decode() == "\n".join(lines) + "\n"

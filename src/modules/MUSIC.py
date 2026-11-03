@@ -389,16 +389,17 @@ class MUSIC(BaseModule):
                 **kwargs,
             )
         except subprocess.CalledProcessError as e:
-            logging.error(f"[MUSIC] Execution failed: {e}")
+            logging.error(f"[MUSIC] Execution failed: {e}, see {log_path}")
             raise
         finally:
             if log_file is not None:
                 log_file.close()
             os.chdir(cwd)
+            # Show the output also when MUSIC failed
+            if self.full_config.general.module_terminal_output and log_path:
+                with open(log_path, errors="replace") as f:
+                    print(f.read(), end="")
 
-        if self.full_config.general.module_terminal_output:
-            with open(log_path, errors="replace") as f:
-                print(f.read(), end="")
         if not music_evolution_finished(log_path):
             raise RuntimeError(
                 f"[MUSIC] MUSIC exited without finishing the hydro evolution, "
@@ -474,11 +475,14 @@ class MUSIC(BaseModule):
             # Concatenate the per-thread parts into the results file; write
             # a temporary file first, so that output_N.dat is only ever
             # complete (resume treats an existing output as finished)
-            with open(dst_file + ".tmp", "wb") as out_f:
+            # (inside MUSIC_dir, so a failed attempt leaves nothing in
+            # results/ and the file is removed with the directory)
+            combined = os.path.join(MUSIC_dir, "surface_combined.tmp")
+            with open(combined, "wb") as out_f:
                 for src in matching_files:
                     with open(src, "rb") as in_f:
                         shutil.copyfileobj(in_f, out_f)
-            os.replace(dst_file + ".tmp", dst_file)
+            os.replace(combined, dst_file)
 
         # Clean up MUSIC working directory entirely
         try:

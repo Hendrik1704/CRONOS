@@ -82,10 +82,12 @@ def glob_in_directory(directory: Path, pattern: str) -> list[str]:
     # A pattern that already starts with the directory, as in
     # `run/ --pattern 'run/job_*/event_*.h5'`, is used as given; any other
     # pattern only matches inside the directory
-    prefixes = tuple(
-        os.path.normpath(path) + os.sep
-        for path in (str(directory), os.path.relpath(str(directory)))
-    )
+    paths = [str(directory)]
+    try:
+        paths.append(os.path.relpath(str(directory)))
+    except ValueError:  # e.g. another drive on Windows
+        pass
+    prefixes = tuple(os.path.normpath(path) + os.sep for path in paths)
     if os.path.normpath(pattern).startswith(prefixes):
         return glob.glob(pattern, recursive=True)
     in_dir = os.path.join(glob.escape(str(directory)), pattern)

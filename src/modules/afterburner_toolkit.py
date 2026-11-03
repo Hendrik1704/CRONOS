@@ -5,6 +5,14 @@ import subprocess
 import shutil
 
 
+
+def _link(target, link_path):
+    """Create a symlink, replacing an existing link (setup is repeated
+    after an interrupted cleanup of the module directory)."""
+    if os.path.islink(link_path) or os.path.exists(link_path):
+        os.remove(link_path)
+    os.symlink(target, link_path)
+
 class afterburner_toolkit(BaseModule):
     """Analysis toolkit module for flow and correlation measurements.
 
@@ -82,7 +90,7 @@ class afterburner_toolkit(BaseModule):
             "EOS",
         )
         if os.path.exists(afterburner_toolkit_EOS_path):
-            os.symlink(
+            _link(
                 afterburner_toolkit_EOS_path,
                 os.path.join(event_dir, "afterburner_toolkit", "EOS"),
             )
@@ -101,7 +109,7 @@ class afterburner_toolkit(BaseModule):
                 "convert_to_binary_SMASH.e",
             )
             if os.path.exists(smash_converter_path):
-                os.symlink(
+                _link(
                     smash_converter_path,
                     os.path.join(
                         event_dir,
@@ -126,7 +134,7 @@ class afterburner_toolkit(BaseModule):
             "hadronic_afterburner_tools.e",
         )
         if os.path.exists(afterburner_toolkit_exe_path):
-            os.symlink(
+            _link(
                 afterburner_toolkit_exe_path,
                 os.path.join(
                     event_dir,
@@ -173,6 +181,10 @@ class afterburner_toolkit(BaseModule):
             The toolkit can analyze both SMASH OSCAR format and binary
             particle formats, adapting automatically to the input type.
         """
+        # The links may be missing after an interrupted cleanup of the
+        # module directory (fetch_output removes it), so set them up again
+        os.makedirs(os.path.join(event_dir, "afterburner_toolkit"), exist_ok=True)
+        self.prepare_environment(event_dir)
         logging.info(f"[afterburner_toolkit] Create input file...")
         current_module_index = self.full_config.general.modules.index(
             "afterburner_toolkit"

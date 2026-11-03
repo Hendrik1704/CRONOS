@@ -161,12 +161,21 @@ def copy_event_file(
     if ref.event_name in job_group:
         attrs = job_group[ref.event_name].attrs
         existing_src = attrs.get("source_file", "")
-        if (
-            existing_src == str(src_path)
-            and attrs.get("source_size") == stat.st_size
-            and attrs.get("source_mtime") == stat.st_mtime
+        if not existing_src:
+            # No source attributes: an incomplete copy (e.g. the process was
+            # killed), which is replaced
+            print(f"REPAIR {ref.group_path}: incomplete earlier copy")
+            del job_group[ref.event_name]
+            return copy_event_file(src_path, out_h5, ref)
+        if existing_src == str(src_path) and (
+            "source_size" not in attrs
+            or (
+                attrs["source_size"] == stat.st_size
+                and attrs["source_mtime"] == stat.st_mtime
+            )
         ):
-            # The same file was merged before: nothing to do.
+            # The same file was merged before (databases written before
+            # size and mtime were recorded only store the path)
             return
         # A different event file (or a new file at a reused path, e.g. a
         # run directory prepared again) maps to the same group: never

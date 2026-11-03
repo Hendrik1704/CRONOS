@@ -825,6 +825,22 @@ class TestMUSICRunAndOutput(TestPhysicsModuleBase):
                 module.run(self.event_dir)
         assert "freeze-out surface is not closed" in caplog.text
 
+    def test_run_with_terminal_output_shows_output_on_failure(self, capsys):
+        module = self.make_module(terminal_output=True)
+
+        def crash(cmd, **kwargs):
+            kwargs["stdout"].write("MUSIC crashed here\n")
+            raise subprocess.CalledProcessError(1, cmd)
+
+        with patch.object(
+            sys.modules["src.modules.MUSIC"],
+            "run_external_command",
+            side_effect=crash,
+        ):
+            with pytest.raises(subprocess.CalledProcessError):
+                module.run(self.event_dir)
+        assert "MUSIC crashed here" in capsys.readouterr().out
+
     def test_run_with_terminal_output_still_checks_completion(self, capsys):
         """The output is printed afterwards, and the check still runs."""
         module = self.make_module(terminal_output=True)

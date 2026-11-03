@@ -96,3 +96,49 @@ def test_directory_relative_pattern_does_not_fall_back_to_cwd(
     assert module.glob_in_directory(
         requested, "runB/job_*/event_*.h5"
     ) == ["runB/job_1/event_0.h5"]
+
+
+def test_incomplete_group_is_replaced_and_old_database_is_accepted(tmp_path):
+    event_database = _import_utility("event_database")
+    src = tmp_path / "run" / "job_0" / "event_0.h5"
+    src.parent.mkdir(parents=True)
+    with h5py.File(src, "w") as f:
+        f.create_dataset("a.dat", data=np.arange(3.0))
+    ref = event_database.event_ref_from_path(src)
+
+    with h5py.File(tmp_path / "db.h5", "w") as out_h5:
+        # left by a killed process: no source attributes
+        out_h5.require_group("job_0").create_group("event_0")
+        event_database.copy_event_file(src, out_h5, ref)
+        group = out_h5["job_0"]["event_0"]
+        assert "a.dat" in group and group.attrs["source_file"] == str(src)
+
+        # a database written before size and mtime were recorded
+        del group.attrs["source_size"]
+        del group.attrs["source_mtime"]
+        event_database.copy_event_file(src, out_h5, ref)  # no error
+
+
+def test_file_with_comments_between_events_round_trips(tmp_path):
+    """E.g. the SMASH particle list: the event lines must survive."""
+    results = tmp_path / "results"
+    spvn = results / "spvn_results_0"
+    spvn.mkdir(parents=True)
+    text = (
+        "#!OSCAR2013 particle_lists t x y z\n"
+        "# event 0 out 1\n1 2 3 4\n# event 0 end 0\n"
+        "# event 1 out 2\n5 6 7 8\n9 10 11 12\n# event 1 end 0\n"
+    )
+    (spvn / "output_5.dat").write_text(text)
+    config = Configuration({"general": {"modules": ["IPGlasma"]}})
+    assert zip_into_hdf5(config, str(results), "0")
+
+    h5_extractor = _import_utility("h5_extractor")
+    extractor = h5_extractor.HDF5Extractor.__new__(h5_extractor.HDF5Extractor)
+    extractor.output_dir = tmp_path
+    with h5py.File(results / "event_0.h5") as f:
+        dset = f["event_0"]["output_5.dat"]
+        path = extractor._save_as_native(
+            dset, "output_5.dat", {"name": "output_5.dat"}
+        )
+    assert Path(path).read_text() == text

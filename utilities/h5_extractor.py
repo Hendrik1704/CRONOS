@@ -352,6 +352,17 @@ class HDF5Extractor:
                 data = dataset[:]
             attributes = dict(dataset.attrs) if dataset.attrs else {}
 
+            storage = attributes.get("storage")
+            if isinstance(storage, (bytes, np.bytes_)):
+                storage = storage.decode()
+            if storage == "raw_bytes":
+                # A file stored byte for byte (e.g. a particle list with
+                # comment lines between the events)
+                output_path = self.output_dir / safe_name
+                with open(output_path, "wb") as f:
+                    f.write(np.asarray(data, dtype=np.uint8).tobytes())
+                return str(output_path)
+
             # Analyze attributes for format hints
             format_hint = self._detect_native_format(
                 dataset_info, attributes, data
