@@ -95,6 +95,7 @@ class KoMPoST(BaseModule):
         - tOut: Final time when hydrodynamics takes over (fm/c)
         - InputFile: Energy-momentum tensor data from initial conditions
         - OutputFileTag: Prefix for KoMPoST output files
+        - WriteTmunuBackup: Always 0, the backup T^μν maps are not needed
 
         Physics Context:
             KoMPoST performs effective kinetic theory evolution of the energy-momentum
@@ -129,7 +130,10 @@ class KoMPoST(BaseModule):
             f.write(f"tIn={self.config.tIn};\n\n")
             f.write(f"tOut = {self.config.tOut};\n\n")
             f.write(f"InputFile={self.config.InputFile}\n")
-            f.write(f"OutputFileTag={self.config.OutputFileTag}\n\n")
+            f.write(f"OutputFileTag={self.config.OutputFileTag}\n")
+            f.write("# The KoMPoST directory is removed in fetch_output, so skip\n")
+            f.write("# the input, full and background T^{munu} backup files\n")
+            f.write("WriteTmunuBackup = 0\n\n")
 
             # KoMPoSTParameters
             f.write("[KoMPoSTParameters]\n")

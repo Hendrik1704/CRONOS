@@ -257,6 +257,7 @@ class TestKoMPoST(TestPhysicsModuleBase):
             content = f.read()
             assert "0.08" in content  # shear viscosity
             assert "0.2" in content  # tau0
+            assert "WriteTmunuBackup = 0" in content
 
     @patch("src.modules.KoMPoST.run_external_command")
     def test_run_method(self, mock_run_command):
