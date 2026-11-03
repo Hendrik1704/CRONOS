@@ -516,21 +516,26 @@ class HDF5Extractor:
         else:
             output_path = self.output_dir / f"{safe_name}.dat"
 
-        header = attributes.get("header")
+        # The full leading comment block if stored, else the first line
+        header = attributes.get("full_header", attributes.get("header"))
         if isinstance(header, (bytes, np.bytes_)):
             header = header.decode("utf-8", errors="replace")
 
         if data.ndim == 1:
             # np.genfromtxt returns 1-D arrays both for a single-row table
-            # and for a single column; a header naming as many columns as
-            # there are values identifies the single-row case.
-            n_header_cols = (
-                len(str(header).lstrip("#").split()) if header else 0
-            )
-            if data.size > 1 and n_header_cols == data.size:
-                data = data.reshape(1, -1)
+            # and for a single column; CRONOS stores which one it was. For
+            # older files, a header naming as many columns as there are
+            # values identifies the single-row case.
+            layout = attributes.get("table_layout")
+            if isinstance(layout, (bytes, np.bytes_)):
+                layout = layout.decode()
+            if layout is None:
+                first_header_line = str(header).splitlines()[0] if header else ""
+                n_header_cols = len(first_header_line.lstrip("#").split())
+                is_row = data.size > 1 and n_header_cols == data.size
             else:
-                data = data.reshape(-1, 1)
+                is_row = layout == "row"
+            data = data.reshape(1, -1) if is_row else data.reshape(-1, 1)
 
         with open(output_path, "w") as f:
             if header:

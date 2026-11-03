@@ -5,7 +5,10 @@ from src.cluster_submission import submission_script_cluster
 from src.checkpoint_manager import CheckpointManager
 from src.configuration import snapshot_config_paths
 import errno
-import fcntl
+try:
+    import fcntl
+except ImportError:  # not available on Windows
+    fcntl = None
 import logging
 import os
 import shutil
@@ -566,6 +569,8 @@ def run_modules(
     lock_path = os.path.join(job_dir, ".cronos.lock")
     with open(lock_path, "w") as lock_file:
         try:
+            if fcntl is None:
+                raise OSError("file locks are not available on this platform")
             fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             raise RuntimeError(
@@ -586,7 +591,9 @@ def run_modules(
                     "Removed existing checkpoint file - starting from beginning"
                 )
 
-        _run_modules_locked(config, module_registry, job_dir, project_root)
+        _run_modules_locked(
+            config, module_registry, job_dir, project_root, force_restart
+        )
 
 
 def _remove_event_directory(event_dir_path):
@@ -601,7 +608,9 @@ def _remove_event_directory(event_dir_path):
         )
 
 
-def _run_modules_locked(config, module_registry, job_dir, project_root):
+def _run_modules_locked(
+    config, module_registry, job_dir, project_root, force_restart=False
+):
     """Run all unfinished events of a job (see run_modules)."""
     # Initialize checkpoint manager
     checkpoint_manager = CheckpointManager(job_dir)
@@ -703,9 +712,10 @@ def _run_modules_locked(config, module_registry, job_dir, project_root):
                     "results",
                     f"output_{all_modules.index(module_name)}.dat",
                 )
-                if os.path.exists(module_output):
-                    # fetch_output moves the output into results/ before it
-                    # removes the module directory, so the module finished
+                if not force_restart and os.path.exists(module_output):
+                    # fetch_output moves output_N.dat into results/ as its
+                    # last output, before it removes the module directory,
+                    # so the module finished
                     # but the job was killed before the checkpoint was saved
                     logging.info(
                         f"[CHECKPOINT] {module_name} output already in "

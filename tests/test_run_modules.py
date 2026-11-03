@@ -2,7 +2,10 @@
 failure handling, result handling, seeds, locking) with fake modules."""
 
 import argparse
-import fcntl
+try:
+    import fcntl
+except ImportError:  # not available on Windows
+    fcntl = None
 import json
 import os
 import re
@@ -330,6 +333,7 @@ def test_seeds_per_event(tmp_path, random_seed):
     assert re.search(rf"'random_seed': {expected}\b", text)
 
 
+@pytest.mark.skipif(fcntl is None, reason="needs fcntl file locks")
 def test_job_dir_lock(tmp_path):
     run_dir = _prepare(tmp_path)
     job_dir = run_dir / "job_0"

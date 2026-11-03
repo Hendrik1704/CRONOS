@@ -178,9 +178,6 @@ def copy_event_file(
 
     with h5py.File(src_path, "r") as in_h5:
         event_group = job_group.create_group(ref.event_name)
-        event_group.attrs["source_file"] = str(src_path)
-        event_group.attrs["source_size"] = stat.st_size
-        event_group.attrs["source_mtime"] = stat.st_mtime
         try:
             # New format: datasets are stored inside an event_{id} group.
             # Navigate into it if present; fall back to the file root.
@@ -191,8 +188,13 @@ def copy_event_file(
             )
             for key in inner.keys():
                 inner.copy(inner[key], event_group, name=key)
-        except Exception:
-            # Do not leave a partially copied event behind.
+            # The source attributes mark the group as complete, so they are
+            # only written after all datasets were copied
+            event_group.attrs["source_file"] = str(src_path)
+            event_group.attrs["source_size"] = stat.st_size
+            event_group.attrs["source_mtime"] = stat.st_mtime
+        except BaseException:
+            # Do not leave a partially copied event behind (also on Ctrl+C).
             del job_group[ref.event_name]
             raise
 

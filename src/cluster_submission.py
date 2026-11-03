@@ -300,9 +300,12 @@ def create_wsu_submission_script(args, config):
                 f'    --bind "${{REPO_DIR}}:{CONTAINER_WORK_DIR}" \\\n'
             )
         else:
-            # All paths are absolute; only the run directory is needed (the
-            # repository may be the container's /app, which is not on the host)
+            # All paths are absolute. The module directories link into the
+            # repository's external_codes, so bind it at its own path, unless
+            # it is the container's /app (prepared inside the container)
             script_file.write(f'    --bind "{run_dir}" \\\n')
+            if str(CRONOS_ROOT) != "/app":
+                script_file.write('    --bind "${REPO_DIR}" \\\n')
         script_file.write('    "$SIF_IMAGE" \\\n')
         script_file.write("    python3 /app/run_simulations.py \\\n")
 

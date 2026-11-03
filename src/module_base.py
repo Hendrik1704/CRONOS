@@ -304,9 +304,13 @@ def run_subprocess_with_memory_monitoring(
         logging.warning(
             f"[{module_name}] Subprocess interrupted, terminating..."
         )
-        process.terminate()
-        process.wait()
         memory_stats["monitoring_active"] = False
+        process.terminate()
+        try:
+            process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
         raise
 
     except subprocess.TimeoutExpired:

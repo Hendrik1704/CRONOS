@@ -1,3 +1,4 @@
+import sys
 import pytest
 import time
 import os
@@ -223,7 +224,9 @@ class TestRunExternalCommand:
     """Test the subprocess runner used by the modules."""
 
     def test_run_external_command_success(self):
-        result = run_external_command(["true"], "test_module", timeout=10)
+        result = run_external_command(
+            [sys.executable, "-c", "pass"], "test_module", timeout=10
+        )
         assert result["return_code"] == 0
         assert result["success"] is True
 
@@ -231,7 +234,10 @@ class TestRunExternalCommand:
         import subprocess
 
         with pytest.raises(subprocess.CalledProcessError):
-            run_external_command(["false"], "test_module")
+            run_external_command(
+                [sys.executable, "-c", "import sys; sys.exit(1)"],
+                "test_module",
+            )
 
     @pytest.mark.parametrize("capture_output", [False, True])
     def test_run_external_command_timeout_kills_process(self, capture_output):
@@ -250,7 +256,7 @@ class TestRunExternalCommand:
         with patch("subprocess.Popen", side_effect=spy_popen):
             with pytest.raises(subprocess.TimeoutExpired):
                 run_external_command(
-                    ["sleep", "30"],
+                    [sys.executable, "-c", "import time; time.sleep(30)"],
                     "test_module",
                     timeout=0.5,
                     capture_output=capture_output,

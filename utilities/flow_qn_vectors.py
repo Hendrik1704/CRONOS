@@ -74,16 +74,22 @@ class EventInput:
 def glob_in_directory(directory: Path, pattern: str) -> list[str]:
     """Glob `pattern` relative to `directory` (absolute patterns are used as is).
 
-    For backwards compatibility, a relative pattern that matches nothing inside
-    `directory` is retried relative to the current working directory, as in
-    `run/ --pattern 'run/job_*/event_*.h5'`.
+    A relative pattern that starts with `directory` itself, as in
+    `run/ --pattern 'run/job_*/event_*.h5'`, is used as given.
     """
     if os.path.isabs(pattern):
         return glob.glob(pattern, recursive=True)
-    in_dir = os.path.join(glob.escape(str(directory)), pattern)
-    return glob.glob(in_dir, recursive=True) or glob.glob(
-        pattern, recursive=True
+    # A pattern that already starts with the directory, as in
+    # `run/ --pattern 'run/job_*/event_*.h5'`, is used as given; any other
+    # pattern only matches inside the directory
+    prefixes = tuple(
+        os.path.normpath(path) + os.sep
+        for path in (str(directory), os.path.relpath(str(directory)))
     )
+    if os.path.normpath(pattern).startswith(prefixes):
+        return glob.glob(pattern, recursive=True)
+    in_dir = os.path.join(glob.escape(str(directory)), pattern)
+    return glob.glob(in_dir, recursive=True)
 
 
 def iter_event_files(

@@ -445,11 +445,6 @@ class IPGlasma(BaseModule):
                 f"IP-Glasma output not found for writeOutputs={write_outputs}"
             )
 
-        dst_file = os.path.join(
-            results_dir, f"output_{current_module_index}.dat"
-        )
-        shutil.move(src_file, dst_file)
-        logging.info(f"[IPGlasma] Moved {src_file} to {dst_file}")
 
         # Additional files: keep original names
         extra_files = [
@@ -467,6 +462,14 @@ class IPGlasma(BaseModule):
                 logging.warning(
                     f"[IPGlasma] Expected file {src} not found; skipping."
                 )
+
+        # output_N.dat is moved last: on resume its existence shows that
+        # all outputs were collected
+        dst_file = os.path.join(
+            results_dir, f"output_{current_module_index}.dat"
+        )
+        shutil.move(src_file, dst_file)
+        logging.info(f"[IPGlasma] Moved {src_file} to {dst_file}")
 
         shutil.rmtree(ipglasma_dir)
         logging.info(f"[IPGlasma] Removed directory {ipglasma_dir}")

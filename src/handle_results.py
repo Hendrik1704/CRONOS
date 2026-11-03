@@ -152,6 +152,19 @@ def zip_into_hdf5(config, event_dir_results_path, event_id):
                             break
                         header_lines.append(line.strip())
 
+                if data.ndim == 1:
+                    # genfromtxt gives 1-D arrays for one row and for one
+                    # column; keep which one it was for the extraction
+                    with open(file_path, "r") as f:
+                        n_rows = sum(
+                            1
+                            for line in f
+                            if line.strip() and not line.startswith("#")
+                        )
+                    dset.attrs["table_layout"] = np.bytes_(
+                        "row" if n_rows == 1 else "column"
+                    )
+
                 if header_lines:
                     dset.attrs["header"] = np.bytes_(header_lines[0])
                 if len(header_lines) > 1:
