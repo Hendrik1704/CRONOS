@@ -15,14 +15,19 @@ Database usage (merged HDF5 from `utilities/event_database.py build`):
 
     # All event groups
     python utilities/flow_qn_vectors.py --db merged_events.h5 --all-events
+
+Event files that cannot be processed are skipped with a message; the exit code
+is then 2.
 """
 
 from __future__ import annotations
 
 import argparse
 import glob
+import os
 import io
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Iterator, Sequence
@@ -57,12 +62,28 @@ class EventInput:
 
     @property
     def label(self) -> str:
-        # Create a stable label like job_0_event_0
-        parts = list(self.path.parts)
-        job = next((p for p in parts if p.startswith("job_")), "job")
+        # Create a stable label like job_0_event_0, using the job directory
+        # closest to the event file (normally its parent).
+        parts = list(self.path.parent.parts)
+        job = next((p for p in reversed(parts) if _JOB_RE.fullmatch(p)), "job")
         m = re.search(r"event_(\d+)\.h5$", self.path.name)
         ev = f"event_{m.group(1)}" if m else self.path.stem
         return f"{job}_{ev}"
+
+
+def glob_in_directory(directory: Path, pattern: str) -> list[str]:
+    """Glob `pattern` relative to `directory` (absolute patterns are used as is).
+
+    For backwards compatibility, a relative pattern that matches nothing inside
+    `directory` is retried relative to the current working directory, as in
+    `run/ --pattern 'run/job_*/event_*.h5'`.
+    """
+    if os.path.isabs(pattern):
+        return glob.glob(pattern, recursive=True)
+    in_dir = os.path.join(glob.escape(str(directory)), pattern)
+    return glob.glob(in_dir, recursive=True) or glob.glob(
+        pattern, recursive=True
+    )
 
 
 def iter_event_files(
@@ -76,7 +97,7 @@ def iter_event_files(
                 raise ValueError(
                     "When an input is a directory you must provide --pattern"
                 )
-            files.extend(Path(x) for x in glob.glob(pattern, recursive=True))
+            files.extend(Path(x) for x in glob_in_directory(p, pattern))
         else:
             files.append(p)
     unique = sorted({p.resolve() for p in files if p.suffix == ".h5"})
@@ -311,7 +332,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--pattern",
         default=None,
-        help="Glob pattern used when an input is a directory, e.g. 'run/job_*/event_*.h5'",
+        help=(
+            "Glob pattern used when an input is a directory, relative to that "
+            "directory, e.g. 'job_*/event_*.h5'"
+        ),
     )
     parser.add_argument(
         "--out-dir",
@@ -411,10 +435,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not events:
         raise SystemExit("No event .h5 files found (or use --db)")
 
+    skipped = 0
     for ev in events:
-        process_event_file(ev, out_dir, args.pTmin, args.pTmax)
+        try:
+            process_event_file(ev, out_dir, args.pTmin, args.pTmax)
+        except Exception as e:
+            # One unreadable/incomplete event must not abort the whole run.
+            skipped += 1
+            print(f"SKIP {ev.path} ({e})", file=sys.stderr)
 
-    print(f"Processed {len(events)} event file(s). Outputs in {out_dir}")
+    processed = len(events) - skipped
+    print(f"Processed {processed} event file(s). Outputs in {out_dir}")
+    if skipped:
+        print(f"Skipped {skipped} event file(s)", file=sys.stderr)
+        return 2
     return 0
 
 

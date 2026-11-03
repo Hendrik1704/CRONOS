@@ -101,3 +101,51 @@ def test_centrality_binning_writes_expected_bins(tmp_path: Path):
     # Sorted descending: most central first.
     assert np.allclose(v0, [100.0, 50.0])
     assert np.allclose(v1, [10.0, 1.0])
+
+
+@pytest.mark.unit
+def test_centrality_binning_skips_unreadable_file(tmp_path: Path):
+    project_root = Path(__file__).resolve().parents[1]
+    cb = _import_centrality_module(project_root)
+
+    run_dir = tmp_path / "run"
+    _write_nch_event(run_dir / "job_0" / "event_0.h5", nch=10.0, key=cb.NCH_KEY)
+    broken = run_dir / "job_0" / "event_1.h5"
+    broken.write_bytes(b"truncated")
+
+    out_dir = tmp_path / "bins"
+    rc = cb.main(
+        [str(run_dir), "--pattern", "job_*/event_*.h5"]
+        + ["--cuts", "0", "100", "--out-dir", str(out_dir)]
+    )
+    assert rc == 2
+    text = (out_dir / "C0-100.txt").read_text(encoding="utf-8")
+    assert "event_0.h5" in text
+    assert "event_1.h5" not in text
+
+
+@pytest.mark.unit
+def test_centrality_binning_links_use_job_dirs_and_relative_paths(
+    tmp_path: Path,
+):
+    project_root = Path(__file__).resolve().parents[1]
+    cb = _import_centrality_module(project_root)
+
+    # The run lives below an unrelated "job_42" directory (e.g. scratch).
+    run_dir = tmp_path / "job_42" / "run_wsu"
+    _write_nch_event(run_dir / "job_0" / "event_0.h5", nch=10.0, key=cb.NCH_KEY)
+    _write_nch_event(run_dir / "job_1" / "event_0.h5", nch=5.0, key=cb.NCH_KEY)
+
+    out_dir = run_dir / "centrality_bins"
+    rc = cb.main(
+        [str(run_dir), "--pattern", "job_*/event_*.h5"]
+        + ["--cuts", "0", "100", "--out-dir", str(out_dir)]
+        + ["--link", "symlink"]
+    )
+    assert rc == 0
+    bin_dir = out_dir / "C0-100"
+    assert sorted(p.name for p in bin_dir.iterdir()) == ["job_0", "job_1"]
+    link = bin_dir / "job_0" / "event_0.h5"
+    assert link.is_symlink()
+    assert Path(link.readlink()) == Path("../../../job_0/event_0.h5")
+    assert link.resolve() == (run_dir / "job_0" / "event_0.h5").resolve()

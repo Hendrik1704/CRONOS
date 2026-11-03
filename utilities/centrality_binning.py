@@ -12,7 +12,11 @@ The script outputs one text file per bin listing:
 Typical usage:
     python utilities/centrality_binning.py run/ --pattern 'run/job_*/event_*.h5'
 
-Optionally it can also create directories and symlink the event files.
+Optionally it can also create directories and symlink the event files
+(`<out-dir>/<bin>/job_<N>/event_<M>.h5`, using relative symlinks).
+
+Event files that cannot be read are skipped with a message; the exit code is
+then 2 (0 if all files were used).
 """
 
 from __future__ import annotations
@@ -21,6 +25,8 @@ import argparse
 import glob
 import io
 import os
+import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
@@ -32,6 +38,8 @@ import numpy as np
 DEFAULT_CENTRALITY_CUTS = (0, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100)
 
 NCH_KEY = "particle_9999_vndata_eta_-0.5_0.5.dat"
+
+_JOB_RE = re.compile(r"job_\d+")
 
 
 @dataclass(frozen=True)
@@ -91,6 +99,21 @@ def _extract_nch_from_event_file(event_h5: Path) -> float:
     return float(table[idx[0], 1])
 
 
+def glob_in_directory(directory: Path, pattern: str) -> list[str]:
+    """Glob `pattern` relative to `directory` (absolute patterns are used as is).
+
+    For backwards compatibility, a relative pattern that matches nothing inside
+    `directory` is retried relative to the current working directory, as in
+    `run/ --pattern 'run/job_*/event_*.h5'`.
+    """
+    if os.path.isabs(pattern):
+        return glob.glob(pattern, recursive=True)
+    in_dir = os.path.join(glob.escape(str(directory)), pattern)
+    return glob.glob(in_dir, recursive=True) or glob.glob(
+        pattern, recursive=True
+    )
+
+
 def discover_event_files(
     inputs: Sequence[str], pattern: str | None
 ) -> list[Path]:
@@ -102,7 +125,7 @@ def discover_event_files(
                 raise ValueError(
                     "When an input is a directory you must provide --pattern"
                 )
-            files.extend(Path(x) for x in glob.glob(pattern, recursive=True))
+            files.extend(Path(x) for x in glob_in_directory(p, pattern))
         else:
             files.append(p)
     unique = sorted({p.resolve() for p in files if p.suffix == ".h5"})
@@ -128,21 +151,20 @@ def maybe_link_events(
     bin_dir.mkdir(parents=True, exist_ok=True)
     
     for ev in events:
-        # Extract job index from the event file path (e.g., "job_123")
-        job_index = None
-        parts = ev.path.parts
-        for part in parts:
-            if part.startswith("job_"):
-                job_index = part[4:]
-                break
-        
-        if job_index is None:
+        # Use the job directory closest to the event file (e.g. "job_123"),
+        # i.e. normally its parent directory.
+        job_name = next(
+            (p for p in reversed(ev.path.parent.parts) if _JOB_RE.fullmatch(p)),
+            None,
+        )
+
+        if job_name is None:
             raise ValueError(
                 f"Could not extract job index from path: {ev.path}"
             )
         
-        # Create job-specific subdirectory
-        job_dir = bin_dir / job_index
+        # Create job-specific subdirectory (bin_dir/job_N/)
+        job_dir = bin_dir / job_name
         job_dir.mkdir(parents=True, exist_ok=True)
         
         dst = job_dir / ev.path.name
@@ -151,7 +173,9 @@ def maybe_link_events(
             dst.unlink()
         
         if method == "symlink":
-            os.symlink(ev.path, dst)
+            # Relative link: stays valid when the tree is accessed through a
+            # different mount point (e.g. created in Apptainer under /work).
+            os.symlink(os.path.relpath(ev.path, job_dir), dst)
         elif method == "copy":
             import shutil
 
@@ -172,7 +196,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--pattern",
         default=None,
-        help="Glob used when input is a directory, e.g. 'run/job_*/event_*.h5'",
+        help=(
+            "Glob used when input is a directory, relative to that directory, "
+            "e.g. 'job_*/event_*.h5'"
+        ),
     )
     parser.add_argument(
         "--cuts",
@@ -199,12 +226,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         raise SystemExit("No event .h5 files found")
 
     event_nch: list[EventNch] = []
+    skipped = 0
     for p in event_files:
         try:
             nch = _extract_nch_from_event_file(p)
         except Exception as e:
-            raise RuntimeError(f"Failed to extract Nch from {p}: {e}") from e
+            # One unreadable/incomplete event must not abort the binning.
+            skipped += 1
+            print(f"SKIP {p} (failed to extract Nch: {e})", file=sys.stderr)
+            continue
         event_nch.append(EventNch(path=p, nch=nch))
+    if not event_nch:
+        raise SystemExit("No readable event .h5 files found")
 
     # Sort by multiplicity descending: most central first.
     event_nch.sort(key=lambda x: x.nch, reverse=True)
@@ -239,6 +272,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"{label}: {len(selected)} event(s)")
 
     print(f"Wrote centrality bin lists to {out_dir}")
+    if skipped:
+        print(f"Skipped {skipped} unreadable event file(s)", file=sys.stderr)
+        return 2
     return 0
 
 

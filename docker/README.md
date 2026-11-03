@@ -24,7 +24,7 @@ docker build -f docker/Dockerfile -t cronos .
 docker pull hendrik1704/cronos:latest
 ```
 
-Images are automatically published on every push to `main` or `devel` via GitHub Actions.
+Images are automatically published on every push to `main` or `devel` via GitHub Actions. Pull requests against these branches only build the image (nothing is pushed).
 
 ## Running a simulation
 
