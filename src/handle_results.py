@@ -208,15 +208,16 @@ def handle_results(config, event_dir_results_path, event_id):
         if f.startswith("output_") and f.endswith(".dat")
     ]
     logging.debug(f"All output files found: {all_output_files}")
+    # Determine the last module's output file
+    last_output_file = (
+        sorted(all_output_files)[-1] if all_output_files else None
+    )
     if not save_intermediate:
-        # Determine the last module's output file
-        if all_output_files:
-            last_output_file = sorted(all_output_files)[-1]
+        if last_output_file:
             logging.info(
                 f"Keeping only the last output file: {last_output_file}"
             )
         else:
-            last_output_file = None
             logging.warning("No output files found to keep.")
 
         # Remove all other output files except the last one
@@ -226,13 +227,11 @@ def handle_results(config, event_dir_results_path, event_id):
                 os.remove(file_path)
                 logging.debug(f"Removed intermediate file: {file_path}")
 
-    if not keep_particle_files:
-        # Remove also the last output_*.dat file if it exists
-        for f in all_output_files:
-            file_path = os.path.join(event_dir_results_path, f)
-            if f == last_output_file:
-                os.remove(file_path)
-            logging.debug(f"Removed particle file: {file_path}")
+    if not keep_particle_files and last_output_file:
+        # Remove also the last output_*.dat file
+        file_path = os.path.join(event_dir_results_path, last_output_file)
+        os.remove(file_path)
+        logging.debug(f"Removed particle file: {file_path}")
 
     spvn_dir = os.path.join(event_dir_results_path, f"spvn_results_{event_id}")
     os.makedirs(spvn_dir, exist_ok=True)
