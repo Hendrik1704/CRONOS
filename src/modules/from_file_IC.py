@@ -18,6 +18,7 @@ class FromFileIC(BaseModule):
     - Automatic .dat file detection and loading
     - McDipper to MUSIC format conversion integration
     - Boost-invariant and full 3D+1 mode support
+    - 3D input for KoMPoST3D is passed on without conversion
     - Grid parameter configuration (Nx, Neta, dx, deta)
     - EOS integration for thermodynamic conversions
     - Memory-monitored subprocess execution
@@ -43,6 +44,21 @@ class FromFileIC(BaseModule):
         >>> ic_module.fetch_output(event_dir)         # Standardized output
     """
 
+    def _convert_to_music(self):
+        """Check whether the input file is converted to the MUSIC format.
+
+        Only 3D input that goes directly into MUSIC is converted. Boost-invariant
+        input and 3D input for KoMPoST3D (already in the KoMPoST-3D T^μν format)
+        are passed on unchanged.
+
+        Returns:
+            bool: True if McDipper_to_MUSIC.py has to be run
+        """
+        return (
+            getattr(self.config, "boost_invariant", 1) == 0
+            and "KoMPoST3D" not in self.full_config.general.modules
+        )
+
     def prepare_environment(self, event_dir):
         """Prepare environment for external initial conditions loading.
 
@@ -64,9 +80,9 @@ class FromFileIC(BaseModule):
             - Logs setup progress and any missing dependencies
             - Exits with error code 1 if critical dependencies missing
         """
-        if getattr(self.config, "boost_invariant", 1) == 1:
+        if not self._convert_to_music():
             logging.info(
-                f"[FromFileIC] Boost invariant mode active. Nothing to prepare."
+                f"[FromFileIC] No conversion of the input needed. Nothing to prepare."
             )
         else:
             logging.info(
@@ -145,7 +161,7 @@ class FromFileIC(BaseModule):
                     SystemExit: If working directory missing or no .dat files found
                     subprocess.CalledProcessError: If McDipper conversion fails
         """
-        if getattr(self.config, "boost_invariant", 1) == 1:
+        if not self._convert_to_music():
             logging.info("[FromFileIC] No IC to run, profile saved...")
         else:
             from_file_ic_dir = os.path.join(event_dir, "from_file_IC")
@@ -233,7 +249,7 @@ class FromFileIC(BaseModule):
             "from_file_IC"
         )
 
-        if getattr(self.config, "boost_invariant", 1) == 1:
+        if not self._convert_to_music():
             src_file = os.path.join(from_file_ic_dir, entries[0])
             dst_file = os.path.join(
                 results_dir, f"output_{current_module_index}.dat"

@@ -57,6 +57,7 @@ from src.check_settings import check_settings
 from src.modules.from_file_IC import FromFileIC
 from src.modules.IPGlasma import IPGlasma
 from src.modules.KoMPoST import KoMPoST
+from src.modules.KoMPoST3D import KoMPoST3D
 from src.modules.entropy_matching import EntropyMatching
 from src.modules.MUSIC import MUSIC
 from src.modules.iSS import iSS
@@ -67,6 +68,7 @@ MODULE_REGISTRY = {
     "from_file_IC": FromFileIC,
     "IPGlasma": IPGlasma,
     "KoMPoST": KoMPoST,
+    "KoMPoST3D": KoMPoST3D,
     "entropy_matching": EntropyMatching,
     "MUSIC": MUSIC,
     "iSS": iSS,

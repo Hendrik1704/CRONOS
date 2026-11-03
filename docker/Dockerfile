@@ -80,6 +80,8 @@ RUN cd ipglasma && mkdir build && cd build && cmake .. -DdisableMPI=ON && \
 
 RUN cd KoMPoST && make -j$(nproc) && cd ..
 
+RUN cd KoMPoST-3D && make -j$(nproc) && cd ..
+
 RUN cd MUSIC && mkdir build && cd build && \
     cmake .. -DCMAKE_PREFIX_PATH=/usr/share/eigen3/cmake && \
     make -Bj$(nproc) && make install && cd .. && rm -r build && cd ..
