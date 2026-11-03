@@ -5,6 +5,37 @@ import subprocess
 import shutil
 import glob
 
+# MUSIC's stdout is written here when module_terminal_output is False. It must
+# not end in .dat, because MUSIC removes *.dat from its working directory.
+MUSIC_LOG_FILE = "MUSIC.log"
+# Messages MUSIC prints when the hydro evolution ends normally (Evolve::EvolveIt
+# in evolve.cpp). MUSIC also returns 0 after some failures (exit(0) calls in
+# advance.cpp, or failed hydro re-runs in main.cpp), so the return code alone
+# does not show that the evolution finished.
+MUSIC_FINISHED_MESSAGE = "Finished."
+MUSIC_MAX_TIME_MESSAGE = "Maximum allowed time reached."
+
+
+def music_evolution_finished(log_path):
+    """Return True if the MUSIC log shows that the evolution ended normally.
+
+    Reaching Total_evolution_time_tau before all cells froze out counts as a
+    failure, since the freeze-out surface is then not closed.
+    """
+    with open(log_path, errors="replace") as f:
+        for line in f:
+            line = line.rstrip()
+            if line.endswith(f" {MUSIC_FINISHED_MESSAGE}"):
+                return True
+            if MUSIC_MAX_TIME_MESSAGE in line:
+                # The freeze-out surface is not closed, which is a failure
+                logging.error(
+                    "[MUSIC] Total_evolution_time_tau was reached before all "
+                    "cells froze out; the freeze-out surface is not closed."
+                )
+                return False
+    return False
+
 
 class MUSIC(BaseModule):
     """MUSIC relativistic hydrodynamics module for CRONOS simulation framework.
@@ -54,7 +85,7 @@ class MUSIC(BaseModule):
             event_dir (str): Path to event-specific directory where MUSIC will execute.
 
         Raises:
-            SystemExit: If any required MUSIC components are missing.
+            FileNotFoundError: If any required MUSIC components are missing.
 
         Example:
             >>> music.prepare_environment(\"/path/to/run/job_0/event_0/\")
@@ -67,10 +98,9 @@ class MUSIC(BaseModule):
         if os.path.exists(music_eos_path):
             os.symlink(music_eos_path, os.path.join(event_dir, "MUSIC", "EOS"))
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[MUSIC] Required directory {music_eos_path} does not exist."
             )
-            exit(1)
 
         music_tables_path = os.path.join(
             self.project_root, "external_codes", "MUSIC", "tables"
@@ -80,10 +110,9 @@ class MUSIC(BaseModule):
                 music_tables_path, os.path.join(event_dir, "MUSIC", "tables")
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[MUSIC] Required directory {music_tables_path} does not exist."
             )
-            exit(1)
 
         music_exe_path = os.path.join(
             self.project_root, "external_codes", "MUSIC", "MUSIChydro"
@@ -93,10 +122,9 @@ class MUSIC(BaseModule):
                 music_exe_path, os.path.join(event_dir, "MUSIC", "MUSIChydro")
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[MUSIC] Required executable {music_exe_path} does not exist."
             )
-            exit(1)
 
     def prepare_input(self, event_dir):
         """Generate MUSIC parameter file and link initial conditions data.
@@ -122,7 +150,7 @@ class MUSIC(BaseModule):
                 from previous modules and MUSIC subdirectory.
 
         Raises:
-            SystemExit: If MUSIC directory doesn't exist or input linking fails.
+            FileNotFoundError: If MUSIC directory doesn't exist or input linking fails.
         """
         logging.info(f"[MUSIC] Create input file...")
         current_module_index = self.full_config.general.modules.index("MUSIC")
@@ -132,10 +160,9 @@ class MUSIC(BaseModule):
 
         MUSIC_dir = os.path.join(event_dir, "MUSIC")
         if not os.path.exists(MUSIC_dir):
-            logging.error(
+            raise FileNotFoundError(
                 f"[MUSIC] Required directory {MUSIC_dir} does not exist."
             )
-            exit(1)
         ini_file = os.path.join(MUSIC_dir, "parameters_MUSIC.ini")
 
         with open(ini_file, "w") as f:
@@ -291,7 +318,6 @@ class MUSIC(BaseModule):
             f.write(f"eps_switch {self.config.eps_switch}\n")
             f.write(f"eps_freeze_max {self.config.eps_freeze_max}\n")
             f.write(f"eps_freeze_min {self.config.eps_freeze_min}\n")
-            f.write(f"freeze_eps_flag {self.config.freeze_eps_flag}\n")
             f.write(f"EndOfData\n")
 
         logging.info("[MUSIC] Input file created successfully.")
@@ -327,6 +353,8 @@ class MUSIC(BaseModule):
 
         Raises:
             subprocess.CalledProcessError: If MUSIC execution fails.
+            RuntimeError: If MUSIC exits without its completion message (only
+                checked when the output goes to the MUSIC log file).
 
         Note:
             Execution time and peak memory usage are automatically logged
@@ -339,15 +367,19 @@ class MUSIC(BaseModule):
 
         logging.info("[MUSIC] Running MUSIC...")
 
+        log_path = None
+        log_file = None
         cwd = os.getcwd()
         try:
             os.chdir(MUSIC_dir)
 
             kwargs = {"check": True}
             if not self.full_config.general.module_terminal_output:
-                kwargs["stdout"] = subprocess.DEVNULL
-                kwargs["stderr"] = subprocess.DEVNULL
-                logging.debug("[MUSIC] Running with suppressed output...")
+                log_path = os.path.join(os.getcwd(), MUSIC_LOG_FILE)
+                log_file = open(log_path, "w")
+                kwargs["stdout"] = log_file
+                kwargs["stderr"] = subprocess.STDOUT
+                logging.debug(f"[MUSIC] Writing MUSIC output to {log_path}")
             run_external_command(
                 [f"./{MUSIC_exe}", ini_file],
                 memory_threshold_mb=self.full_config.general.memory_threshold_mb,
@@ -356,8 +388,21 @@ class MUSIC(BaseModule):
             )
         except subprocess.CalledProcessError as e:
             logging.error(f"[MUSIC] Execution failed: {e}")
+            raise
         finally:
+            if log_file is not None:
+                log_file.close()
             os.chdir(cwd)
+
+        if log_path is None:
+            logging.debug(
+                "[MUSIC] Output went to the terminal, completion check skipped."
+            )
+        elif not music_evolution_finished(log_path):
+            raise RuntimeError(
+                f"[MUSIC] MUSIC exited without finishing the hydro evolution, "
+                f"see {log_path}"
+            )
 
         logging.info("[MUSIC] Execution finished.")
 
@@ -371,8 +416,9 @@ class MUSIC(BaseModule):
 
         The process:
         1. Searches for freeze-out surface files (surface_*.dat pattern)
-        2. Handles multiple surface files by selecting the first match
-        3. Moves surface to standardized output name for next module
+        2. Checks that all files belong to one isotherm (iSS samples one)
+        3. Moves the surface (or concatenates the per-thread parts of a
+           (3+1)D surface) to the standardized output name for next module
         4. Removes temporary MUSIC directory and working files
         5. Logs completion and file locations
 
@@ -381,11 +427,12 @@ class MUSIC(BaseModule):
                 output and results directory for standardized file placement.
 
         Raises:
-            Logs errors if no surface files found but continues execution.
+            FileNotFoundError: If MUSIC did not write a freeze-out surface.
+            RuntimeError: If surfaces for more than one isotherm exist.
 
         Example:
             >>> music.fetch_output(event_dir)
-            # Moves surface_0.dat to results/output_2.dat (if MUSIC is module 2)
+            # Moves surface_eps_0.18.dat to results/output_2.dat (if MUSIC is module 2)
             # Removes MUSIC/ directory and temporary files
         """
         logging.info("[MUSIC] Data successfully processed...")
@@ -395,75 +442,39 @@ class MUSIC(BaseModule):
         matching_files = sorted(glob.glob(src_pattern))
 
         if not matching_files:
-            logging.error(f"[MUSIC] No files found matching {src_pattern}")
-            return
-
-        # If exactly one surface file exists, move it directly and return
-        if len(matching_files) == 1:
-            single_src = matching_files[0]
-            results_dir = os.path.join(event_dir, "results")
-            os.makedirs(results_dir, exist_ok=True)
-            dst_file = os.path.join(
-                results_dir, f"output_{current_module_index}.dat"
+            raise FileNotFoundError(
+                f"[MUSIC] No freeze-out surface found matching {src_pattern}"
             )
-            shutil.move(single_src, dst_file)
-            try:
-                shutil.rmtree(MUSIC_dir)
-            except Exception:
-                logging.warning(
-                    f"[MUSIC] Failed to remove {MUSIC_dir} - leaving it for inspection"
-                )
-            logging.info(
-                f"[MUSIC] Moved single surface {single_src} to {dst_file}"
+
+        # MUSIC writes surface_eps_<e>.dat (boost-invariant) or one
+        # surface_eps_<e>_<thread>.dat per OpenMP thread ((3+1)D) for each
+        # isotherm <e>. iSS samples a single isotherm.
+        isotherms = sorted(
+            {
+                "_".join(os.path.basename(path)[: -len(".dat")].split("_")[:3])
+                for path in matching_files
+            }
+        )
+        if len(isotherms) > 1:
+            raise RuntimeError(
+                f"[MUSIC] Found freeze-out surfaces for several isotherms "
+                f"{isotherms}, but iSS needs exactly one (set N_freeze_out = 1)."
             )
-            return
 
-        # Group files by the first three underscore-separated fields of the filename
-        groups = {}
-        for path in matching_files:
-            name = os.path.basename(path)
-            stem = os.path.splitext(name)[0]
-            parts = stem.split("_")
-            if len(parts) >= 3:
-                key = "_".join(parts[:3])
-            else:
-                key = stem
-            groups.setdefault(key, []).append(path)
-
-        # Create group files by concatenating members of each group (streaming)
-        group_files = []
-        for key in sorted(groups.keys()):
-            group_path = os.path.join(MUSIC_dir, f"{key}.dat")
-            logging.info(
-                f"[MUSIC] Creating group file {group_path} from {len(groups[key])} parts"
-            )
-            # Overwrite if exists
-            with open(group_path, "wb") as out_f:
-                for src in groups[key]:
-                    # Skip if the source is the same as the intended group file
-                    if os.path.abspath(src) == os.path.abspath(group_path):
-                        continue
-                    with open(src, "rb") as in_f:
-                        shutil.copyfileobj(in_f, out_f)
-            group_files.append(group_path)
-
-        # Concatenate all group files into a single combined surface file
-        combined_path = os.path.join(MUSIC_dir, "__combined_surface__.dat")
-        with open(combined_path, "wb") as out_comb:
-            for gf in sorted(group_files):
-                with open(gf, "rb") as in_gf:
-                    shutil.copyfileobj(in_gf, out_comb)
-
-        # Ensure results directory exists
         results_dir = os.path.join(event_dir, "results")
         os.makedirs(results_dir, exist_ok=True)
-
         dst_file = os.path.join(
             results_dir, f"output_{current_module_index}.dat"
         )
 
-        # Move the combined file to the standardized results filename
-        shutil.move(combined_path, dst_file)
+        if len(matching_files) == 1:
+            shutil.move(matching_files[0], dst_file)
+        else:
+            # Concatenate the per-thread parts into the results file
+            with open(dst_file, "wb") as out_f:
+                for src in matching_files:
+                    with open(src, "rb") as in_f:
+                        shutil.copyfileobj(in_f, out_f)
 
         # Clean up MUSIC working directory entirely
         try:
@@ -473,4 +484,6 @@ class MUSIC(BaseModule):
                 f"[MUSIC] Failed to remove {MUSIC_dir} - leaving it for inspection"
             )
 
-        logging.info(f"[MUSIC] Moved combined surface(s) to {dst_file}")
+        logging.info(
+            f"[MUSIC] Moved surface ({len(matching_files)} file(s)) to {dst_file}"
+        )

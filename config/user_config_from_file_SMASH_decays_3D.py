@@ -29,7 +29,6 @@ from_file_IC = {
 }
 
 MUSIC = {
-    "hydro_mode": 2,  # mode for reading in freeze out information
     "boost_invariant": 0,  # 0: no boost invariance, 1: boost invariance
     "Initial_time_tau_0": 0.6,  # starting time of the hydrodynamic evolution (fm/c)
     "Initial_profile": 95,  # Read in initial profile from a file

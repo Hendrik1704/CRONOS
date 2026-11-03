@@ -50,6 +50,7 @@ entropy_matching = {
 }
 
 MUSIC = {
+    "Initial_time_tau_0": 1.0,  # hydro starts at KoMPoST's tOut (fm/c)
     "EOS_to_use": 91,
 }
 
