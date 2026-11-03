@@ -54,7 +54,7 @@ class iSS(BaseModule):
             event_dir (str): Path to event-specific directory where iSS will execute.
 
         Raises:
-            SystemExit: If iSS executable or particle tables are missing.
+            FileNotFoundError: If iSS executable or particle tables are missing.
         """
         logging.info(f"[iSS] Preparing environment in {event_dir}...")
 
@@ -66,10 +66,9 @@ class iSS(BaseModule):
                 iss_tables_path, os.path.join(event_dir, "iSS", "iSS_tables")
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[iSS] Required directory {iss_tables_path} does not exist."
             )
-            exit(1)
 
         iss_exe_path = os.path.join(
             self.project_root, "external_codes", "iSS", "iSS.e"
@@ -77,10 +76,9 @@ class iSS(BaseModule):
         if os.path.exists(iss_exe_path):
             os.symlink(iss_exe_path, os.path.join(event_dir, "iSS", "iSS.e"))
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[iSS] Required executable {iss_exe_path} does not exist."
             )
-            exit(1)
 
     def prepare_input(self, event_dir):
         """Generate iSS configuration file and adapt settings for downstream modules.
@@ -120,8 +118,9 @@ class iSS(BaseModule):
 
         iSS_dir = os.path.join(event_dir, "iSS")
         if not os.path.exists(iSS_dir):
-            logging.error(f"[iSS] Required directory {iSS_dir} does not exist.")
-            exit(1)
+            raise FileNotFoundError(
+                f"[iSS] Required directory {iSS_dir} does not exist."
+            )
         ini_file = os.path.join(iSS_dir, "parameters_iSS.ini")
 
         # If SMASH is not used, then use other defaults for some parameters
@@ -338,6 +337,7 @@ class iSS(BaseModule):
             )
         except subprocess.CalledProcessError as e:
             logging.error(f"[iSS] Execution failed: {e}")
+            raise
         finally:
             os.chdir(cwd)
 

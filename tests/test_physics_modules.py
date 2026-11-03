@@ -11,6 +11,23 @@ from src.modules.SMASH import SMASH
 from src.modules.iSS import iSS
 from src.modules.entropy_matching import EntropyMatching
 from src.modules.afterburner_toolkit import afterburner_toolkit
+import subprocess
+
+
+def write_music_output(*lines):
+    """Mock for run_external_command that writes lines to MUSIC's stdout."""
+
+    def run(cmd, **kwargs):
+        for line in lines:
+            kwargs["stdout"].write(line + "\n")
+        return {"return_code": 0}
+
+    return run
+
+
+def failing_command(*args, **kwargs):
+    """Mock for run_external_command of a code that fails."""
+    raise subprocess.CalledProcessError(1, ["code"])
 
 
 class TestPhysicsModuleBase:
@@ -190,7 +207,7 @@ class TestKoMPoST(TestPhysicsModuleBase):
 
         module = KoMPoST(config, full_config, self.project_root, "event_0")
 
-        with pytest.raises(SystemExit):
+        with pytest.raises(FileNotFoundError):
             module.prepare_environment(self.event_dir)
 
     def test_prepare_input_creates_parameter_file(self):
@@ -325,11 +342,11 @@ class TestMUSIC:
 
         module = MUSIC(config, full_config, self.project_root, "event_0")
 
-        # Test should handle missing external directories gracefully by catching SystemExit
-        with pytest.raises(SystemExit):
+        # Missing external directories raise FileNotFoundError
+        with pytest.raises(FileNotFoundError):
             module.prepare_environment(self.event_dir)
 
-        # SystemExit occurs before directory creation, which is expected behavior
+        # The error is raised before any link is created
 
     def test_prepare_environment_with_executable(self):
         """Test MUSIC prepare_environment when executable and data exist."""
@@ -382,6 +399,9 @@ class TestMUSIC:
         # Create MUSIC directory
         music_dir = os.path.join(self.event_dir, "MUSIC")
         os.makedirs(music_dir)
+        mock_run_command.side_effect = write_music_output(
+            "\u266b 1 MB Finished."
+        )
 
         module = MUSIC(config, full_config, self.project_root, "event_0")
         module.run(self.event_dir)
@@ -424,11 +444,11 @@ class TestSMASH:
 
         module = SMASH(config, full_config, self.project_root, "event_0")
 
-        # Test should handle missing external directories gracefully by catching SystemExit
-        with pytest.raises(SystemExit):
+        # Missing external directories raise FileNotFoundError
+        with pytest.raises(FileNotFoundError):
             module.prepare_environment(self.event_dir)
 
-        # SystemExit occurs before directory creation, which is expected behavior
+        # The error is raised before any link is created
 
     @patch("src.modules.SMASH.run_external_command")
     def test_run_method(self, mock_run_command):
@@ -489,11 +509,11 @@ class TestiSS:
 
         module = iSS(config, full_config, self.project_root, "event_0")
 
-        # Test should handle missing external directories gracefully by catching SystemExit
-        with pytest.raises(SystemExit):
+        # Missing external directories raise FileNotFoundError
+        with pytest.raises(FileNotFoundError):
             module.prepare_environment(self.event_dir)
 
-        # SystemExit occurs before directory creation, which is expected behavior
+        # The error is raised before any link is created
 
     @patch("src.modules.iSS.run_external_command")
     def test_run_method(self, mock_run_command):
@@ -562,8 +582,8 @@ class TestEntropyMatching:
             config, full_config, self.project_root, "event_0"
         )
 
-        # Test should handle missing external directories gracefully by catching SystemExit
-        with pytest.raises(SystemExit):
+        # Missing external directories raise FileNotFoundError
+        with pytest.raises(FileNotFoundError):
             module.prepare_environment(self.event_dir)
 
 
@@ -609,8 +629,8 @@ class TestAfterburnerToolkit:
             config, full_config, self.project_root, "event_0"
         )
 
-        # Test should handle missing external directories gracefully by catching SystemExit
-        with pytest.raises(SystemExit):
+        # Missing external directories raise FileNotFoundError
+        with pytest.raises(FileNotFoundError):
             module.prepare_environment(self.event_dir)
 
 
@@ -725,6 +745,372 @@ class TestModuleConfigurationValidation:
         # Test dict access
         assert module.config["simple_param"] == "simple_value"
         assert module.config["nested"]["param1"] == "value1"
+
+
+def general_config(modules, terminal_output=False):
+    return {
+        "modules": modules,
+        "module_terminal_output": terminal_output,
+        "memory_threshold_mb": 1000,
+        "random_seed": 42,
+    }
+
+
+class TestMUSICRunAndOutput(TestPhysicsModuleBase):
+    """MUSIC failures must raise, and only one isotherm may be passed on."""
+
+    def make_module(self, terminal_output=False):
+        os.makedirs(os.path.join(self.event_dir, "MUSIC"), exist_ok=True)
+        full_config = Configuration(
+            {"general": general_config(["MUSIC", "iSS"], terminal_output)}
+        )
+        return MUSIC(Configuration({}), full_config, self.project_root, "0")
+
+    def write_surface(self, name, content):
+        with open(os.path.join(self.event_dir, "MUSIC", name), "w") as f:
+            f.write(content)
+
+    @patch(
+        "src.modules.MUSIC.run_external_command", side_effect=failing_command
+    )
+    def test_run_reraises_failure(self, mock_run_command):
+        with pytest.raises(subprocess.CalledProcessError):
+            self.make_module().run(self.event_dir)
+
+    @pytest.mark.parametrize(
+        "lines",
+        [
+            [],
+            # advance.cpp exit(0) after a failure
+            ["SpeedMax = -1\n is negative.", "Can't happen."],
+            # main.cpp returns 0 after the failed hydro re-runs
+            ["\u266b 1 MB Finished checking input parameter list."],
+        ],
+    )
+    def test_run_raises_without_completion_message(self, lines):
+        module = self.make_module()
+        with patch(
+            "src.modules.MUSIC.run_external_command",
+            side_effect=write_music_output(*lines),
+        ):
+            with pytest.raises(RuntimeError, match="without finishing"):
+                module.run(self.event_dir)
+        # The log stays in the MUSIC directory for inspection
+        assert os.path.exists(
+            os.path.join(self.event_dir, "MUSIC", "MUSIC.log")
+        )
+
+    @pytest.mark.parametrize(
+        "line",
+        [
+            "\u266b 120.5 MB Finished.",
+            "\033[1m\033[33m! Maximum allowed time reached.\033[0m",
+        ],
+    )
+    def test_run_accepts_completion_message(self, line):
+        module = self.make_module()
+        with patch(
+            "src.modules.MUSIC.run_external_command",
+            side_effect=write_music_output("\u266b 1 MB Done time step", line),
+        ):
+            module.run(self.event_dir)
+
+    @patch("src.modules.MUSIC.run_external_command")
+    def test_run_with_terminal_output_skips_completion_check(
+        self, mock_run_command
+    ):
+        self.make_module(terminal_output=True).run(self.event_dir)
+        assert "stdout" not in mock_run_command.call_args.kwargs
+
+    def test_fetch_output_raises_without_surface(self):
+        module = self.make_module()
+        with pytest.raises(FileNotFoundError):
+            module.fetch_output(self.event_dir)
+
+    def test_fetch_output_boost_invariant_surface(self):
+        module = self.make_module()
+        self.write_surface("surface_eps_0.18.dat", "surface")
+        module.fetch_output(self.event_dir)
+        with open(os.path.join(self.event_dir, "results", "output_0.dat")) as f:
+            assert f.read() == "surface"
+        assert not os.path.exists(os.path.join(self.event_dir, "MUSIC"))
+
+    def test_fetch_output_concatenates_thread_parts(self):
+        module = self.make_module()
+        for thread in range(3):
+            self.write_surface(f"surface_eps_0.18_{thread}.dat", f"t{thread};")
+        module.fetch_output(self.event_dir)
+        with open(os.path.join(self.event_dir, "results", "output_0.dat")) as f:
+            assert sorted(f.read().split(";")) == ["", "t0", "t1", "t2"]
+
+    @pytest.mark.parametrize(
+        "names",
+        [
+            ["surface_eps_0.1.dat", "surface_eps_0.18.dat"],
+            [
+                "surface_eps_0.1_0.dat",
+                "surface_eps_0.1_1.dat",
+                "surface_eps_0.18_0.dat",
+            ],
+        ],
+    )
+    def test_fetch_output_rejects_several_isotherms(self, names):
+        module = self.make_module()
+        for name in names:
+            self.write_surface(name, name)
+        with pytest.raises(RuntimeError, match="N_freeze_out"):
+            module.fetch_output(self.event_dir)
+        # The surfaces are left untouched
+        for name in names:
+            with open(os.path.join(self.event_dir, "MUSIC", name)) as f:
+                assert f.read() == name
+
+
+class TestFromFileIC3D(TestPhysicsModuleBase):
+    """from_file_IC with boost_invariant 0 converts the profile for MUSIC."""
+
+    def make_module(self):
+        os.makedirs(os.path.join(self.event_dir, "from_file_IC"), exist_ok=True)
+        config = Configuration(
+            {"boost_invariant": 0, "Nx": 3, "Neta": 2, "dx": 0.1, "deta": 0.2}
+        )
+        full_config = Configuration(
+            {"general": general_config(["from_file_IC", "MUSIC"])}
+        )
+        return FromFileIC(config, full_config, self.project_root, "0")
+
+    def ic_dir_file(self, name):
+        return os.path.join(self.event_dir, "from_file_IC", name)
+
+    def test_prepare_environment_links_eos_and_converter(self):
+        os.makedirs(
+            os.path.join(self.project_root, "external_codes", "MUSIC", "EOS")
+        )
+        script = os.path.join(
+            self.project_root, "utilities", "McDipper_to_MUSIC.py"
+        )
+        open(script, "w").close()
+        self.make_module().prepare_environment(self.event_dir)
+        assert os.path.isdir(self.ic_dir_file("EOS"))
+        assert os.path.exists(self.ic_dir_file("McDipper_to_MUSIC.py"))
+
+    def test_prepare_environment_raises_without_eos(self):
+        with pytest.raises(FileNotFoundError):
+            self.make_module().prepare_environment(self.event_dir)
+
+    @patch("src.modules.from_file_IC.run_external_command")
+    def test_run_converts_the_ic_file(self, mock_run_command):
+        module = self.make_module()
+        open(self.ic_dir_file("Tmunu1_test.dat"), "w").close()
+        # left behind by an earlier attempt
+        open(self.ic_dir_file("converted_output.dat"), "w").close()
+        module.run(self.event_dir)
+        cmd = mock_run_command.call_args.args[0]
+        assert cmd[1] == "McDipper_to_MUSIC.py"
+        assert cmd[3:7] == ["3", "2", "0.1", "0.2"]
+        assert cmd[7:] == ["Tmunu1_test.dat", "converted_output.dat"]
+
+    @patch(
+        "src.modules.from_file_IC.run_external_command",
+        side_effect=failing_command,
+    )
+    def test_run_reraises_failure(self, mock_run_command):
+        module = self.make_module()
+        open(self.ic_dir_file("Tmunu1_test.dat"), "w").close()
+        with pytest.raises(subprocess.CalledProcessError):
+            module.run(self.event_dir)
+
+    def test_run_raises_without_ic_file(self):
+        with pytest.raises(FileNotFoundError):
+            self.make_module().run(self.event_dir)
+
+    def test_fetch_output_moves_converted_profile(self):
+        module = self.make_module()
+        with open(self.ic_dir_file("Tmunu1_test.dat"), "w") as f:
+            f.write("input")
+        with open(self.ic_dir_file("converted_output.dat"), "w") as f:
+            f.write("converted")
+        module.fetch_output(self.event_dir)
+        with open(os.path.join(self.event_dir, "results", "output_0.dat")) as f:
+            assert f.read() == "converted"
+
+
+class TestModuleFailuresPropagate(TestPhysicsModuleBase):
+    """Failed external codes must raise so the executor marks the event failed."""
+
+    @patch(
+        "src.modules.KoMPoST.run_external_command", side_effect=failing_command
+    )
+    def test_kompost_run(self, mock_run_command):
+        os.makedirs(os.path.join(self.event_dir, "KoMPoST"))
+        full_config = Configuration({"general": general_config(["KoMPoST"])})
+        module = KoMPoST(Configuration({}), full_config, self.project_root, "0")
+        with pytest.raises(subprocess.CalledProcessError):
+            module.run(self.event_dir)
+
+    @patch(
+        "src.modules.entropy_matching.run_external_command",
+        side_effect=failing_command,
+    )
+    def test_entropy_matching_run(self, mock_run_command):
+        os.makedirs(os.path.join(self.event_dir, "entropy_matching"))
+        full_config = Configuration(
+            {"general": general_config(["KoMPoST", "entropy_matching"])}
+        )
+        config = Configuration({"matching_type": 0, "nu_eff": 40.0})
+        module = EntropyMatching(config, full_config, self.project_root, "0")
+        with pytest.raises(subprocess.CalledProcessError):
+            module.run(self.event_dir)
+
+    @patch("src.modules.iSS.run_external_command", side_effect=failing_command)
+    def test_iss_run(self, mock_run_command):
+        os.makedirs(os.path.join(self.event_dir, "iSS"))
+        full_config = Configuration({"general": general_config(["iSS"])})
+        module = iSS(Configuration({}), full_config, self.project_root, "0")
+        with pytest.raises(subprocess.CalledProcessError):
+            module.run(self.event_dir)
+
+    @patch(
+        "src.modules.SMASH.run_external_command", side_effect=failing_command
+    )
+    def test_smash_run(self, mock_run_command):
+        os.makedirs(os.path.join(self.event_dir, "SMASH"))
+        full_config = Configuration({"general": general_config(["SMASH"])})
+        module = SMASH(Configuration({}), full_config, self.project_root, "0")
+        with pytest.raises(subprocess.CalledProcessError):
+            module.run(self.event_dir)
+
+    @patch(
+        "src.modules.SMASH.run_external_command", side_effect=failing_command
+    )
+    def test_smash_converter(self, mock_run_command):
+        os.makedirs(os.path.join(self.event_dir, "SMASH"))
+        open(os.path.join(self.event_dir, "results", "output_0.dat"), "w")
+        full_config = Configuration(
+            {"general": general_config(["iSS", "SMASH"])}
+        )
+        module = SMASH(Configuration({}), full_config, self.project_root, "0")
+        with pytest.raises(subprocess.CalledProcessError):
+            module.prepare_input(self.event_dir)
+        assert not os.path.exists(
+            os.path.join(self.event_dir, "SMASH", "parameters_SMASH.yaml")
+        )
+
+    def make_afterburner(self, modules):
+        os.makedirs(os.path.join(self.event_dir, "afterburner_toolkit"))
+        full_config = Configuration({"general": general_config(modules)})
+        config = Configuration({"input_filename": "output_1.dat"})
+        return afterburner_toolkit(config, full_config, self.project_root, "0")
+
+    @patch(
+        "src.modules.afterburner_toolkit.run_external_command",
+        side_effect=failing_command,
+    )
+    def test_afterburner_converter(self, mock_run_command):
+        module = self.make_afterburner(["SMASH", "afterburner_toolkit"])
+        with pytest.raises(subprocess.CalledProcessError):
+            module.run(self.event_dir)
+        mock_run_command.assert_called_once()  # the analysis did not run
+
+    @patch("src.modules.afterburner_toolkit.run_external_command")
+    def test_afterburner_converter_without_output(self, mock_run_command):
+        module = self.make_afterburner(["SMASH", "afterburner_toolkit"])
+        with pytest.raises(FileNotFoundError):
+            module.run(self.event_dir)
+        mock_run_command.assert_called_once()
+
+    @patch("src.modules.afterburner_toolkit.run_external_command")
+    def test_afterburner_without_input(self, mock_run_command):
+        module = self.make_afterburner(["iSS", "afterburner_toolkit"])
+        with pytest.raises(FileNotFoundError):
+            module.run(self.event_dir)
+        mock_run_command.assert_not_called()
+
+    @patch(
+        "src.modules.afterburner_toolkit.run_external_command",
+        side_effect=failing_command,
+    )
+    def test_afterburner_run(self, mock_run_command):
+        module = self.make_afterburner(["iSS", "afterburner_toolkit"])
+        open(
+            os.path.join(self.event_dir, "afterburner_toolkit", "output_1.dat"),
+            "w",
+        ).close()
+        with pytest.raises(subprocess.CalledProcessError):
+            module.run(self.event_dir)
+
+
+class TestModuleResume(TestPhysicsModuleBase):
+    """Rerunning a module after a failed attempt must work."""
+
+    def test_entropy_matching_prepare_input_twice(self):
+        os.makedirs(os.path.join(self.event_dir, "entropy_matching"))
+        with open(os.path.join(self.event_dir, "results", "output_1.dat"), "w"):
+            pass
+        full_config = Configuration(
+            {
+                "general": general_config(
+                    ["from_file_IC", "KoMPoST", "entropy_matching"]
+                )
+            }
+        )
+        module = EntropyMatching(
+            Configuration({}), full_config, self.project_root, "0"
+        )
+        module.prepare_input(self.event_dir)
+        module.prepare_input(self.event_dir)  # resume: link already exists
+        link = os.path.join(self.event_dir, "entropy_matching", "output_1.dat")
+        assert os.path.islink(link) and os.path.isabs(os.readlink(link))
+
+    def test_smash_uses_fixed_clean_output_dir(self):
+        smash_dir = os.path.join(self.event_dir, "SMASH")
+        # Leftovers of a crashed attempt
+        os.makedirs(os.path.join(smash_dir, "data", "0"))
+        for name in ["particle_lists.oscar.unfinished", "smash.lock"]:
+            open(os.path.join(smash_dir, "data", "0", name), "w").close()
+
+        def run_smash(cmd, **kwargs):
+            assert not os.path.exists("data")
+            assert cmd[cmd.index("-o") + 1] == os.path.join("data", "0")
+            os.makedirs(os.path.join("data", "0"))
+            with open(
+                os.path.join("data", "0", "particle_lists.oscar"), "w"
+            ) as f:
+                f.write("particles")
+            return {"return_code": 0}
+
+        full_config = Configuration(
+            {"general": general_config(["iSS", "SMASH"])}
+        )
+        module = SMASH(Configuration({}), full_config, self.project_root, "0")
+        with patch(
+            "src.modules.SMASH.run_external_command", side_effect=run_smash
+        ):
+            module.run(self.event_dir)
+        module.fetch_output(self.event_dir)
+        with open(os.path.join(self.event_dir, "results", "output_1.dat")) as f:
+            assert f.read() == "particles"
+
+    def test_smash_event_count_is_not_kept_in_the_config(self):
+        os.makedirs(os.path.join(self.event_dir, "SMASH"))
+        open(os.path.join(self.event_dir, "results", "output_0.dat"), "w")
+        full_config = Configuration(
+            {"general": general_config(["iSS", "SMASH"])}
+        )
+        config = Configuration(
+            {"Delta_Time": 0.1, "End_Time": 100.0, "No_Collisions": 1}
+        )
+        module = SMASH(config, full_config, self.project_root, "0")
+        with patch(
+            "src.modules.SMASH.run_external_command",
+            return_value={"return_code": 0, "stdout": "7\n"},
+        ):
+            module.prepare_input(self.event_dir)
+        with open(
+            os.path.join(self.event_dir, "SMASH", "parameters_SMASH.yaml")
+        ) as f:
+            assert "Nevents:       7\n" in f.read()
+        assert "Nevents" not in config.to_dict()
 
 
 if __name__ == "__main__":

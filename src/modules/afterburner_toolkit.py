@@ -61,7 +61,7 @@ class afterburner_toolkit(BaseModule):
             event_dir (str): Path to event-specific directory where afterburner_toolkit will execute.
 
         Raises:
-            SystemExit: If any required afterburner_toolkit components are missing.
+            FileNotFoundError: If any required afterburner_toolkit components are missing.
 
         Side Effects:
             - Creates symbolic links to analysis executables and data
@@ -87,10 +87,9 @@ class afterburner_toolkit(BaseModule):
                 os.path.join(event_dir, "afterburner_toolkit", "EOS"),
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[afterburner_toolkit] Required directory {afterburner_toolkit_EOS_path} does not exist."
             )
-            exit(1)
 
         # Check if SMASH is in the module list
         if "SMASH" in self.full_config.general.modules:
@@ -111,10 +110,9 @@ class afterburner_toolkit(BaseModule):
                     ),
                 )
             else:
-                logging.error(
+                raise FileNotFoundError(
                     f"[afterburner_toolkit] Required executable {smash_converter_path} does not exist."
                 )
-                exit(1)
         else:
             logging.debug(
                 "[afterburner_toolkit] SMASH module not found in configuration. Skipping SMASH converter linking."
@@ -137,10 +135,9 @@ class afterburner_toolkit(BaseModule):
                 ),
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[afterburner_toolkit] Required executable {afterburner_toolkit_exe_path} does not exist."
             )
-            exit(1)
 
     def prepare_input(self, event_dir):
         """Generate afterburner_toolkit configuration and establish particle input links.
@@ -184,10 +181,9 @@ class afterburner_toolkit(BaseModule):
 
         afterburner_toolkit_dir = os.path.join(event_dir, "afterburner_toolkit")
         if not os.path.exists(afterburner_toolkit_dir):
-            logging.error(
+            raise FileNotFoundError(
                 f"[afterburner_toolkit] Required directory {afterburner_toolkit_dir} does not exist."
             )
-            exit(1)
 
         input_file = os.path.join(
             event_dir, "results", self.config.input_filename
@@ -426,13 +422,14 @@ class afterburner_toolkit(BaseModule):
                         f"[afterburner_toolkit] Moved converted file to {os.path.join(results_dir, 'particle_list.dat')}"
                     )
                 else:
-                    logging.error(
+                    raise FileNotFoundError(
                         f"[afterburner_toolkit] Converted file {converted_file} does not exist."
                     )
             except subprocess.CalledProcessError as e:
                 logging.error(
                     f"[afterburner_toolkit] Converter execution failed: {e}"
                 )
+                raise
             finally:
                 os.chdir(cwd)
         else:
@@ -450,7 +447,7 @@ class afterburner_toolkit(BaseModule):
                     f"[afterburner_toolkit] Copied input file to {dst_file}"
                 )
             else:
-                logging.error(
+                raise FileNotFoundError(
                     f"[afterburner_toolkit] Input file {src_file} does not exist."
                 )
 
@@ -472,6 +469,7 @@ class afterburner_toolkit(BaseModule):
             )
         except subprocess.CalledProcessError as e:
             logging.error(f"[afterburner_toolkit] Execution failed: {e}")
+            raise
         finally:
             os.chdir(cwd)
 

@@ -62,7 +62,7 @@ class FromFileIC(BaseModule):
         Side Effects:
             - Creates symlinks in event_dir/from_file_IC/
             - Logs setup progress and any missing dependencies
-            - Exits with error code 1 if critical dependencies missing
+            - Raises FileNotFoundError if critical dependencies are missing
         """
         if getattr(self.config, "boost_invariant", 1) == 1:
             logging.info(
@@ -81,7 +81,7 @@ class FromFileIC(BaseModule):
                     os.path.join(event_dir, "from_file_IC", "EOS"),
                 )
             else:
-                logging.error(
+                raise FileNotFoundError(
                     f"[FromFileIC] Required directory {eos_path} does not exist."
                 )
 
@@ -96,10 +96,9 @@ class FromFileIC(BaseModule):
                     ),
                 )
             else:
-                logging.error(
+                raise FileNotFoundError(
                     f"[FromFileIC] Required executable {matching_script_path} does not exist."
                 )
-                exit(1)
 
     def prepare_input(self, event_dir):
         """Log input configuration for external initial conditions.
@@ -139,10 +138,10 @@ class FromFileIC(BaseModule):
                     - Updates config.input_filename with detected file
                     - Creates converted_output.dat in working directory
                     - Logs conversion progress and completion status
-                    - Exits with error if no .dat files found or conversion fails
+                    - Raises if no .dat files are found or the conversion fails
 
                 Raises:
-                    SystemExit: If working directory missing or no .dat files found
+                    FileNotFoundError: If working directory missing or no .dat files found
                     subprocess.CalledProcessError: If McDipper conversion fails
         """
         if getattr(self.config, "boost_invariant", 1) == 1:
@@ -150,21 +149,24 @@ class FromFileIC(BaseModule):
         else:
             from_file_ic_dir = os.path.join(event_dir, "from_file_IC")
             if not os.path.exists(from_file_ic_dir):
-                logging.error(
+                raise FileNotFoundError(
                     f"[FromFileIC] Required directory {from_file_ic_dir} does not exist."
                 )
-                exit(1)
             convert_script = "McDipper_to_MUSIC.py"
             cwd = os.getcwd()
             try:
                 os.chdir(from_file_ic_dir)
                 # Find the .dat file in the directory
-                dat_files = [f for f in os.listdir(".") if f.endswith(".dat")]
+                # (skip a converted_output.dat left behind by an earlier attempt)
+                dat_files = [
+                    f
+                    for f in os.listdir(".")
+                    if f.endswith(".dat") and f != "converted_output.dat"
+                ]
                 if not dat_files:
-                    logging.error(
+                    raise FileNotFoundError(
                         f"[FromFileIC] No .dat files found in {from_file_ic_dir}."
                     )
-                    exit(1)
                 # There should be only one .dat file, take the first
                 self.config.input_filename = dat_files[0]
                 run_external_command(
@@ -188,6 +190,7 @@ class FromFileIC(BaseModule):
                 logging.info(f"[FromFileIC] Conversion completed successfully.")
             except subprocess.CalledProcessError as e:
                 logging.error(f"[FromFileIC] Execution failed: {e}")
+                raise
             finally:
                 os.chdir(cwd)
 
