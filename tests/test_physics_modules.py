@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch, MagicMock
 from src.configuration import Configuration
 from src.modules.from_file_IC import FromFileIC
 from src.modules.KoMPoST import KoMPoST
+from src.modules.KoMPoST3D import KoMPoST3D
 from src.modules.MUSIC import MUSIC
 from src.modules.SMASH import SMASH
 from src.modules.iSS import iSS
@@ -129,6 +130,47 @@ class TestFromFileIC(TestPhysicsModuleBase):
         result_file = os.path.join(self.event_dir, "results", "output_0.dat")
         assert os.path.exists(result_file)
         assert not os.path.exists(from_file_dir)  # Directory should be removed
+
+    @pytest.mark.parametrize(
+        "boost_invariant, modules, expected",
+        [
+            (1, ["from_file_IC", "KoMPoST", "MUSIC"], False),
+            (0, ["from_file_IC", "MUSIC"], True),
+            (0, ["from_file_IC", "KoMPoST3D", "MUSIC"], False),
+        ],
+    )
+    def test_convert_to_music(self, boost_invariant, modules, expected):
+        """Only 3D input that goes directly into MUSIC is converted."""
+        config = Configuration({"boost_invariant": boost_invariant})
+        full_config = Configuration({"general": {"modules": modules}})
+
+        module = FromFileIC(config, full_config, self.project_root, "event_0")
+
+        assert module._convert_to_music() == expected
+
+    def test_fetch_output_passes_kompost3d_input_through(self):
+        """3D input for KoMPoST3D is moved to results without conversion."""
+        from_file_dir = os.path.join(self.event_dir, "from_file_IC")
+        os.makedirs(from_file_dir)
+        test_file = os.path.join(from_file_dir, "Tmunu1_AverageState3D.dat")
+        with open(test_file, "w") as f:
+            f.write("KoMPoST-3D input")
+
+        config = Configuration({"boost_invariant": 0})
+        full_config = Configuration(
+            {"general": {"modules": ["from_file_IC", "KoMPoST3D", "MUSIC"]}}
+        )
+
+        module = FromFileIC(config, full_config, self.project_root, "event_0")
+
+        module.prepare_environment(self.event_dir)
+        module.run(self.event_dir)
+        module.fetch_output(self.event_dir)
+
+        result_file = os.path.join(self.event_dir, "results", "output_0.dat")
+        with open(result_file) as f:
+            assert f.read() == "KoMPoST-3D input"
+        assert not os.path.exists(from_file_dir)
 
 
 class TestKoMPoST(TestPhysicsModuleBase):
@@ -289,6 +331,152 @@ class TestKoMPoST(TestPhysicsModuleBase):
         assert "./KoMPoST.exe" in call_args[0] or "KoMPoST.exe" in str(
             call_args[0]
         )
+
+
+class TestKoMPoST3D(TestPhysicsModuleBase):
+    """Test KoMPoST3D module functionality."""
+
+    def _config(self):
+        return Configuration(
+            {
+                "tIn": 0.2,
+                "tOut": 0.8,
+                "EtaOverS": 0.16,
+                "EtaOverSTemperatureScale": 0.0,
+                "NuEffective": 40.0,
+                "EVOLUTION_MODE": 1,
+                "ENERGY_PERTURBATIONS": 1,
+                "MOMENTUM_PERTURBATIONS": 0,
+                "Regulator": "TwoPass",
+                "normFactor": 1.0,
+                "afm": 0.21,
+                "deta": 0.25,
+                "Ns": 128,
+                "Neta": 65,
+                "xSTART": 0,
+                "xEND": 127,
+                "ySTART": 0,
+                "yEND": 127,
+                "etaSTART": 0,
+                "etaEND": 64,
+            }
+        )
+
+    def test_prepare_environment_executable_exists(self):
+        """Test prepare_environment links the executable and RTA tables."""
+        kompost_dir = os.path.join(
+            self.project_root, "external_codes", "KoMPoST-3D"
+        )
+        os.makedirs(os.path.join(kompost_dir, "RTA"))
+        executable = os.path.join(kompost_dir, "KoMPoST.exe")
+        with open(executable, "w") as f:
+            f.write("#!/bin/bash\necho 'KoMPoST-3D executable'")
+        os.chmod(executable, 0o755)
+        os.makedirs(os.path.join(self.event_dir, "KoMPoST3D"))
+
+        full_config = Configuration({"general": {"modules": ["KoMPoST3D"]}})
+        module = KoMPoST3D(
+            self._config(), full_config, self.project_root, "event_0"
+        )
+
+        module.prepare_environment(self.event_dir)
+
+        assert os.path.exists(
+            os.path.join(self.event_dir, "KoMPoST3D", "KoMPoST.exe")
+        )
+        assert os.path.exists(os.path.join(self.event_dir, "KoMPoST3D", "RTA"))
+
+    def test_prepare_environment_executable_missing(self):
+        """Test prepare_environment when KoMPoST-3D is not installed."""
+        full_config = Configuration({"general": {"modules": ["KoMPoST3D"]}})
+        module = KoMPoST3D(
+            self._config(), full_config, self.project_root, "event_0"
+        )
+
+        with pytest.raises(SystemExit):
+            module.prepare_environment(self.event_dir)
+
+    def test_prepare_input_creates_parameter_file(self):
+        """Test prepare_input writes the 3D grid and links the input."""
+        full_config = Configuration(
+            {"general": {"modules": ["from_file_IC", "KoMPoST3D", "MUSIC"]}}
+        )
+        with open(
+            os.path.join(self.event_dir, "results", "output_0.dat"), "w"
+        ) as f:
+            f.write("mock initial conditions")
+        os.makedirs(os.path.join(self.event_dir, "KoMPoST3D"))
+
+        module = KoMPoST3D(
+            self._config(), full_config, self.project_root, "event_0"
+        )
+        module.prepare_input(self.event_dir)
+
+        param_file = os.path.join(
+            self.event_dir, "KoMPoST3D", "parameters_KoMPoST3D.ini"
+        )
+        with open(param_file) as f:
+            content = f.read()
+        for line in [
+            "InputFile=output_0.dat",
+            "OutputFileTag=output_1",
+            "WriteTmunuBackup = 0",
+            "NuEffective = 40.0",
+            "normFactor = 1.0",
+            "deta = 0.25",
+            "Neta=65;",
+            "etaEND=64;",
+        ]:
+            assert line in content
+        assert os.path.islink(
+            os.path.join(self.event_dir, "KoMPoST3D", "output_0.dat")
+        )
+
+    @patch("src.modules.KoMPoST3D.run_external_command")
+    def test_run_method(self, mock_run_command):
+        """Test KoMPoST3D runs the executable with its parameter file."""
+        full_config = Configuration(
+            {
+                "general": {
+                    "modules": ["KoMPoST3D"],
+                    "memory_threshold_mb": 1000,
+                    "module_terminal_output": False,
+                }
+            }
+        )
+        os.makedirs(os.path.join(self.event_dir, "KoMPoST3D"))
+        module = KoMPoST3D(
+            self._config(), full_config, self.project_root, "event_0"
+        )
+
+        module.run(self.event_dir)
+
+        mock_run_command.assert_called_once()
+        assert mock_run_command.call_args[0][0] == [
+            "./KoMPoST.exe",
+            "parameters_KoMPoST3D.ini",
+        ]
+
+    def test_fetch_output(self):
+        """Test fetch_output moves the pimunuNS output to results."""
+        kompost_dir = os.path.join(self.event_dir, "KoMPoST3D")
+        os.makedirs(kompost_dir)
+        with open(os.path.join(kompost_dir, "output_1_pimunuNS.dat"), "w") as f:
+            f.write("pimunuNS")
+        with open(os.path.join(kompost_dir, "output_1_hydro.dat"), "w") as f:
+            f.write("hydro")
+        full_config = Configuration(
+            {"general": {"modules": ["from_file_IC", "KoMPoST3D", "MUSIC"]}}
+        )
+        module = KoMPoST3D(
+            self._config(), full_config, self.project_root, "event_0"
+        )
+
+        module.fetch_output(self.event_dir)
+
+        with open(os.path.join(self.event_dir, "results", "output_1.dat")) as f:
+            assert f.read() == "pimunuNS"
+        assert not os.path.exists(kompost_dir)
 
 
 class TestMUSIC:

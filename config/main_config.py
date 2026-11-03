@@ -13,7 +13,7 @@ general = {
     # Memory monitoring settings
     "memory_threshold_mb": 4096,  # Memory threshold in MB for warnings (default: 4GB)
     # List of modules to connect/load.
-    # Possible modules: from_file_IC, KoMPoST, entropy_matching, MUSIC, iSS, SMASH, afterburner_toolkit
+    # Possible modules: from_file_IC, IPGlasma, KoMPoST, KoMPoST3D, entropy_matching, MUSIC, iSS, SMASH, afterburner_toolkit
     "modules": [],
     "number_of_jobs": 1,
     "number_events_per_job": 1,
@@ -166,6 +166,32 @@ KoMPoST = {
     "xEND": 511,  # The last grid point to include in the x direction
     "ySTART": 0,  # The first grid point to include in the y direction
     "yEND": 511,  # The last grid point to include in the y direction
+}
+
+# KoMPoST-3D for 3D (non boost-invariant) initial conditions. The input file
+# (from from_file_IC with boost_invariant 0) must already be in the KoMPoST-3D
+# T^munu format. One event needs ~9 GB of memory (response tables).
+KoMPoST3D = {
+    "tIn": 0.2,
+    "tOut": 0.8,
+    "EtaOverS": 0.16,  # specific shear viscosity
+    "EtaOverSTemperatureScale": 0.0,
+    "NuEffective": 40.0,
+    "EVOLUTION_MODE": 1,  # only 1 (kinetic theory, RTA) is supported
+    "ENERGY_PERTURBATIONS": 1,
+    "MOMENTUM_PERTURBATIONS": 0,  # only 0 is supported
+    "Regulator": "TwoPass",
+    "normFactor": 1.0,  # scaling of the input tau*Tmunu
+    "afm": 0.21,  # transverse lattice spacing in fm
+    "deta": 0.25,  # lattice spacing in spatial rapidity
+    "Ns": 128,  # number of grid points in x and y
+    "Neta": 65,  # number of grid points in spatial rapidity
+    "xSTART": 0,  # The first grid point to include in the x direction
+    "xEND": 127,  # The last grid point to include in the x direction
+    "ySTART": 0,  # The first grid point to include in the y direction
+    "yEND": 127,  # The last grid point to include in the y direction
+    "etaSTART": 0,  # The first grid point to include in the eta direction
+    "etaEND": 64,  # The last grid point to include in the eta direction
 }
 
 entropy_matching = {

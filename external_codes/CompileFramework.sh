@@ -22,6 +22,11 @@ cd KoMPoST &&
 make -j"$NUM_CPUS" &&
 cd ..
 
+echo "Build KoMPoST-3D code for 3D pre-equilibrium stage"
+cd KoMPoST-3D &&
+make -j"$NUM_CPUS" &&
+cd ..
+
 echo "Configure Eigen (used for MUSIC and SMASH)"
 cd eigen-3.4.0 &&
 mkdir -p build &&

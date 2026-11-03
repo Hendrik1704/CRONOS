@@ -22,6 +22,25 @@ cd KoMPoST
 git checkout 5d35aed36635ffa92f9ba9d97531f209097dacb0
 cd ..
 
+echo "Download KoMPoST-3D from GitHub:"
+KOMPOST3D_COMMIT=d3307864db44e7365db58130d8386933a47e579d
+# Skip the git-lfs files (if git-lfs is installed), only the response table is needed
+GIT_LFS_SKIP_SMUDGE=1 git clone https://github.com/Hendrik1704/KoMPoST-3D.git
+cd KoMPoST-3D
+GIT_LFS_SKIP_SMUDGE=1 git checkout "$KOMPOST3D_COMMIT"
+# The kinetic theory response table is stored in git-lfs, download it directly
+# so that git-lfs is not required
+wget -O RTA/ENERGYRESPONSE/Gs_tot_finer.dat \
+	"https://media.githubusercontent.com/media/Hendrik1704/KoMPoST-3D/${KOMPOST3D_COMMIT}/RTA/ENERGYRESPONSE/Gs_tot_finer.dat"
+
+# Basic sanity check: make sure the full response table was downloaded
+if ! echo "f03a7ebfd316d457ac3380579b11bb866bc5950b93a7326d5d9e2960a3903e1e  RTA/ENERGYRESPONSE/Gs_tot_finer.dat" | sha256sum -c --status; then
+	echo "ERROR: Failed to download the KoMPoST-3D response table (RTA/ENERGYRESPONSE/Gs_tot_finer.dat)." >&2
+	exit 1
+fi
+
+cd ..
+
 echo "Download MUSIC from GitHub:"
 git clone --branch chun_dev --single-branch https://github.com/Hendrik1704/MUSIC
 cd MUSIC
