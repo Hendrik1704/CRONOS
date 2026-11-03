@@ -43,8 +43,7 @@ from_file_IC = {
 }
 
 IPGlasma = {
-    # IP-Glasma 2.0 parameter names (renamed or replaced keys of older versions
-    # are rejected by check_settings with their new name)
+    # IP-Glasma 2.0 parameter names
     'runEvolution': 1,  # 1: run the collision and classical evolution, 0: stop after the Wilson lines
     'size': 800,  # number of grid points of IP-Glasma computation
     'L': 30.,  # grid size in the transverse plane
@@ -62,7 +61,7 @@ IPGlasma = {
     'bMax': 20.,
     'sampleBFromLinearDistribution': 1,
     'rotateReactionPlane': 0,
-    'g2muGeV': 0.526,  # only with useNucleus 0 (was g2mu 0.1 in lattice units at L 30, size 800)
+    'g2muGeV': 0.526,  # constant g^2 mu in GeV, only with useNucleus 0
     'useSmoothNucleus': 0,
     'useFixedNpart': 0,
     'nucleiToAverage': 1,

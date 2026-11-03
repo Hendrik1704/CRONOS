@@ -4,12 +4,7 @@ import pytest
 
 from src.check_settings import check_settings
 from src.configuration import Configuration, load_config
-from src.modules.IPGlasma import (
-    IPGLASMA_PARAMETERS,
-    RENAMED_PARAMETERS,
-    REPLACED_PARAMETERS,
-    IPGlasma,
-)
+from src.modules.IPGlasma import IPGLASMA_PARAMETERS, IPGlasma
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -38,12 +33,6 @@ def test_main_config_provides_all_parameters():
     config = _load_config(["IPGlasma", "MUSIC"])
     ipglasma_config = config.IPGlasma.to_dict()
     assert [k for k in IPGLASMA_PARAMETERS if k not in ipglasma_config] == []
-
-
-def test_shipped_configs_use_no_old_parameter_names():
-    config = _load_config(["IPGlasma", "MUSIC"])
-    old_names = set(RENAMED_PARAMETERS) | set(REPLACED_PARAMETERS)
-    assert old_names.isdisjoint(config.IPGlasma.to_dict())
     assert check_settings(config)
 
 
@@ -68,15 +57,6 @@ def test_prepare_input_writes_ipglasma2_parameters(tmp_path, random_seed):
     assert parameters["writeTmunuBinary"] == "0"  # KoMPoST reads text
     assert parameters["projectile"] == "Pb"  # from the user config
     assert parameters["nucleonModel"] == "hotspots"
-
-
-@pytest.mark.parametrize(
-    "old_key", ["Projectile", "x_projectile_jimwlk", "writeOutputs", "mode"]
-)
-def test_check_settings_rejects_old_parameter_names(old_key):
-    config = _load_config(["IPGlasma", "MUSIC"])
-    config.IPGlasma[old_key] = 1
-    assert not check_settings(config)
 
 
 def test_check_settings_requires_matching_output():
