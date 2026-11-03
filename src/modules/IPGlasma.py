@@ -4,12 +4,41 @@ import os
 import subprocess
 import shutil
 
+# Parameters set by CRONOS instead of the IPGlasma configuration
+CRONOS_CONTROLLED_PARAMETERS = {
+    "seed": "set from general.random_seed",
+    "useSeedList": "always 0",
+    "writeTmunuBinary": "always 0, KoMPoST reads the text T^munu file",
+    "writeOutputsToHDF5": "always 0, the outputs are needed as files",
+}
+
+
+def format_ipglasma_value(value):
+    """Format a configuration value for the IP-Glasma 2.0 input file.
+
+    IP-Glasma 2.0 only accepts 0 or 1 for on/off parameters, a
+    comma-separated list for list parameters and ``none`` for an empty list.
+
+    Args:
+        value: Value from the IPGlasma configuration.
+
+    Returns:
+        str: The value in input-file syntax.
+    """
+    if isinstance(value, bool):
+        return str(int(value))
+    if isinstance(value, (list, tuple)):
+        if not value:
+            return "none"
+        return ",".join(repr(float(v)) for v in value)
+    return str(value)
+
 
 class IPGlasma(BaseModule):
     """IP-Glasma initial condition module for the CRONOS framework.
 
-    Wraps the IP-Glasma code to generate fluctuating Glasma initial
-    conditions for hydrodynamic evolution. This module prepares the
+    Wraps the IP-Glasma code (version 2.0) to generate fluctuating Glasma
+    initial conditions for hydrodynamic evolution. This module prepares the
     execution environment, writes the IP-Glasma parameter file from the
     configuration, runs the external binary with memory monitoring, and
     collects the relevant output files.
@@ -35,7 +64,8 @@ class IPGlasma(BaseModule):
 
         - ``nucleusConfigurations`` (nuclear density profiles)
         - ``ipglasma`` executable
-        - ``qs2Adj_vs_Tp_vs_Y_200.in`` (Qs table)
+        - the nuclear Qs table named by ``nucleusQsTableFileName``
+          (``qs2Adj_vs_Tp_vs_Y_240.in`` by default)
         - ``tables`` and ``utilities`` directories
 
         Args:
@@ -77,16 +107,14 @@ class IPGlasma(BaseModule):
             )
             exit(1)
 
+        qs_table = self.config.nucleusQsTableFileName
         ipglasma_qs2adj_path = os.path.join(
-            self.project_root,
-            "external_codes",
-            "ipglasma",
-            "qs2Adj_vs_Tp_vs_Y_200.in",
+            self.project_root, "external_codes", "ipglasma", qs_table
         )
         if os.path.exists(ipglasma_qs2adj_path):
             os.symlink(
                 ipglasma_qs2adj_path,
-                os.path.join(ipglasma_event_dir, "qs2Adj_vs_Tp_vs_Y_200.in"),
+                os.path.join(ipglasma_event_dir, qs_table),
             )
         else:
             logging.error(
@@ -125,9 +153,9 @@ class IPGlasma(BaseModule):
         """Generate IP-Glasma parameter file for the current event.
 
         Writes ``parameters_IPGlasma.ini`` in the event's ``IPGlasma``
-        directory. All parameters are taken from ``self.config`` and
-        written in the format expected by the IP-Glasma code, including
-        handling of the snapshot list without scientific notation.
+        directory. Every parameter of ``self.config`` is written, so that
+        IP-Glasma checks all of them; the parameters in
+        ``CRONOS_CONTROLLED_PARAMETERS`` are set by CRONOS.
 
         Args:
             event_dir (str): Path to the event-specific directory that
@@ -145,145 +173,17 @@ class IPGlasma(BaseModule):
         ini_file = os.path.join(IPGlasma_dir, "parameters_IPGlasma.ini")
 
         with open(ini_file, "w") as f:
-            f.write(f"mode {self.config.mode}\n")
-            f.write(f"readMultFromFile {self.config.readMultFromFile}\n")
-            f.write(f"size {self.config.size}\n")
-            f.write(f"L {self.config.L}\n")
-            f.write(f"Nc {self.config.Nc}\n")
-            f.write(f"m {self.config.m}\n")
-            f.write(f"rmax {self.config.rmax}\n")
-            f.write(f"UVdamp {self.config.UVdamp}\n")
-            f.write(f"Jacobianm {self.config.Jacobianm}\n")
-            f.write(f"g {self.config.g}\n")
-            f.write(f"SubNucleonParamType {self.config.SubNucleonParamType}\n")
-            f.write(f"SubNucleonParamSet {self.config.SubNucleonParamSet}\n")
-            f.write(f"BG {self.config.BG}\n")
-            f.write(f"BGq {self.config.BGq}\n")
-            f.write(f"BGqVar {self.config.BGqVar}\n")
-            f.write(f"dqMin {self.config.dqMin}\n")
-            f.write(f"omega {self.config.omega}\n")
-            f.write(f"useSmoothNucleus {self.config.useSmoothNucleus}\n")
-            f.write(
-                f"useConstituentQuarkProton {self.config.useConstituentQuarkProton}\n"
-            )
-            f.write(f"NqFluc {self.config.NqFluc}\n")
-            f.write(
-                f"shiftConstituentQuarkProtonOrigin {self.config.shiftConstituentQuarkProtonOrigin}\n"
-            )
-            f.write(f"runningCoupling {self.config.runningCoupling}\n")
-            f.write(f"muZero {self.config.muZero}\n")
-            f.write(f"minimumQs2ST {self.config.minimumQs2ST}\n")
-            f.write(f"setWSDeformParams {self.config.setWSDeformParams}\n")
-            f.write(f"R_WS {self.config.R_WS}\n")
-            f.write(f"a_WS {self.config.a_WS}\n")
-            f.write(f"dR_np {self.config.dR_np}\n")
-            f.write(f"da_np {self.config.da_np}\n")
-            f.write(f"beta2 {self.config.beta2}\n")
-            f.write(f"beta3 {self.config.beta3}\n")
-            f.write(f"beta4 {self.config.beta4}\n")
-            f.write(f"gamma {self.config.gamma}\n")
-            f.write(f"force_dmin_flag {self.config.force_dmin_flag}\n")
-            f.write(f"d_min {self.config.d_min}\n")
-            f.write(f"c {self.config.c}\n")
-            f.write(f"g2mu {self.config.g2mu}\n")
-            f.write(f"useFatTails {self.config.useFatTails}\n")
-            f.write(f"tDistNu {self.config.tDistNu}\n")
-            f.write(f"smearQs {self.config.smearQs}\n")
-            f.write(f"smearingWidth {self.config.smearingWidth}\n")
-            f.write(f"protonAnisotropy {self.config.protonAnisotropy}\n")
-            f.write(f"roots {self.config.roots}\n")
-            f.write(f"usePseudoRapidity {self.config.usePseudoRapidity}\n")
-            f.write(f"RapidityA {self.config.RapidityA}\n")
-            f.write(f"RapidityB {self.config.RapidityB}\n")
-            f.write(f"useFluctuatingx {self.config.useFluctuatingx}\n")
-            f.write(
-                f"xFromThisFactorTimesQs {self.config.xFromThisFactorTimesQs}\n"
-            )
-            f.write(f"useNucleus {self.config.useNucleus}\n")
-            f.write(f"useGaussian {self.config.useGaussian}\n")
-            f.write(
-                f"nucleonPositionsFromFile {self.config.nucleonPositionsFromFile}\n"
-            )
-            f.write(
-                f"NucleusQsTableFileName {self.config.NucleusQsTableFileName}\n"
-            )
-            f.write(f"QsmuRatio {self.config.QsmuRatio}\n")
-            f.write(
-                f"samplebFromLinearDistribution {self.config.samplebFromLinearDistribution}\n"
-            )
-            f.write(
-                f"runWith0Min1Avg2MaxQs {self.config.runWith0Min1Avg2MaxQs}\n"
-            )
-            f.write(
-                f"runWithThisFactorTimesQs {self.config.runWithThisFactorTimesQs}\n"
-            )
-            f.write(f"runWithLocalQs {self.config.runWithLocalQs}\n")
-            f.write(f"runWithkt {self.config.runWithkt}\n")
-            f.write(f"Ny {self.config.Ny}\n")
-            f.write(f"useSeedList 0\n")
-            if self.full_config.general.random_seed == -1:
-                f.write(f"useTimeForSeed 1\n")
-                f.write(f"seed 42\n")
-            else:
-                f.write(f"useTimeForSeed 0\n")
-                f.write(f"seed {self.full_config.general.random_seed}\n")
-            f.write(f"Projectile {self.config.Projectile}\n")
-            f.write(f"Target {self.config.Target}\n")
-            f.write(f"bmin {self.config.bmin}\n")
-            f.write(f"bmax {self.config.bmax}\n")
-            f.write(f"rotateReactionPlane {self.config.rotateReactionPlane}\n")
-            f.write(f"lightNucleusOption {self.config.lightNucleusOption}\n")
-            f.write(
-                f"polariztionProjectile {self.config.polariztionProjectile}\n"
-            )
-            f.write(f"polariztionTarget {self.config.polariztionTarget}\n")
-            f.write(
-                f"polarizationProjectileJz {self.config.polarizationProjectileJz}\n"
-            )
-            f.write(
-                f"polarizationTargetJz {self.config.polarizationTargetJz}\n"
-            )
-            f.write(f"useFixedNpart {self.config.useFixedNpart}\n")
-            f.write(
-                f"averageOverThisManyNuclei {self.config.averageOverThisManyNuclei}\n"
-            )
-            f.write(f"SigmaNN {self.config.SigmaNN}\n")
-            f.write(f"gaussianWounding {self.config.gaussianWounding}\n")
-            f.write(f"inverseQsForMaxTime {self.config.inverseQsForMaxTime}\n")
-            f.write(f"maxtime {self.config.maxtime}\n")
-            f.write(f"dtau {self.config.dtau}\n")
-            f.write(f"LOutput {self.config.LOutput}\n")
-            f.write(f"sizeOutput {self.config.sizeOutput}\n")
-            f.write(
-                f"computeGluonMultiplicity {self.config.computeGluonMultiplicity}\n"
-            )
-            f.write(f"etaSizeOutput {self.config.etaSizeOutput}\n")
-            f.write(f"detaOutput {self.config.detaOutput}\n")
-            f.write(f"writeOutputs {self.config.writeOutputs}\n")
-            f.write(f"writeEvolution {self.config.writeEvolution}\n")
-            f.write(
-                f"readInitialWilsonLines {self.config.readInitialWilsonLines}\n"
-            )
-            f.write(f"writeWilsonLines {self.config.writeWilsonLines}\n")
-            f.write(f"writeOutputsToHDF5 {self.config.writeOutputsToHDF5}\n")
-            f.write(f"useJIMWLK {self.config.useJIMWLK}\n")
-            f.write(f"mu0_jimwlk {self.config.mu0_jimwlk}\n")
-            f.write(f"simpleLangevin {self.config.simpleLangevin}\n")
-            f.write(f"alphas_jimwlk {self.config.alphas_jimwlk}\n")
-            f.write(f"jimwlk_ic_x {self.config.jimwlk_ic_x}\n")
-            f.write(f"x_projectile_jimwlk {self.config.x_projectile_jimwlk}\n")
-            f.write(f"x_target_jimwlk {self.config.x_target_jimwlk}\n")
-            f.write(f"Ds_jimwlk {self.config.Ds_jimwlk}\n")
-            f.write(f"Lambda_QCD_jimwlk {self.config.Lambda_QCD_jimwlk}\n")
-            f.write(f"m_jimwlk {self.config.m_jimwlk}\n")
-            f.write(f"saveSnapshots {self.config.saveSnapshots}\n")
-            snapshot = self.config.xSnapshotList
-            if isinstance(snapshot, list):
-                varStr = ",".join(f"{float(var):.7f}" for var in snapshot)
-            else:
-                varStr = f"{float(snapshot):.7f}"
-
-            f.write(f"xSnapshotList {varStr}\n")
+            # Write every key, so that IP-Glasma 2.0, which rejects unknown
+            # keys and requires all keys that are not optional, checks them
+            for key, value in self.config.to_dict().items():
+                if key not in CRONOS_CONTROLLED_PARAMETERS:
+                    f.write(f"{key} {format_ipglasma_value(value)}\n")
+            f.write("useSeedList 0\n")
+            # seed -1 draws a random seed
+            f.write(f"seed {self.full_config.general.random_seed}\n")
+            # KoMPoST reads the text T^munu file
+            f.write("writeTmunuBinary 0\n")
+            f.write("writeOutputsToHDF5 0\n")
             f.write("EndOfFile")
 
         logging.info("[IPGlasma] Input file created successfully.")
@@ -308,14 +208,18 @@ class IPGlasma(BaseModule):
         logging.info("[IPGlasma] Running IP-Glasma...")
 
         cwd = os.getcwd()
+        log_file = None
         try:
             os.chdir(ipglasma_dir)
 
             run_kwargs = {}
             if not self.full_config.general.module_terminal_output:
-                run_kwargs["stdout"] = subprocess.DEVNULL
-                run_kwargs["stderr"] = subprocess.DEVNULL
-                logging.debug("[IPGlasma] Running with suppressed output...")
+                # Keep the output in a log file, IP-Glasma reports input
+                # errors on stdout
+                log_file = open("ipglasma.log", "w")
+                run_kwargs["stdout"] = log_file
+                run_kwargs["stderr"] = subprocess.STDOUT
+                logging.debug("[IPGlasma] Writing output to ipglasma.log...")
             run_external_command(
                 [f"./{ipglasma_exe}", ini_file],
                 memory_threshold_mb=self.full_config.general.memory_threshold_mb,
@@ -323,17 +227,21 @@ class IPGlasma(BaseModule):
                 **run_kwargs,
             )
         except subprocess.CalledProcessError as e:
-            # IP-Glasma's main() always returns 1 on the normal exit path
-            # (upstream bug in main.cpp). Treat exit code 1 as success.
-            if e.returncode == 1:
-                logging.info(
-                    "[IPGlasma] Ignoring exit code 1 "
-                    "(known upstream issue in IP-Glasma main.cpp)."
+            # IP-Glasma 2.0 returns 1 for an invalid input file
+            logging.error(f"[IPGlasma] Execution failed: {e}")
+            if log_file is not None:
+                log_file.close()
+                with open("ipglasma.log") as f:
+                    tail = f.readlines()[-20:]
+                logging.error(
+                    "[IPGlasma] Last lines of "
+                    f"{os.path.join(ipglasma_dir, 'ipglasma.log')}:\n"
+                    + "".join(tail)
                 )
-            else:
-                logging.error(f"[IPGlasma] Execution failed: {e}")
-                raise
+            raise
         finally:
+            if log_file is not None:
+                log_file.close()
             os.chdir(cwd)
 
         logging.info("[IPGlasma] Execution finished.")
@@ -346,8 +254,9 @@ class IPGlasma(BaseModule):
         """Return path to the Tmunu output file, or ``None``."""
         import glob
 
-        maxtime = float(self.config.maxtime)
-        candidate = os.path.join(ipglasma_dir, f"Tmunu-t{maxtime}-0.dat")
+        maxtime = float(self.config.maxTime)
+        # IP-Glasma writes the time like C++ streams do, e.g. 0.4 or 1
+        candidate = os.path.join(ipglasma_dir, f"Tmunu-t{maxtime:g}-0.dat")
         if os.path.exists(candidate):
             return candidate
         # Fallback: glob for float-formatting differences
@@ -375,16 +284,14 @@ class IPGlasma(BaseModule):
         ``output_{module_index}.dat`` so that subsequent modules can
         locate it consistently.
 
-        The output filename depends on the ``writeOutputs`` parameter:
+        The output file depends on the output switches:
 
-        - ``writeOutputs`` with bit 0 set (1, 3, 5, ...):
-          ``epsilon-u-Hydro-TauHydro-0.dat``
-        - ``writeOutputs`` with bit 2 set (4, 5, ...):
-          ``Tmunu-t{maxtime}-0.dat``
+        - ``writeHydro 1``: ``epsilon-u-Hydro-TauHydro-0.dat``
+        - ``writeTmunu 1``: ``Tmunu-t{maxTime}-0.dat`` (text format)
 
-        When both bits are set, the ``Tmunu`` file is preferred if
+        When both are written, the ``Tmunu`` file is preferred if
         KoMPoST is among the active modules (it requires the full
-        $T^{\mu\nu}$); otherwise ``epsilon-u-Hydro`` is used.
+        T^μν); otherwise ``epsilon-u-Hydro`` is used.
 
         In addition, the following auxiliary files are moved unchanged
         (if present) from the ``IPGlasma`` directory to ``results``:
@@ -392,6 +299,8 @@ class IPGlasma(BaseModule):
         - ``NcollList0.dat``
         - ``NgluonEstimators0.dat``
         - ``NpartList0.dat``
+        - ``usedParameters0.dat`` (all parameters used, the IP-Glasma
+          version and the random seed)
 
         After moving the files the temporary ``IPGlasma`` directory is
         removed.
@@ -408,25 +317,23 @@ class IPGlasma(BaseModule):
         results_dir = os.path.join(event_dir, "results")
         os.makedirs(results_dir, exist_ok=True)
 
-        # Determine the main output file based on writeOutputs mode.
-        # IP-Glasma uses bit flags: bit 0 -> epsilon-u-Hydro, bit 2 -> Tmunu
-        write_outputs = int(self.config.writeOutputs)
+        # Determine the main output file from the output switches
+        write_hydro = int(self.config.writeHydro) == 1
+        write_tmunu = int(self.config.writeTmunu) == 1
         uses_kompost = "KoMPoST" in self.full_config.general.modules
-        has_bit0 = write_outputs % 2 == 1
-        has_bit2 = write_outputs // 4 == 1
         src_file = None
 
         # When both outputs exist, prefer Tmunu only if KoMPoST is active;
         # otherwise prefer epsilon-u-Hydro.
-        if has_bit2 and has_bit0:
+        if write_tmunu and write_hydro:
             check_order = (
                 [self._find_tmunu, self._find_epsilon_u]
                 if uses_kompost
                 else [self._find_epsilon_u, self._find_tmunu]
             )
-        elif has_bit2:
+        elif write_tmunu:
             check_order = [self._find_tmunu]
-        elif has_bit0:
+        elif write_hydro:
             check_order = [self._find_epsilon_u]
         else:
             check_order = []
@@ -439,10 +346,12 @@ class IPGlasma(BaseModule):
         if src_file is None:
             logging.error(
                 f"[IPGlasma] No output file found in {ipglasma_dir} "
-                f"for writeOutputs={write_outputs}."
+                f"for writeHydro={self.config.writeHydro}, "
+                f"writeTmunu={self.config.writeTmunu}."
             )
             raise FileNotFoundError(
-                f"IP-Glasma output not found for writeOutputs={write_outputs}"
+                f"IP-Glasma output not found for writeHydro="
+                f"{self.config.writeHydro}, writeTmunu={self.config.writeTmunu}"
             )
 
         dst_file = os.path.join(
@@ -456,6 +365,7 @@ class IPGlasma(BaseModule):
             "NcollList0.dat",
             "NgluonEstimators0.dat",
             "NpartList0.dat",
+            "usedParameters0.dat",
         ]
         for fname in extra_files:
             src = os.path.join(ipglasma_dir, fname)

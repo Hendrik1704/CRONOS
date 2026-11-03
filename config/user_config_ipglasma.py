@@ -24,45 +24,45 @@ general = {
 }
 
 IPGlasma = {
-    "bmin": 0.,
-    "bmax": 20.,
-    "Projectile": "Pb",
-    "Target": "Pb",
+    "bMin": 0.,
+    "bMax": 20.,
+    "projectile": "Pb",
+    "target": "Pb",
     "nucleonPositionsFromFile": 0,
-    "roots": 5020.,
-    "SigmaNN": 67.,
-    "useConstituentQuarkProton": 3,   # 0: round proton; 3: fluctuating proton
+    "sqrtS": 5020.,
+    "sigmaNN": 67.,
+    "nucleonModel": "hotspots",   # gaussian: round proton; hotspots: fluctuating proton
+    "Nq": 3,  # number of hot spots
     "L": 30.,
     "size": 800,
     "LOutput": 34.,
     "sizeOutput": 340,
-    "writeOutputs": 1, # 1: initial conditions e, u^\mu, \pi^{\mu\nu} for hydro; 4: initial T^{\mu\nu} for KoMPoST
+    "writeHydro": 1,  # initial conditions e, u^\mu, \pi^{\mu\nu} for hydro
+    "writeTmunu": 0,  # initial T^{\mu\nu} for KoMPoST
     "writeWilsonLines": 0,
-    "maxtime": 0.4,
-    "setWSDeformParams": 0,
-    "SubNucleonParamType": 0,
-    "SubNucleonParamSet": 0,
+    "maxTime": 0.4,
+    "useInputWSParams": 0,
+    "subNucleonParamType": 0,
+    "subNucleonParamSet": 0,
     "m": 0.51,
     "BG": 3.83,
     "BGq": 0.30,
     "omega": 1.0,
     "dqMin": 0.2582,
-    "UVdamp": 0.0,
+    "UVDamp": 0.0,
     "smearingWidth": 0.88,
-    "QsmuRatio": 0.37,
-    "useFluctuatingx": 0,
-    "RapidityA": 0.0,
-    "RapidityB": 0.0,
+    "QsMuRatio": 0.37,
+    "useFluctuatingX": 0,
     "useJIMWLK": 1,
-    "mu0_jimwlk": 0.28,
-    "alphas_jimwlk": 0,
-    "jimwlk_ic_x":  0.01,
-    "x_projectile_jimwlk": 0.0001294820717,
-    "x_target_jimwlk": 0.0001294820717,
-    "Ds_jimwlk": 0.003,
-    "Lambda_QCD_jimwlk": 0.0348,
-    "m_jimwlk": 0.16,
-    "saveSnapshots": 0,
+    "jimwlkMu0": 0.28,
+    "jimwlkAlphaS": 0,
+    "jimwlkInitialX":  0.01,
+    "projectileX": 0.0001294820717,  # JIMWLK evolves the projectile to this x
+    "targetX": 0.0001294820717,  # JIMWLK evolves the target to this x
+    "jimwlkDs": 0.003,
+    "jimwlkLambdaQCD": 0.0348,
+    "jimwlkMass": 0.16,
+    "jimwlkSaveSnapshots": 0,
 }
 
 MUSIC = {

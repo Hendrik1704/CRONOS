@@ -43,109 +43,105 @@ from_file_IC = {
 }
 
 IPGlasma = {
-    # all parameters below are for (type == self)
-    'mode': 1,  # run mode
-    'readMultFromFile': 0,
+    # IP-Glasma 2.0 parameter names
+    'runEvolution': 1,  # 1: run the collision and classical evolution, 0: stop after the Wilson lines
     'size': 800,  # number of grid points of IP-Glasma computation
     'L': 30.,  # grid size in the transverse plane
-    'Nc': 3,  # number of color
-    'm': 0.2,  # infrared cut-off mass (GeV)
-    'rmax': 100.,
-    'UVdamp': 0.,
-    'Jacobianm': 0.35,
+    'Ny': 50,
     'g': 1.,  # strong coupling constant
-    'SubNucleonParamType': 0,  # 0: do not use posterior parameter sets
-    # 1: use subnucleon parameters from variant Nq posterior distribution
-    # 2: use subnucleon parameters from fixed Nq = 3 posterior distribution
-    'SubNucleonParamSet': -1,  # -1: choose a random set from the posterior distribution
-    # 0: choose the MAP parameter set
-    # positive intergers: choose a fixed set of parameter for sub-nucleonic structure
-    'BG': 4.,
-    'BGq': 0.3,
-    'BGqVar': 0.0,
-    'dqMin': 0.0,
-    'omega': 1.0,
+    'maxTime': 0.4,
+    'timeStepsPerLatticeSpacing': 10,
+    'inverseQsForMaxTime': 0,
+    'projectile': "Au",
+    'target': "Au",
+    'sigmaNN': 42.,
+    'useNucleus': 1,
+    'readInitialWilsonLines': 0,
+    'bMin': 0.,
+    'bMax': 20.,
+    'sampleBFromLinearDistribution': 1,
+    'rotateReactionPlane': 0,
+    'g2muGeV': 0.526,  # constant g^2 mu in GeV, only with useNucleus 0
     'useSmoothNucleus': 0,
-    'useConstituentQuarkProton': 0,
-    'NqFluc': 0.0,
-    'shiftConstituentQuarkProtonOrigin': 1,
-    'runningCoupling': 0,
-    'muZero': 0.3,
-    'minimumQs2ST': 0.,
-    'setWSDeformParams': 0,
-    'R_WS': 6.6,
-    'a_WS': 0.52,
-    'dR_np': 0.,
-    'da_np': 0.,
+    'useFixedNpart': 0,
+    'nucleiToAverage': 1,
+    'gaussianWounding': 1,
+    'nucleonPositionsFromFile': 0,
+    'polarizationProjectile': 0,     # 0: unpolarized; 1: longitudinal polarized; 2: transverse polarized
+    'polarizationTarget': 0,         # 0: unpolarized; 1: longitudinal polarized; 2: transverse polarized
+    'polarizationProjectileJz': 0,
+    'polarizationTargetJz': 0,
+    'lightNucleusOption': 1,
+    'useInputWSParams': 0,
+    'radiusWS': 6.6,
+    'diffusenessWS': 0.52,
     'beta2': 0.0,
     'beta3': 0.0,
     'beta4': 0.0,
     'gamma': 0.0,
-    'force_dmin_flag': 1,  # flag to force d_min for deformed nuclei
-    'd_min': 0.9,  # fm
-    'c': 0.2,
-    'g2mu': 0.1,
-    'useFatTails': 0,
-    'tDistNu': 3,
+    'deltaRnp': 0.,
+    'deltaAnp': 0.,
+    'forceDMin': 1,  # flag to force d_min for deformed nuclei
+    'dMin': 0.9,  # fm
+    'nucleonModel': "gaussian",  # gaussian, hotspots (Nq hot spots) or strings
+    'subNucleonParamType': 0,  # 0: do not use posterior parameter sets
+    # 1: use subnucleon parameters from variant Nq posterior distribution
+    # 2: use subnucleon parameters from fixed Nq = 3 posterior distribution
+    # (posterior sets require nucleonModel hotspots)
+    'subNucleonParamSet': -1,  # -1: choose a random set from the posterior distribution
+    # 0: choose the MAP parameter set
+    # positive intergers: choose a fixed set of parameter for sub-nucleonic structure
+    'm': 0.2,  # infrared cut-off mass (GeV)
+    'BG': 4.,
+    'protonAnisotropy': 0,  # only with nucleonModel gaussian
+    'BGq': 0.3,
+    'BGqVar': 0.0,
+    'dqMin': 0.0,
+    'omega': 1.0,
+    'Nq': 3,  # number of hot spots (nucleonModel hotspots)
+    'NqFluc': 0.0,
+    'shiftConstituentQuarkProtonOrigin': 1,
+    'QsMuRatio': 0.8,
     'smearQs': 1,
     'smearingWidth': 0.6,
-    'protonAnisotropy': 0,
-    'roots': 200.,
+    'UVDamp': 0.,
+    'minimumQs2ST': 0.,
+    'nucleusQsTableFileName': "qs2Adj_vs_Tp_vs_Y_240.in",
+    'rapidity': 0.,  # rapidity of the spectra, and of x with useFluctuatingX 1
     'usePseudoRapidity': 0,
-    'RapidityA': 0.,
-    'RapidityB': 0.,
-    'useFluctuatingx': 1,
-    'xFromThisFactorTimesQs': 1,
-    'useNucleus': 1,
-    'useGaussian': 0,
-    'nucleonPositionsFromFile': 0,
-    'NucleusQsTableFileName': "qs2Adj_vs_Tp_vs_Y_200.in",
-    'QsmuRatio': 0.8,
-    'samplebFromLinearDistribution': 1,
-    'runWith0Min1Avg2MaxQs': 2,
-    'runWithThisFactorTimesQs': 0.5,
+    'jacobianMass': 0.35,
+    'useFluctuatingX': 1,
+    'sqrtS': 200.,
+    'projectileX': 0.01,  # Bjorken x of the projectile (useFluctuatingX 0 or JIMWLK; with JIMWLK it must be below jimwlkInitialX)
+    'targetX': 0.01,  # Bjorken x of the target (useFluctuatingX 0 or JIMWLK)
+    'xQsFactor': 1,
+    'runningCoupling': 0,
+    'mu0': 0.3,
+    'c': 0.2,
+    'nFlavors': 3,
+    'LambdaQCD': 0.2,
+    'runWithQs': 2,
+    'runningCouplingQsFactor': 0.5,
     'runWithLocalQs': 0,
-    'runWithkt': 0,
-    'Ny': 50,
-    'Projectile': "Au",
-    'Target': "Au",
-    'bmin': 0.,
-    'bmax': 20.,
-    'rotateReactionPlane': 0,
-    'lightNucleusOption': 1,
-    'polariztionProjectile': 0,     # 0: unpolarized; 1: longitudinal polarized; 2: transverse polarized
-    'polariztionTarget': 0,         # 0: unpolarized; 1: longitudinal polarized; 2: transverse polarized
-    'polarizationProjectileJz': 0,
-    'polarizationTargetJz': 0,
-    'useFixedNpart': 0,
-    'averageOverThisManyNuclei': 1,
-    'SigmaNN': 42.,
-    'gaussianWounding': 1,
-    'inverseQsForMaxTime': 0,
-    'maxtime': 0.4,
-    'dtau': 0.1,
+    'runWithKt': 0,
+    'computeGluonMultiplicity': 0,
+    'computeEccentricities': 0,
+    'writeHydro': 1,  # 1: initial conditions e, u^\mu, \pi^{\mu\nu} for hydro
+    'writeJazma': 0,
+    'writeTmunu': 0,  # 1: initial T^{\mu\nu} for KoMPoST
     'LOutput': 30,
     'sizeOutput': 512,
-    'computeGluonMultiplicity': 0,
-    'etaSizeOutput': 1,
-    'detaOutput': 0,
-    'writeOutputs': 1,          # 1: initial conditions e, u^\mu, \pi^{\mu\nu} for hydro; 4: initial T^{\mu\nu} for KoMPoST
-    'writeEvolution': 0,
-    'readInitialWilsonLines': 0,
     'writeWilsonLines': 0,
-    'writeOutputsToHDF5': 0,
-    'useJIMWLK': 0,
-    'mu0_jimwlk': 0.28,
-    'simpleLangevin': 1,
-    'alphas_jimwlk': 0,
-    'jimwlk_ic_x': 0.01,
-    'x_projectile_jimwlk': 0.001,
-    'x_target_jimwlk': 0.001,
-    'Ds_jimwlk': 0.005,
-    'Lambda_QCD_jimwlk': 0.040,
-    'm_jimwlk': 0.4,
-    'saveSnapshots': 0,
-    'xSnapshotList': [5e-3, 2e-3, 0.0001, 0.00005, 0.00001]
+    'useJIMWLK': 0,  # requires useFluctuatingX 0; evolves from jimwlkInitialX to projectileX/targetX
+    'jimwlkMu0': 0.28,
+    'jimwlkLambdaQCD': 0.040,
+    'jimwlkC': 0.2,
+    'jimwlkMass': 0.4,
+    'jimwlkAlphaS': 0,  # 0: running coupling
+    'jimwlkDs': 0.005,
+    'jimwlkInitialX': 0.01,
+    'jimwlkSaveSnapshots': 0,
+    'jimwlkXSnapshotList': [5e-3, 2e-3, 1e-3, 5e-4],  # x of the Wilson-line snapshots (jimwlkSaveSnapshots 1)
 }
 
 KoMPoST = {

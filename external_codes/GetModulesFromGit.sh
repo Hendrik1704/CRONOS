@@ -3,9 +3,10 @@
 set -euo pipefail
 
 echo "Download IP-Glasma from GitHub:"
-git clone https://github.com/chunshen1987/ipglasma -b ipglasma_jimwlk
+# IP-Glasma 2.0 (devel branch, not released yet)
+git clone https://github.com/schenke/ipglasma -b devel
 cd ipglasma
-git checkout bf92fe1758a61acc5cf84dff2428b83570ea81fa
+git checkout 1f1f4aeb43af1800c5ec77894471ef9cbab17871
 cd nucleusConfigurations && bash download_nucleusTables.sh
 
 # Basic sanity check: make sure a key nucleus configuration exists
