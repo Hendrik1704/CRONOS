@@ -94,6 +94,8 @@ This command
 * copies all valid events into a single file `merged_events.h5`, and
 * skips incomplete or corrupted events.
 
+The command can be rerun when more jobs have finished: new events are appended to the existing `merged_events.h5`.
+
 The resulting database has the structure
 
 ```
@@ -106,24 +108,6 @@ merged_events.h5
 │   └── ...
 └── ...
 ```
-
-### Optional: delete per-event files after merging
-
-To save disk space, the original event files can be removed automatically after they have been successfully copied:
-
-```bash
-apptainer exec \
-    --bind $(pwd):/work \
-    ./cronos.sif \
-    python3 /app/utilities/event_database.py \
-    build \
-    --pattern "/work/run_wsu/job_*/event_*.h5" \
-    --out "/work/run_wsu/merged_events.h5" \
-    --validate \
-    --delete-source
-```
-
-Only successfully copied event files are deleted. Events that fail validation or cannot be copied are left untouched.
 
 ## 6. Bin events into centrality classes
 
@@ -206,6 +190,7 @@ run_wsu/
 ```
 
 The original `job_*` directory structure is preserved inside each centrality class to avoid filename collisions, since every simulation job typically produces files with the same event names (e.g. `event_0.h5`, `event_1.h5`, ...).
+The symbolic links are relative, so links created inside the container (under `/work`) also work on the host.
 
 Instead of symbolic links, physical copies of the event files can be created by replacing
 
@@ -240,3 +225,22 @@ to generate the bins
 ```text
 0–1, 1–5, 5–10, 10–20, 20–40, 40–60, 60–80, 80–100%
 ```
+
+## 7. Optional: delete per-event files after merging
+
+Only do this after all steps that need the per-event files are finished, in particular the centrality binning of section 6 (the bin lists and symlinks point to the per-event files).
+To save disk space, the original event files can then be removed automatically after they have been successfully copied into the database:
+
+```bash
+apptainer exec \
+    --bind $(pwd):/work \
+    ./cronos.sif \
+    python3 /app/utilities/event_database.py \
+    build \
+    --pattern "/work/run_wsu/job_*/event_*.h5" \
+    --out "/work/run_wsu/merged_events.h5" \
+    --validate \
+    --delete-source
+```
+
+Only successfully copied event files are deleted. Events that fail validation, cannot be copied, or collide with a different event already stored under the same `/job_N/event_M` group are left untouched.
