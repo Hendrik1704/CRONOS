@@ -19,7 +19,7 @@ cd ../..
 echo "Download KoMPoST from GitHub:"
 git clone https://github.com/Hendrik1704/KoMPoST.git
 cd KoMPoST
-git checkout 3cc99ea40edac68da25eae784e922cac11548297
+git checkout fdbe1114303504c1ff34245c6f11748657a04fd6
 cd ..
 
 echo "Download MUSIC from GitHub:"
