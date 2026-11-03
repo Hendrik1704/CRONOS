@@ -17,18 +17,23 @@ MUSIC_MAX_TIME_MESSAGE = "Maximum allowed time reached."
 
 
 def music_evolution_finished(log_path):
-    """Return True if the MUSIC log shows that the evolution ended normally."""
+    """Return True if the MUSIC log shows that the evolution ended normally.
+
+    Reaching Total_evolution_time_tau before all cells froze out counts as a
+    failure, since the freeze-out surface is then not closed.
+    """
     with open(log_path, errors="replace") as f:
         for line in f:
             line = line.rstrip()
             if line.endswith(f" {MUSIC_FINISHED_MESSAGE}"):
                 return True
             if MUSIC_MAX_TIME_MESSAGE in line:
-                logging.warning(
+                # The freeze-out surface is not closed, which is a failure
+                logging.error(
                     "[MUSIC] Total_evolution_time_tau was reached before all "
                     "cells froze out; the freeze-out surface is not closed."
                 )
-                return True
+                return False
     return False
 
 

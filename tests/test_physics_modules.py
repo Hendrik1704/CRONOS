@@ -800,20 +800,29 @@ class TestMUSICRunAndOutput(TestPhysicsModuleBase):
             os.path.join(self.event_dir, "MUSIC", "MUSIC.log")
         )
 
-    @pytest.mark.parametrize(
-        "line",
-        [
-            "\u266b 120.5 MB Finished.",
-            "\033[1m\033[33m! Maximum allowed time reached.\033[0m",
-        ],
-    )
-    def test_run_accepts_completion_message(self, line):
+    def test_run_accepts_completion_message(self):
         module = self.make_module()
         with patch(
             "src.modules.MUSIC.run_external_command",
-            side_effect=write_music_output("\u266b 1 MB Done time step", line),
+            side_effect=write_music_output(
+                "\u266b 1 MB Done time step", "\u266b 120.5 MB Finished."
+            ),
         ):
             module.run(self.event_dir)
+
+    def test_run_fails_when_maximum_time_is_reached(self, caplog):
+        """The freeze-out surface is not closed, so the event fails."""
+        module = self.make_module()
+        with patch(
+            "src.modules.MUSIC.run_external_command",
+            side_effect=write_music_output(
+                "\u266b 1 MB Done time step",
+                "\033[1m\033[33m! Maximum allowed time reached.\033[0m",
+            ),
+        ):
+            with pytest.raises(RuntimeError):
+                module.run(self.event_dir)
+        assert "freeze-out surface is not closed" in caplog.text
 
     @patch("src.modules.MUSIC.run_external_command")
     def test_run_with_terminal_output_skips_completion_check(
