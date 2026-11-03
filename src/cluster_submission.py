@@ -43,9 +43,16 @@ Requires: SLURM workload manager (for cluster execution)
 """
 
 from .colors import Colors
+from .configuration import snapshot_config_paths
 import logging
 import os
 from pathlib import Path
+
+# Root of the CRONOS repository containing this file
+CRONOS_ROOT = Path(__file__).resolve().parent.parent
+
+# Mount point of the repository inside the CRONOS container (wsu cluster)
+CONTAINER_WORK_DIR = "/work"
 
 
 def create_noctua2_submission_script(args):
@@ -93,22 +100,32 @@ def create_noctua2_submission_script(args):
         - Working directory management for relative paths
         - Integration with run_simulations.py execution
 
+    All paths in the script (log files, run_simulations.py, configuration
+    copies in the run directory, job directories) are absolute, so the
+    script can be submitted from any directory.
+
     Example Generated Script:
         #!/bin/bash
         #SBATCH -J CRONOS
         #SBATCH -A hpc-prf-flucurhi
+        #SBATCH -o /abs/run/log/output_%A_%a.log
         #SBATCH --array=0-99
         #SBATCH -t 40:00:00
         ...
-        python ../run_simulations.py --job_dir job_$SLURM_ARRAY_TASK_ID/
+        python "/abs/CRONOS/run_simulations.py" \\
+            --main_config_path "/abs/run/main_config.py" \\
+            --user_config_path "/abs/run/user_config.py" \\
+            --job_dir "/abs/run/job_$SLURM_ARRAY_TASK_ID/"
 
     Notes:
         - Each array task executes one job_* directory independently
         - Supports checkpoint-based resumption for fault tolerance
         - Optimized for memory-intensive heavy-ion collision simulations
     """
-    run_dir = args.run_dir
-    slurm_logging_dir = "log"
+    run_dir = os.path.abspath(args.run_dir)
+    slurm_logging_dir = os.path.join(run_dir, "log")
+    main_config_path, user_config_path = snapshot_config_paths(run_dir)
+    run_simulations_path = CRONOS_ROOT / "run_simulations.py"
 
     # open a file in the run_dir
     script_path = f"{run_dir}/submit_job.sh"
@@ -145,13 +162,16 @@ def create_noctua2_submission_script(args):
         script_file.write("module load numlib/FFTW/3.3.10-GCC-12.3.0\n\n")
 
         # Implement that each array task runs one of the job_directories in the run_dir
-        script_file.write("cd $SLURM_SUBMIT_DIR\n")
+        script_file.write(f'cd "{run_dir}"\n')
         script_file.write(
             'echo "Running job in directory: job_$SLURM_ARRAY_TASK_ID"\n'
         )
 
         script_file.write(
-            f"python ../run_simulations.py --main_config_path ../{args.main_config_path} --user_config_path ../{args.user_config_path} --job_dir job_$SLURM_ARRAY_TASK_ID/\n"
+            f'python "{run_simulations_path}" '
+            f'--main_config_path "{main_config_path}" '
+            f'--user_config_path "{user_config_path}" '
+            f'--job_dir "{run_dir}/job_$SLURM_ARRAY_TASK_ID/"\n'
         )
 
 
@@ -163,14 +183,43 @@ def create_wsu_submission_script(args, config):
         run directory or via the CRONOS_SIF environment variable.
     - The container image contains the CRONOS framework under /app.
 
-    The script will run each job_* directory via an Apptainer exec
-    call that forwards the configuration paths from the command-line
-    arguments (args.main_config_path, args.user_config_path),
-    analogous to the noctua2 submission script.
+    The script will run each job_* directory via an Apptainer exec call
+    that passes the configuration copies in the run directory
+    (main_config.py, user_config.py) and the job directory as absolute paths
+    as seen by prepare_simulations.py.
+
+    If the run directory is inside the container mount point /work (i.e.
+    prepare_simulations.py was run in the container as described in the
+    README), the host paths are not known at generation time: the script
+    must then be submitted from the run directory, the log files are
+    written relative to it and the repository root bound to /work is
+    derived from it. Otherwise (prepared on the host) all host paths are
+    absolute and the run directory is bound into the container at the
+    same path.
     """
-    run_dir = Path(args.run_dir)
-    slurm_logging_dir = "log"
+    run_dir = Path(os.path.abspath(args.run_dir))
     script_path = run_dir / "submit_job.sh"
+    main_config_path, user_config_path = snapshot_config_paths(run_dir)
+
+    # Position of the run directory relative to the container mount point
+    run_dir_in_container = False
+    try:
+        rel_run_dir = run_dir.relative_to(CONTAINER_WORK_DIR)
+        run_dir_in_container = rel_run_dir != Path(".")
+    except ValueError:
+        pass
+
+    if run_dir_in_container:
+        # Host paths are only known relative to the submit directory
+        slurm_logging_dir = "log"
+        repo_dir = (
+            '$(realpath "$SLURM_SUBMIT_DIR/'
+            + "../" * len(rel_run_dir.parts)
+            + '")'
+        )
+    else:
+        slurm_logging_dir = str(run_dir / "log")
+        repo_dir = f'"{CRONOS_ROOT}"'
 
     # Detect job directories
     job_dirs = [
@@ -211,19 +260,33 @@ def create_wsu_submission_script(args, config):
         script_file.write("module load apptainer/1.3.0\n\n")
 
         # ---- runtime setup ----
-        script_file.write("cd $SLURM_SUBMIT_DIR\n")
+        if run_dir_in_container:
+            script_file.write("cd $SLURM_SUBMIT_DIR\n")
+            script_file.write(
+                'if [ ! -d "job_${SLURM_ARRAY_TASK_ID}" ]; then\n'
+            )
+            script_file.write(
+                '    echo "Error: submit this script from the run directory '
+                '(job_${SLURM_ARRAY_TASK_ID} not found in $SLURM_SUBMIT_DIR)."\n'
+            )
+            script_file.write("    exit 1\n")
+            script_file.write("fi\n")
+            script_file.write('RUN_DIR="$SLURM_SUBMIT_DIR"\n')
+        else:
+            script_file.write(f'cd "{run_dir}"\n')
+            script_file.write(f'RUN_DIR="{run_dir}"\n')
         script_file.write('JOB_DIR="job_${SLURM_ARRAY_TASK_ID}"\n')
-        script_file.write('REPO_DIR=$(realpath "$SLURM_SUBMIT_DIR/..")\n\n')
+        script_file.write(f"REPO_DIR={repo_dir}\n\n")
 
         script_file.write('echo "Running job: ${JOB_DIR}"\n\n')
 
         # ---- container image selection ----
         script_file.write('if [ -n "$CRONOS_SIF" ]; then\n')
         script_file.write('    SIF_IMAGE="$CRONOS_SIF"\n')
-        script_file.write('elif [ -f "../cronos.sif" ]; then\n')
-        script_file.write('    SIF_IMAGE="../cronos.sif"\n')
-        script_file.write('elif [ -f "cronos.sif" ]; then\n')
-        script_file.write('    SIF_IMAGE="cronos.sif"\n')
+        script_file.write('elif [ -f "${REPO_DIR}/cronos.sif" ]; then\n')
+        script_file.write('    SIF_IMAGE="${REPO_DIR}/cronos.sif"\n')
+        script_file.write('elif [ -f "${RUN_DIR}/cronos.sif" ]; then\n')
+        script_file.write('    SIF_IMAGE="${RUN_DIR}/cronos.sif"\n')
         script_file.write("else\n")
         script_file.write('    echo "Error: Could not find cronos.sif."\n')
         script_file.write('    exit 1\n')
@@ -231,17 +294,24 @@ def create_wsu_submission_script(args, config):
 
         # ---- execution ----
         script_file.write("apptainer exec \\\n")
-        script_file.write('    --bind "${REPO_DIR}:/work" \\\n')
+        script_file.write(
+            f'    --bind "${{REPO_DIR}}:{CONTAINER_WORK_DIR}" \\\n'
+        )
+        if not run_dir_in_container:
+            script_file.write(f'    --bind "{run_dir}" \\\n')
         script_file.write('    "$SIF_IMAGE" \\\n')
         script_file.write("    python3 /app/run_simulations.py \\\n")
 
-        # These are already container (/work/...) paths
-        script_file.write(f"        --main_config_path {args.main_config_path} \\\n")
-        script_file.write(f"        --user_config_path {args.user_config_path} \\\n")
-
+        # Paths as seen by prepare_simulations.py (container paths if it
+        # was run in the container)
         script_file.write(
-            f'        --job_dir "{args.run_dir}/${{JOB_DIR}}"\n'
+            f'        --main_config_path "{main_config_path}" \\\n'
         )
+        script_file.write(
+            f'        --user_config_path "{user_config_path}" \\\n'
+        )
+
+        script_file.write(f'        --job_dir "{run_dir}/${{JOB_DIR}}"\n')
 
     os.chmod(script_path, 0o755)
 

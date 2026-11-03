@@ -23,14 +23,17 @@ Physics Workflow:
 Usage:
     python run_simulations.py [OPTIONS]
     
-    # Basic execution of prepared simulation
+    # Basic execution of prepared simulation (uses the configuration copies
+    # run/main_config.py and run/user_config.py written at preparation time)
     python run_simulations.py --job_dir run/job_0/
     
-    # Force restart from beginning (ignore checkpoints)
+    # Force restart from beginning (ignore checkpoints); only possible if
+    # the prepared module directories of the job still exist
     python run_simulations.py --job_dir run/job_0/ --force-restart
     
     # Custom configuration with specific job
     python run_simulations.py --main_config_path config/production.py \\
+                              --user_config_path config/user_config_x.py \\
                               --job_dir run/job_5/
 
 Checkpoint Features:
@@ -59,8 +62,8 @@ import logging
 import argparse
 import os
 from pathlib import Path
-from src.configuration import load_config
-from src.executor import run_modules
+from src.configuration import load_config, snapshot_config_paths
+from src.executor import run_modules, check_force_restart_possible
 from src.check_settings import check_settings
 
 from src.modules.from_file_IC import FromFileIC
@@ -120,14 +123,18 @@ def main():
     parser.add_argument(
         "--main_config_path",
         nargs="?",
-        default="config/main_config.py",
-        help="Path to the main configuration file",
+        default=None,
+        help="Path to the main configuration file (default: main_config.py "
+        "in the parent directory of the job directory, written by "
+        "prepare_simulations.py)",
     )
     parser.add_argument(
         "--user_config_path",
         nargs="?",
-        default="config/user_config.py",
-        help="Path to the user configuration file",
+        default=None,
+        help="Path to the user configuration file (default: user_config.py "
+        "in the parent directory of the job directory, written by "
+        "prepare_simulations.py)",
     )
     parser.add_argument(
         "--job_dir",
@@ -142,7 +149,23 @@ def main():
     )
     args = parser.parse_args()
 
-    config = load_config(args.main_config_path, args.user_config_path)
+    # By default use the configuration copies written into the run directory
+    # (parent of the job directory) by prepare_simulations.py
+    run_dir = os.path.dirname(os.path.abspath(args.job_dir))
+    main_snapshot, user_snapshot = snapshot_config_paths(run_dir)
+    main_config_path = args.main_config_path or main_snapshot
+    user_config_path = args.user_config_path or user_snapshot
+    for config_path in (main_config_path, user_config_path):
+        if not os.path.isfile(config_path):
+            logging.error(
+                f"Configuration file '{config_path}' not found. Without "
+                "--main_config_path/--user_config_path the copies in the run "
+                f"directory '{run_dir}' written by prepare_simulations.py are "
+                "used; check --job_dir or pass the configuration paths."
+            )
+            exit(1)
+
+    config = load_config(main_config_path, user_config_path)
     if not config:
         logging.error("Failed to load configuration.")
         exit(1)
@@ -156,17 +179,34 @@ def main():
     project_root = Path(__file__).resolve().parent
     logging.info(f"Project root is: {project_root}")
 
-    # Handle force restart by removing checkpoint file
+    # A restart from the first module needs the module directories created
+    # at preparation time, which the modules remove when they finish
     if args.force_restart:
-        checkpoint_file = os.path.join(args.job_dir, ".cronos_checkpoint.json")
-        if os.path.exists(checkpoint_file):
-            os.remove(checkpoint_file)
-            logging.info(
-                "Removed existing checkpoint file - starting from beginning"
+        problems = check_force_restart_possible(
+            args.job_dir, config.general.modules
+        )
+        if problems:
+            logging.error(
+                f"Cannot force a restart of '{args.job_dir}': the prepared "
+                "inputs are no longer complete:"
             )
+            for problem in problems:
+                logging.error(f"  {problem}")
+            logging.error(
+                "Re-run prepare_simulations.py (into a new run directory) to "
+                "start these events from the beginning, or run without "
+                "--force-restart to resume from the checkpoint."
+            )
+            exit(1)
 
     try:
-        run_modules(config, MODULE_REGISTRY, args.job_dir, project_root)
+        run_modules(
+            config,
+            MODULE_REGISTRY,
+            args.job_dir,
+            project_root,
+            force_restart=args.force_restart,
+        )
         logging.info("Simulation completed successfully!")
         exit(0)
     except Exception as e:
@@ -176,7 +216,9 @@ def main():
         checkpoint_file = os.path.join(args.job_dir, ".cronos_checkpoint.json")
         if os.path.exists(checkpoint_file):
             logging.info("Checkpoint file exists - you can inspect it with:")
-            logging.info(f"  python checkpoint_utils.py inspect {args.job_dir}")
+            logging.info(
+                f"  python utilities/checkpoint_utils.py inspect {args.job_dir}"
+            )
             logging.info(
                 "You can resubmit the job to resume from the last successful checkpoint"
             )

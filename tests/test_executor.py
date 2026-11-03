@@ -93,6 +93,18 @@ class TestAnalyzeError:
         assert "original_exception" in analysis
         assert analysis["memory_info"] is None
 
+    def test_generic_oserror_is_not_memory_related(self):
+        """Only an OSError with errno ENOMEM is memory related."""
+        import errno
+
+        with patch("src.executor.get_memory_info", return_value=None):
+            analysis = analyze_error(OSError("Device busy"), "MUSIC")
+            assert not analysis["is_memory_related"]
+            analysis = analyze_error(
+                OSError(errno.ENOMEM, "Cannot allocate memory"), "MUSIC"
+            )
+            assert analysis["is_memory_related"]
+
 
 class TestExecutorIntegration:
     """Integration tests for executor functionality."""

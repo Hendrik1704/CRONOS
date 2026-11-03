@@ -57,7 +57,9 @@ sbatch submit_job.sh
 The script will:
 - Load required modules (`gnu9/9.1.0`, `apptainer/1.3.0`)
 - Execute `python3 /app/run_simulations.py` inside the container for each SLURM array task (`job_$SLURM_ARRAY_TASK_ID`)
-- Pass `--main_config_path` and `--user_config_path` from `/work/config/`
+- Pass the configuration copies `main_config.py` and `user_config.py` that `prepare_simulations.py` wrote into the run directory (`/work/run_wsu/`), so later edits of the files in `config/` do not affect the queued jobs
+
+If the run directory was prepared inside the container (paths under `/work`), `sbatch submit_job.sh` must be called from the run directory, since the host location of the repository is derived from it.
 
 ## 3. Memory and requeue behaviour
 

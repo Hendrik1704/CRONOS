@@ -131,12 +131,19 @@ python prepare_simulations.py \
 - `--cluster`: Target cluster (`local`, `noctua2`, etc.)
 - `--run_dir`: Output directory for simulation files
 
+The main and user configuration are copied into the run directory (`run/main_config.py`, `run/user_config.py`). All jobs of the run use these copies, so editing the original configuration files after the preparation does not change the prepared or queued jobs.
+
+With a fixed `random_seed` (not `-1`), event `M` of job `N` uses the seed `random_seed + N * number_events_per_job + M`, so every event of a run gets a different seed.
+
 ### 2. Submit Jobs
 
 #### Local Execution
 ```bash
 python run_simulations.py --job_dir run/job_0/
 ```
+Without `--main_config_path`/`--user_config_path`, the configuration copies in the parent directory of the job directory (`run/`) are used.
+
+If an event fails, the failure is recorded in the checkpoint, the remaining events of the job are still run, and the job exits with an error at the end. Events failing the afterburner_toolkit quality check are not an error: they are skipped (no HDF5 file) and not retried.
 
 #### Cluster Execution
 ```bash
@@ -186,6 +193,8 @@ python run_simulations.py --job_dir run/job_0/  # Automatic resume
 python run_simulations.py --job_dir run/job_0/ --force-restart
 ```
 
+A forced restart is only possible while the prepared module directories of all events of the job still exist (modules remove their directory when they finish, and finished events are removed). Otherwise `--force-restart` refuses to run; prepare a new run directory with `prepare_simulations.py` instead.
+
 ## Memory Monitoring
 
 CRONOS includes comprehensive real-time memory monitoring for all physics modules:
@@ -229,6 +238,9 @@ The system generates warnings when:
 ### File Structure
 ```
 run/
+├── main_config.py          # Copy of the main configuration used by the jobs
+├── user_config.py          # Copy of the user configuration used by the jobs
+├── submit_job.sh           # SLURM submission script (cluster runs)
 ├── job_0/
 │   ├── event_0.h5          # Final HDF5 output
 │   └── .cronos_checkpoint.json

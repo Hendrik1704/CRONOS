@@ -46,7 +46,7 @@ python3 prepare_simulations.py \
     --cluster noctua2
 ```
 
-This creates `run/` with `job_*` subdirectories and a `submit_job.sh` tailored for Noctua2.
+This creates `run/` with `job_*` subdirectories, a `log/` directory, copies of the two configuration files (`run/main_config.py`, `run/user_config.py`, used by the jobs) and a `submit_job.sh` tailored for Noctua2. The script uses absolute paths, so it can be submitted from any directory.
 
 ## 3. Submit jobs
 
