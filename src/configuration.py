@@ -1,6 +1,7 @@
 import importlib.util
+import os
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
 
 class Configuration:
@@ -227,3 +228,25 @@ def load_config(*paths: str) -> Configuration:
         config.merge(override_data)
 
     return config
+
+
+# File names of the configuration snapshots that prepare_simulations.py
+# writes into the run directory. The jobs of a run use these copies.
+SNAPSHOT_MAIN_CONFIG_NAME = "main_config.py"
+SNAPSHOT_USER_CONFIG_NAME = "user_config.py"
+
+
+def snapshot_config_paths(run_dir: str) -> Tuple[str, str]:
+    """Return the absolute paths of the configuration snapshots of a run.
+
+    Args:
+        run_dir (str): Path to the run directory (parent of the job_N dirs).
+
+    Returns:
+        tuple: (main config snapshot path, user config snapshot path)
+    """
+    run_dir = os.path.abspath(run_dir)
+    return (
+        os.path.join(run_dir, SNAPSHOT_MAIN_CONFIG_NAME),
+        os.path.join(run_dir, SNAPSHOT_USER_CONFIG_NAME),
+    )

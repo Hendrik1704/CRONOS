@@ -72,7 +72,7 @@ class IPGlasma(BaseModule):
             event_dir (str): Path to the event-specific directory.
 
         Raises:
-            SystemExit: If any of the required IP-Glasma components are
+            FileNotFoundError: If any of the required IP-Glasma components are
                 missing in ``external_codes/ipglasma``.
         """
         logging.info(f"Preparing IP-Glasma environment in {event_dir}")
@@ -90,10 +90,9 @@ class IPGlasma(BaseModule):
                 os.path.join(ipglasma_event_dir, "nucleusConfigurations"),
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[IPGlasma] Required directory {nucleus_config_path} does not exist."
             )
-            exit(1)
         ipglasma_exe_path = os.path.join(
             self.project_root, "external_codes", "ipglasma", "ipglasma"
         )
@@ -102,10 +101,9 @@ class IPGlasma(BaseModule):
                 ipglasma_exe_path, os.path.join(ipglasma_event_dir, "ipglasma")
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[IPGlasma] Required executable {ipglasma_exe_path} does not exist."
             )
-            exit(1)
 
         qs_table = self.config.nucleusQsTableFileName
         ipglasma_qs2adj_path = os.path.join(
@@ -117,10 +115,9 @@ class IPGlasma(BaseModule):
                 os.path.join(ipglasma_event_dir, qs_table),
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[IPGlasma] Required file {ipglasma_qs2adj_path} does not exist."
             )
-            exit(1)
 
         ipglasma_tables_path = os.path.join(
             self.project_root, "external_codes", "ipglasma", "tables"
@@ -130,10 +127,9 @@ class IPGlasma(BaseModule):
                 ipglasma_tables_path, os.path.join(ipglasma_event_dir, "tables")
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[IPGlasma] Required directory {ipglasma_tables_path} does not exist."
             )
-            exit(1)
 
         ipglasma_utilities_path = os.path.join(
             self.project_root, "external_codes", "ipglasma", "utilities"
@@ -144,10 +140,9 @@ class IPGlasma(BaseModule):
                 os.path.join(ipglasma_event_dir, "utilities"),
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[IPGlasma] Required directory {ipglasma_utilities_path} does not exist."
             )
-            exit(1)
 
     def prepare_input(self, event_dir):
         """Generate IP-Glasma parameter file for the current event.
@@ -162,14 +157,13 @@ class IPGlasma(BaseModule):
                 contains the ``IPGlasma`` subdirectory.
 
         Raises:
-            SystemExit: If the ``IPGlasma`` directory does not exist.
+            FileNotFoundError: If the ``IPGlasma`` directory does not exist.
         """
         IPGlasma_dir = os.path.join(event_dir, "IPGlasma")
         if not os.path.exists(IPGlasma_dir):
-            logging.error(
+            raise FileNotFoundError(
                 f"[IPGlasma] Required directory {IPGlasma_dir} does not exist."
             )
-            exit(1)
         ini_file = os.path.join(IPGlasma_dir, "parameters_IPGlasma.ini")
 
         with open(ini_file, "w") as f:
@@ -354,11 +348,6 @@ class IPGlasma(BaseModule):
                 f"{self.config.writeHydro}, writeTmunu={self.config.writeTmunu}"
             )
 
-        dst_file = os.path.join(
-            results_dir, f"output_{current_module_index}.dat"
-        )
-        shutil.move(src_file, dst_file)
-        logging.info(f"[IPGlasma] Moved {src_file} to {dst_file}")
 
         # Additional files: keep original names
         extra_files = [
@@ -377,6 +366,14 @@ class IPGlasma(BaseModule):
                 logging.warning(
                     f"[IPGlasma] Expected file {src} not found; skipping."
                 )
+
+        # output_N.dat is moved last: on resume its existence shows that
+        # all outputs were collected
+        dst_file = os.path.join(
+            results_dir, f"output_{current_module_index}.dat"
+        )
+        shutil.move(src_file, dst_file)
+        logging.info(f"[IPGlasma] Moved {src_file} to {dst_file}")
 
         shutil.rmtree(ipglasma_dir)
         logging.info(f"[IPGlasma] Removed directory {ipglasma_dir}")

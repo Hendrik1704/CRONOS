@@ -13,7 +13,8 @@ Physics Background:
     on effective degrees of freedom and equation of state consistency.
 
 Matching Types:
-    0: Energy matching (direct energy transfer without thermodynamic adjustment)
+    0: Energy matching (direct energy transfer without thermodynamic adjustment,
+       bulk pressure column set to 0)
     1: Entropy matching (recommended - maintains thermodynamic consistency)
 
 Entropy Matching Algorithm:
@@ -21,6 +22,8 @@ Entropy Matching Algorithm:
     2. Interpolate energy density from EOS entropy-energy relation
     3. Calculate bulk pressure correction for viscous effects
     4. Update energy density and add bulk pressure column
+    Cells below the EOS table (entropy smaller than its first entry) are set
+    to e = 0 and Pi = 0 instead of extrapolating.
 
 Usage:
     python KoMPoST_to_MUSIC.py <type> <nu_eff> <eos_file> <input> <output>
@@ -100,7 +103,7 @@ def s_matching(e_kompost, nu_eff, file_path_eos):
     p = raw[:, 1]  # (GeV/fm^3)
     T = raw[:, 3]  # (GeV)
 
-    entropy = [HBARC * (p + e) / T for p, e, T in zip(p, e, T)]  # GeV/fm^2
+    entropy = HBARC * (p + e) / T  # GeV/fm^2
     # energy as a function of entropy [e(s)]
     energy_interp = interp1d(
         entropy, e, kind="linear", fill_value="extrapolate"
@@ -112,6 +115,12 @@ def s_matching(e_kompost, nu_eff, file_path_eos):
     e_Music = energy_interp(s_kompost)  # GeV/fm^3
 
     Bulk_pressure = e_kompost / 3 - p_interp(e_Music)  # GeV/fm^3
+
+    # Below the EOS table a linear extrapolation gives negative energies:
+    # treat these (near-)empty cells (and invalid ones, s = nan) as vacuum.
+    below_table = ~(s_kompost >= entropy[0])
+    e_Music = np.where(below_table, 0.0, e_Music)
+    Bulk_pressure = np.where(below_table, 0.0, Bulk_pressure)
 
     return e_Music, Bulk_pressure
 
@@ -148,6 +157,10 @@ def main():
         # read the input file
         data, comment = read_file(filename_in)
 
+        # MUSIC (Initial_profile 94/95) always reads a 19th column with the
+        # bulk pressure; write Pi = 0 so it is never read from a missing field.
+        data = np.column_stack((data, np.zeros(data.shape[0])))
+
     # s matching
     elif type_of_matching == 1:
         # read the input file
@@ -167,11 +180,14 @@ def main():
 
     else:
         print(
-            "Problem with the variable type_of_matching, should be equal to 0 or 1."
+            "Problem with the variable type_of_matching, should be equal to 0 or 1.",
+            file=sys.stderr,
         )
+        sys.exit(1)
 
     # Write the final file: eta, x, y, new_energy, u^tau, u^x, u^y, u^eta,
-    # pi^tautau, pi^taux, pi^tauy, pi^taueta, pi^xx, pi^xy, pi^xeta, pi^yy, pi^yeta, pi^etaeta and Pi (in s matching).
+    # pi^tautau, pi^taux, pi^tauy, pi^taueta, pi^xx, pi^xy, pi^xeta, pi^yy, pi^yeta, pi^etaeta and Pi
+    # (Pi = 0 for energy matching), i.e. the 19 columns read by MUSIC.
     with open(filename_out, "w") as file:
         file.write(comment + "\n")
         for row in data:
