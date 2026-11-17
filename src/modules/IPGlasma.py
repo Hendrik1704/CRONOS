@@ -42,7 +42,7 @@ class IPGlasma(BaseModule):
             event_dir (str): Path to the event-specific directory.
 
         Raises:
-            SystemExit: If any of the required IP-Glasma components are
+            FileNotFoundError: If any of the required IP-Glasma components are
                 missing in ``external_codes/ipglasma``.
         """
         logging.info(f"Preparing IP-Glasma environment in {event_dir}")
@@ -60,10 +60,9 @@ class IPGlasma(BaseModule):
                 os.path.join(ipglasma_event_dir, "nucleusConfigurations"),
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[IPGlasma] Required directory {nucleus_config_path} does not exist."
             )
-            exit(1)
         ipglasma_exe_path = os.path.join(
             self.project_root, "external_codes", "ipglasma", "ipglasma"
         )
@@ -72,10 +71,9 @@ class IPGlasma(BaseModule):
                 ipglasma_exe_path, os.path.join(ipglasma_event_dir, "ipglasma")
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[IPGlasma] Required executable {ipglasma_exe_path} does not exist."
             )
-            exit(1)
 
         ipglasma_qs2adj_path = os.path.join(
             self.project_root,
@@ -89,10 +87,9 @@ class IPGlasma(BaseModule):
                 os.path.join(ipglasma_event_dir, "qs2Adj_vs_Tp_vs_Y_200.in"),
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[IPGlasma] Required file {ipglasma_qs2adj_path} does not exist."
             )
-            exit(1)
 
         ipglasma_tables_path = os.path.join(
             self.project_root, "external_codes", "ipglasma", "tables"
@@ -102,10 +99,9 @@ class IPGlasma(BaseModule):
                 ipglasma_tables_path, os.path.join(ipglasma_event_dir, "tables")
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[IPGlasma] Required directory {ipglasma_tables_path} does not exist."
             )
-            exit(1)
 
         ipglasma_utilities_path = os.path.join(
             self.project_root, "external_codes", "ipglasma", "utilities"
@@ -116,10 +112,9 @@ class IPGlasma(BaseModule):
                 os.path.join(ipglasma_event_dir, "utilities"),
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[IPGlasma] Required directory {ipglasma_utilities_path} does not exist."
             )
-            exit(1)
 
     def prepare_input(self, event_dir):
         """Generate IP-Glasma parameter file for the current event.
@@ -134,14 +129,13 @@ class IPGlasma(BaseModule):
                 contains the ``IPGlasma`` subdirectory.
 
         Raises:
-            SystemExit: If the ``IPGlasma`` directory does not exist.
+            FileNotFoundError: If the ``IPGlasma`` directory does not exist.
         """
         IPGlasma_dir = os.path.join(event_dir, "IPGlasma")
         if not os.path.exists(IPGlasma_dir):
-            logging.error(
+            raise FileNotFoundError(
                 f"[IPGlasma] Required directory {IPGlasma_dir} does not exist."
             )
-            exit(1)
         ini_file = os.path.join(IPGlasma_dir, "parameters_IPGlasma.ini")
 
         with open(ini_file, "w") as f:

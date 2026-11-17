@@ -259,7 +259,9 @@ event_N.h5
     └── <other output files>
 ```
 
-Numeric text files are stored as float64 arrays. The first `#` comment line of such a file is kept in the dataset attribute `header`; if the file has several comment lines, all of them are kept in the attribute `full_header`.
+Numeric text files are stored as float64 arrays. The first `#` comment line before the data is kept in the dataset attribute `header`; if there are several comment lines before the data (blank lines in between are allowed), all of them are kept in the attribute `full_header`. For a one-dimensional table, the attribute `table_layout` records whether it was a single row or a single column.
+
+Files with comment lines *between* their data rows, e.g. the SMASH particle list with its `# event N out/end` lines, are stored byte for byte as a gzip-compressed `uint8` dataset with the attribute `storage = raw_bytes`; `utilities/h5_extractor.py` writes them back unchanged.
 
 The merged database produced by `event_database.py build` uses the layout:
 

@@ -142,3 +142,37 @@ def test_file_with_comments_between_events_round_trips(tmp_path):
             dset, "output_5.dat", {"name": "output_5.dat"}
         )
     assert Path(path).read_text() == text
+
+
+def test_old_database_does_not_take_a_new_file_at_a_reused_path(tmp_path):
+    """Older databases only store the path: compare the contents."""
+    event_database = _import_utility("event_database")
+    src = tmp_path / "run" / "job_0" / "event_0.h5"
+    src.parent.mkdir(parents=True)
+    with h5py.File(src, "w") as f:
+        f.create_dataset("a.dat", data=np.arange(3.0))
+    ref = event_database.event_ref_from_path(src)
+    with h5py.File(tmp_path / "db.h5", "w") as out_h5:
+        event_database.copy_event_file(src, out_h5, ref)
+        group = out_h5["job_0"]["event_0"]
+        del group.attrs["source_size"]  # as written by the old code
+        del group.attrs["source_mtime"]
+
+        # same content: already merged
+        event_database.copy_event_file(src, out_h5, ref)
+
+        # a new run at the same path: different content is a collision
+        with h5py.File(src, "w") as f:
+            f.create_dataset("a.dat", data=np.arange(4.0))
+        with pytest.raises(ValueError, match="already exists"):
+            event_database.copy_event_file(src, out_h5, ref)
+
+
+def test_ipglasma_missing_external_code_raises(tmp_path):
+    """Modules raise exceptions instead of calling exit()."""
+    from src.modules.IPGlasma import IPGlasma
+
+    full_config = Configuration({"general": {"modules": ["IPGlasma"]}})
+    module = IPGlasma(Configuration({}), full_config, str(tmp_path), "0")
+    with pytest.raises(FileNotFoundError):
+        module.prepare_environment(str(tmp_path / "event_0"))

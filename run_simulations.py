@@ -55,7 +55,7 @@ Output:
 - Checkpoint status files for progress tracking
 
 Author: CRONOS Development Team
-Requires: Python 3.8+, psutil, h5py, NumPy
+Requires: Python 3.10+, psutil, h5py, NumPy
 """
 
 import logging

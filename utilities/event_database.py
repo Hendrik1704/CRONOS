@@ -50,6 +50,7 @@ from pathlib import Path
 from typing import Iterable, Iterator, Sequence
 
 import h5py
+import numpy as np
 
 
 DEFAULT_REQUIRED_DATASETS: tuple[str, ...] = (
@@ -150,6 +151,29 @@ def iter_event_groups(h5f: h5py.File) -> Iterator[tuple[str, h5py.Group]]:
             yield (f"/{k}", h5f[k])
 
 
+def _same_event_content(src_path: Path, group: h5py.Group, ref: "EventRef") -> bool:
+    """Check whether an event file holds the same datasets as a stored group."""
+    with h5py.File(src_path, "r") as in_h5:
+        inner = (
+            in_h5[ref.event_name]
+            if ref.event_name in in_h5 and isinstance(in_h5[ref.event_name], h5py.Group)
+            else in_h5
+        )
+        if set(inner.keys()) != set(group.keys()):
+            return False
+        for key in inner.keys():
+            a, b = inner[key], group[key]
+            if isinstance(a, h5py.Group) or isinstance(b, h5py.Group):
+                if not (isinstance(a, h5py.Group) and isinstance(b, h5py.Group)):
+                    return False
+                continue
+            if a.shape != b.shape or a.dtype != b.dtype:
+                return False
+            if not np.array_equal(a[()], b[()], equal_nan=a.dtype.kind == "f"):
+                return False
+    return True
+
+
 def copy_event_file(
     src_path: Path,
     out_h5: h5py.File,
@@ -167,16 +191,20 @@ def copy_event_file(
             print(f"REPAIR {ref.group_path}: incomplete earlier copy")
             del job_group[ref.event_name]
             return copy_event_file(src_path, out_h5, ref)
-        if existing_src == str(src_path) and (
-            "source_size" not in attrs
-            or (
-                attrs["source_size"] == stat.st_size
-                and attrs["source_mtime"] == stat.st_mtime
-            )
-        ):
-            # The same file was merged before (databases written before
-            # size and mtime were recorded only store the path)
-            return
+        if existing_src == str(src_path):
+            if "source_size" in attrs:
+                same = (
+                    attrs["source_size"] == stat.st_size
+                    and attrs["source_mtime"] == stat.st_mtime
+                )
+            else:
+                # Databases written before size and mtime were recorded only
+                # store the path, which may have been reused by a new run:
+                # compare the contents
+                same = _same_event_content(src_path, job_group[ref.event_name], ref)
+            if same:
+                # The same file was merged before: nothing to do.
+                return
         # A different event file (or a new file at a reused path, e.g. a
         # run directory prepared again) maps to the same group: never
         # overwrite.

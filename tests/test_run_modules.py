@@ -305,15 +305,36 @@ def test_bad_event_is_marked_and_not_retried(tmp_path):
     assert CALLS == []
 
 
+class FakeToolkit(FakeModule):
+    """afterburner_toolkit stand-in that produces no vn files."""
+
+    name = "afterburner_toolkit"
+
+    def fetch_output(self, event_dir):
+        os.makedirs(
+            os.path.join(event_dir, "results", f"spvn_results_{self.event_id}"),
+            exist_ok=True,
+        )
+        os.rmdir(os.path.join(event_dir, self.name))
+
+
 def test_bad_event_with_afterburner_quality_check(tmp_path):
-    """Real handle_results: a failed quality check is not an error."""
-    run_dir = _prepare(tmp_path, _config(number_events_per_job=1))
-    job_dir = run_dir / "job_0"
+    """Real handle_results and quality check: a bad event is not an error."""
+    registry = {"ModuleA": ModuleA, "afterburner_toolkit": FakeToolkit}
     config = _config(number_events_per_job=1)
-    with patch("src.handle_results.check_if_event_is_good", return_value=False):
-        run_modules(config, REGISTRY, str(job_dir), str(tmp_path))
+    config.general.modules = ["ModuleA", "afterburner_toolkit"]
+    config.general.cleanup_checkpoints = False
+    config["afterburner_toolkit"] = Configuration({})
+    with patch(f"{__name__}.REGISTRY", registry):
+        run_dir = _prepare(tmp_path, config)
+    job_dir = run_dir / "job_0"
+
+    run_modules(config, registry, str(job_dir), str(tmp_path))
+
     assert not (job_dir / "event_0").exists()
     assert not (job_dir / "event_0.h5").exists()
+    status = CheckpointManager(str(job_dir)).get_event_status("event_0")
+    assert status["completed"] and status["bad"]
 
 
 @pytest.mark.parametrize("random_seed", [42, -1])
@@ -368,6 +389,27 @@ def test_force_restart_check(tmp_path):
     assert any("event_1.h5" in p for p in problems)
     assert any("event_0/ModuleA" in p for p in problems)
 
+
+
+def test_force_restart_check_reports_bad_events(tmp_path):
+    """A bad event has no .h5 file; the checkpoint records it."""
+    run_dir = _prepare(tmp_path)
+    job_dir = run_dir / "job_0"
+    config = _config()
+    config.general.cleanup_checkpoints = False
+    FAILURES[("ModuleA", "1")] = "raise"  # keeps the checkpoint
+
+    def fake_handle_results(config, results_path, event_id):
+        return False  # event_0 fails the quality check
+
+    with patch("src.executor.handle_results", fake_handle_results):
+        with pytest.raises(RuntimeError):
+            run_modules(config, REGISTRY, str(job_dir), str(tmp_path))
+
+    problems = check_force_restart_possible(
+        str(job_dir), ["ModuleA", "ModuleB"]
+    )
+    assert any("event_0" in p and "bad" in p for p in problems)
 
 def test_force_restart_reruns_from_first_module(tmp_path):
     run_dir = _prepare(tmp_path, _config(number_events_per_job=1))

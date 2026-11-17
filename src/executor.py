@@ -9,6 +9,7 @@ try:
     import fcntl
 except ImportError:  # not available on Windows
     fcntl = None
+import json
 import logging
 import os
 import shutil
@@ -458,6 +459,23 @@ def check_force_restart_possible(job_dir, modules):
         for d in entries
         if d.startswith("event_") and os.path.isdir(os.path.join(job_dir, d))
     ]
+    # Finished events without an .h5 file (bad events) are only recorded in
+    # the checkpoint
+    checkpoint_file = os.path.join(job_dir, ".cronos_checkpoint.json")
+    if os.path.exists(checkpoint_file):
+        with open(checkpoint_file) as f:
+            recorded_events = json.load(f).get("events", {})
+        for event_id, status in sorted(recorded_events.items()):
+            if (
+                status.get("completed")
+                and event_id not in event_dirs
+                and f"{event_id}.h5" not in entries
+            ):
+                kind = "bad (quality check)" if status.get("bad") else "finished"
+                problems.append(
+                    f"Event '{event_id}' was already {kind} and its event "
+                    "directory removed"
+                )
     if not event_dirs and not problems:
         problems.append(f"No event directories found in '{job_dir}'")
     for event_dir in event_dirs:

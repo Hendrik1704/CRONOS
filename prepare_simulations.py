@@ -50,7 +50,7 @@ Example Directory Structure Created:
         └── ...
 
 Author: CRONOS Development Team
-Requires: Python 3.8+, NumPy, h5py
+Requires: Python 3.10+, NumPy, h5py
 """
 
 import logging

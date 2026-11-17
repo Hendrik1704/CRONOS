@@ -150,7 +150,7 @@ IPGlasma = {
 
 KoMPoST = {
     "tIn": 0.2,
-    "tOut": 0.8,
+    "tOut": 0.8,  # must equal MUSIC Initial_time_tau_0 when MUSIC follows (checked)
     "EtaOverS": 0.16,  # specific shear viscosity
     "EtaOverSTemperatureScale": 0.0,
     "NuEffective": 40.0,
@@ -188,7 +188,9 @@ MUSIC = {
     "s_factor": 1.0,  # normalization factor for initial profile
     "preEqVisFactor": 1.0,  # additional scale factor for initial viscous tensor
     "boost_invariant": 1,  # 0: no boost invariance, 1: boost invariance
-    "Initial_time_tau_0": 0.4,  # starting time of the hydrodynamic evolution (fm/c)
+    "Initial_time_tau_0": 0.4,  # starting time of the hydrodynamic evolution (fm/c);
+    # MUSIC ignores the time in the initial-profile header, so with KoMPoST this
+    # must equal KoMPoST tOut (checked by check_settings)
     "Total_evolution_time_tau": 50.0,  # the maximum allowed running evolution time (fm/c)
     "Delta_Tau": 0.005,  # time step to use in the evolution [fm/c]
     "Eta_grid_size": 14.0,  # spatial rapidity range

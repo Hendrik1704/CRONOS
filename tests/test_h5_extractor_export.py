@@ -25,7 +25,10 @@ def _import_extractor():
 
 
 def _store_like_cronos(group, name: str, text: str, dtype) -> np.ndarray:
-    """Store a text table the way src/handle_results.py zip_into_hdf5 does."""
+    """Store a text table like files written before `table_layout` and
+    `full_header` existed (only the first header line), to test the
+    extractor's fallback for older files. tests/test_review_edge_cases.py
+    covers files packed by the current zip_into_hdf5."""
     data = np.genfromtxt(io.StringIO(text), dtype=dtype)
     dset = group.create_dataset(name, data=data)
     first_line = text.splitlines()[0].strip()

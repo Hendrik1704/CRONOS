@@ -203,9 +203,12 @@ def zip_into_hdf5(config, event_dir_results_path, event_id):
                 header_lines = []
                 with open(file_path, "r") as f:
                     for line in f:
-                        if not line.startswith("#"):
-                            break
-                        header_lines.append(line.strip())
+                        content = line.strip()
+                        if not content:
+                            continue  # blank lines within the header block
+                        if not content.startswith("#"):
+                            break  # first data row
+                        header_lines.append(content)
 
                 if data.ndim == 1:
                     # genfromtxt gives 1-D arrays for one row and for one
