@@ -123,3 +123,33 @@ class TestMemoryMonitor:
 
 if __name__ == "__main__":
     pytest.main([__file__])
+
+
+@patch("utilities.memory_monitor.psutil.process_iter")
+def test_check_cronos_processes_skips_unreadable_memory_info(
+    mock_process_iter, capsys
+):
+    """psutil reports attributes it may not read as None."""
+    hidden = Mock()
+    hidden.info = {
+        "name": None,
+        "pid": 1,
+        "ppid": 0,
+        "memory_percent": None,
+        "create_time": None,
+        "cmdline": None,
+        "memory_info": None,
+    }
+    visible = Mock()
+    visible.info = {
+        "name": "python",
+        "pid": 1234,
+        "ppid": 1,
+        "memory_percent": 5.0,
+        "create_time": 1234567890,
+        "cmdline": ["python", "run_simulations.py"],
+        "memory_info": Mock(rss=100 * 1024 * 1024),
+    }
+    mock_process_iter.return_value = [hidden, visible]
+    check_cronos_processes()
+    assert "1234" in capsys.readouterr().out

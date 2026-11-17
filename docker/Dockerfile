@@ -7,9 +7,9 @@
 # Build (from repository root):
 #   docker build -f docker/Dockerfile -t cronos .
 #
-# Run:
+# Run (the entrypoint is python3, so pass the script name directly):
 #   docker run --rm -v $(pwd)/run:/app/run cronos \
-#       python3 prepare_simulations.py --user_config_path config/user_config.py
+#       prepare_simulations.py --user_config_path config/user_config.py
 #
 # Convert to Singularity/Apptainer for HPC:
 #   singularity pull cronos.sif docker://hendrik1704/cronos:latest
