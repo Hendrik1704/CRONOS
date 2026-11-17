@@ -9,6 +9,9 @@ The preparation process includes:
 - Initializing physics modules (KoMPoST, MUSIC, iSS, SMASH, etc.)
 - Setting up input files and initial conditions
 - Generating cluster submission scripts for SLURM environments
+- Copying the main and user configuration into the run directory
+  (run_dir/main_config.py, run_dir/user_config.py); the jobs use these
+  copies, so later edits of the original files do not affect the run
 - Configuring checkpoint and result directories
 
 Usage:
@@ -31,6 +34,10 @@ Supported Clusters:
     
 Example Directory Structure Created:
     run/
+    ├── main_config.py      (copy of the main configuration)
+    ├── user_config.py      (copy of the user configuration)
+    ├── submit_job.sh       (cluster submission script, if any)
+    ├── log/                (SLURM log files)
     ├── job_0/
     │   ├── event_0/
     │   │   ├── KoMPoST/
@@ -43,12 +50,11 @@ Example Directory Structure Created:
         └── ...
 
 Author: CRONOS Development Team
-Requires: Python 3.8+, NumPy, h5py
+Requires: Python 3.10+, NumPy, h5py
 """
 
 import logging
 import argparse
-import shutil
 from pathlib import Path
 from src.configuration import load_config
 from src.executor import prepare_modules
@@ -57,6 +63,7 @@ from src.check_settings import check_settings
 from src.modules.from_file_IC import FromFileIC
 from src.modules.IPGlasma import IPGlasma
 from src.modules.KoMPoST import KoMPoST
+from src.modules.KoMPoST3D import KoMPoST3D
 from src.modules.entropy_matching import EntropyMatching
 from src.modules.MUSIC import MUSIC
 from src.modules.iSS import iSS
@@ -67,6 +74,7 @@ MODULE_REGISTRY = {
     "from_file_IC": FromFileIC,
     "IPGlasma": IPGlasma,
     "KoMPoST": KoMPoST,
+    "KoMPoST3D": KoMPoST3D,
     "entropy_matching": EntropyMatching,
     "MUSIC": MUSIC,
     "iSS": iSS,
@@ -155,29 +163,6 @@ def main():
     logging.info(f"Project root is: {project_root}")
 
     prepare_modules(args, config, MODULE_REGISTRY, project_root)
-
-    run_dir = Path(args.run_dir)
-    user_config_src = Path(args.user_config_path).expanduser()
-    if not user_config_src.is_absolute():
-        user_config_src = Path.cwd() / user_config_src
-
-    if user_config_src.exists():
-        user_config_dst = run_dir / user_config_src.name
-        try:
-            shutil.copy2(user_config_src, user_config_dst)
-            logging.info(
-                "Copied user parameter file to run directory: %s", user_config_dst
-            )
-        except OSError:
-            logging.exception(
-                "Failed to copy user parameter file '%s' into '%s'",
-                user_config_src,
-                run_dir,
-            )
-    else:
-        logging.warning(
-            "User parameter file not found (not copied): %s", user_config_src
-        )
 
 
 if __name__ == "__main__":

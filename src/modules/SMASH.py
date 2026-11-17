@@ -4,6 +4,9 @@ import os
 import subprocess
 import shutil
 
+# SMASH output directory relative to the SMASH working directory
+SMASH_OUTPUT_DIR = os.path.join("data", "0")
+
 
 class SMASH(BaseModule):
     """SMASH hadronic afterburner module for hadronic rescattering phase.
@@ -55,7 +58,7 @@ class SMASH(BaseModule):
             event_dir (str): Path to event-specific directory where SMASH will execute.
 
         Raises:
-            SystemExit: If SMASH executable or required scripts are missing.
+            FileNotFoundError: If SMASH executable or required scripts are missing.
         """
         logging.info(f"[SMASH] Preparing environment in {event_dir}...")
 
@@ -68,10 +71,9 @@ class SMASH(BaseModule):
                 iss_tables_path, os.path.join(event_dir, "SMASH", "iSS_tables")
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[SMASH] Required directory {iss_tables_path} does not exist."
             )
-            exit(1)
 
         smash_exe_path = os.path.join(
             self.project_root, "external_codes", "smash", "build", "smash"
@@ -81,10 +83,9 @@ class SMASH(BaseModule):
                 smash_exe_path, os.path.join(event_dir, "SMASH", "smash")
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[SMASH] Required executable {smash_exe_path} does not exist."
             )
-            exit(1)
 
         oscar_script_path = os.path.join(
             self.project_root, "utilities", "convert_OSCAR1997A_to_OSCAR2013.py"
@@ -97,10 +98,9 @@ class SMASH(BaseModule):
                 ),
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[SMASH] Required script {oscar_script_path} does not exist."
             )
-            exit(1)
 
     def prepare_input(self, event_dir):
         """Generate SMASH configuration file and establish particle input links.
@@ -140,10 +140,9 @@ class SMASH(BaseModule):
 
         smash_dir = os.path.join(event_dir, "SMASH")
         if not os.path.exists(smash_dir):
-            logging.error(
+            raise FileNotFoundError(
                 f"[SMASH] Required directory {smash_dir} does not exist."
             )
-            exit(1)
 
         input_file = os.path.join(
             event_dir, "results", self.config.input_filename
@@ -179,12 +178,12 @@ class SMASH(BaseModule):
                 module_name="SMASH-convert",
             )
             num_events = int(result["stdout"].strip())
-            self.config.Nevents = num_events
             logging.info(
                 f"[SMASH] Number of events set to {num_events} from Cooper-Frye FO..."
             )
         except subprocess.CalledProcessError as e:
             logging.error(f"[SMASH] Execution failed: {e}")
+            raise
         finally:
             os.chdir(cwd)
 
@@ -207,7 +206,7 @@ class SMASH(BaseModule):
             f.write(
                 f"    Randomseed:    {self.full_config.general.random_seed}\n"
             )
-            f.write(f"    Nevents:       {self.config.Nevents}\n")
+            f.write(f"    Nevents:       {num_events}\n")
 
             if self.config.No_Collisions == 1:
                 f.write(f"Collision_Term:\n")
@@ -292,19 +291,25 @@ class SMASH(BaseModule):
         cwd = os.getcwd()
         try:
             os.chdir(smash_dir)
+            # Without -o SMASH writes to the first free data/<n>, so after a
+            # failed attempt the output would not end up in data/0. Remove
+            # leftovers (incl. smash.lock) and set the output directory.
+            if os.path.exists("data"):
+                shutil.rmtree("data")
             kwargs = {"check": True}
             if not self.full_config.general.module_terminal_output:
                 kwargs["stdout"] = subprocess.DEVNULL
                 kwargs["stderr"] = subprocess.DEVNULL
                 logging.debug("[SMASH] Running with suppressed output...")
             run_external_command(
-                [f"./{smash_exe}", "-i", ini_file],
+                [f"./{smash_exe}", "-i", ini_file, "-o", SMASH_OUTPUT_DIR],
                 memory_threshold_mb=self.full_config.general.memory_threshold_mb,
                 module_name="SMASH",
                 **kwargs,
             )
         except subprocess.CalledProcessError as e:
             logging.error(f"[SMASH] Execution failed: {e}")
+            raise
         finally:
             os.chdir(cwd)
 
@@ -349,7 +354,7 @@ class SMASH(BaseModule):
         logging.info("[SMASH] Data successfully processed...")
         current_module_index = self.full_config.general.modules.index("SMASH")
         src_file = os.path.join(
-            event_dir, "SMASH", "data", "0", "particle_lists.oscar"
+            event_dir, "SMASH", SMASH_OUTPUT_DIR, "particle_lists.oscar"
         )
         dst_file = os.path.join(
             event_dir, "results", f"output_{current_module_index}.dat"

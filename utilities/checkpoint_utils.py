@@ -28,7 +28,7 @@ Usage Examples:
 
 Commands:
     inspect: Display detailed checkpoint status and progress information
-    clear: Remove checkpoint file to force simulation restart from beginning
+    clear: Remove the checkpoint file (see clear_checkpoint for what the next run does)
     list: Show overview of all checkpoints in a run directory
 
 Integration:
@@ -38,7 +38,7 @@ Integration:
     and debugging simulation workflows.
 
 Author: CRONOS Development Team
-Requires: Python 3.8+, CRONOS checkpoint_manager and colors modules
+Requires: Python 3.10+, CRONOS checkpoint_manager and colors modules
 """
 
 import argparse
@@ -129,7 +129,9 @@ def inspect_checkpoint(job_dir: str):
     for event_id, status in checkpoint_manager.checkpoint_data[
         "events"
     ].items():
-        if status["completed"]:
+        if status["completed"] and status.get("bad"):
+            status_color = Colors.yellow("BAD (failed the quality check)")
+        elif status["completed"]:
             status_color = Colors.green("COMPLETED")
         elif status["failed"]:
             status_color = Colors.red("FAILED")
@@ -147,17 +149,19 @@ def inspect_checkpoint(job_dir: str):
                 f"    Current module: {Colors.yellow(status['current_module'])}"
             )
 
-        if status["failed"] and status["error_message"]:
+        if (status["failed"] or status.get("bad")) and status["error_message"]:
             print(f"    Error: {Colors.red(status['error_message'])}")
 
 
 def clear_checkpoint(job_dir: str, force: bool = False):
-    """Remove checkpoint file to force simulation restart from beginning.
+    """Remove the checkpoint file of a job.
 
-    Safely removes the CRONOS checkpoint file, allowing simulations to restart
-    from the beginning rather than resuming from the last successful module.
-    This is useful for debugging, configuration changes, or recovering from
-    corrupted intermediate states.
+    The next run then has no record of earlier progress. It still does not
+    start every event from scratch: events whose directory was removed
+    (finished or bad events) are not run again, and a module whose output
+    (results/output_N.dat) already exists counts as finished. To run every
+    event from the first module, use `run_simulations.py --force-restart`,
+    which checks that this is possible, or prepare the run again.
 
     Safety Features:
     - Interactive confirmation prompt (unless --force specified)
@@ -183,9 +187,8 @@ def clear_checkpoint(job_dir: str, force: bool = False):
         - Leaves all simulation output and configuration intact
 
     Warning:
-        Clearing checkpoints will cause the next simulation run to restart
-        from the beginning, potentially overwriting existing output files
-        if the simulation is resubmitted without proper cleanup.
+        Without the checkpoint, failed events are retried from the first
+        module whose output is missing, and the record of bad events is lost.
 
     Example:
         >>> clear_checkpoint('run/job_0/', force=False)
@@ -333,14 +336,22 @@ def main():
                     job_completed = checkpoint_manager.checkpoint_data[
                         "job_completed"
                     ]
-
-                    status = (
-                        Colors.green("COMPLETED")
-                        if job_completed
-                        else Colors.yellow("IN PROGRESS")
+                    events = checkpoint_manager.checkpoint_data["events"]
+                    failed_events = sum(
+                        1 for s in events.values() if s.get("failed")
                     )
+                    bad_events = sum(1 for s in events.values() if s.get("bad"))
+
+                    if job_completed:
+                        status = Colors.green("COMPLETED")
+                    elif failed_events:
+                        # The job ran all events, some of them failed
+                        status = Colors.red(f"FAILED ({failed_events} failed)")
+                    else:
+                        status = Colors.yellow("IN PROGRESS")
+                    bad_note = f", {bad_events} bad" if bad_events else ""
                     print(
-                        f"{job_dir.name}: {status} ({completed_events}/{total_events} events)"
+                        f"{job_dir.name}: {status} ({completed_events}/{total_events} events{bad_note})"
                     )
 
         if not found_checkpoints:

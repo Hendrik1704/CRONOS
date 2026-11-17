@@ -7,9 +7,9 @@
 # Build (from repository root):
 #   docker build -f docker/Dockerfile -t cronos .
 #
-# Run:
+# Run (the entrypoint is python3, so pass the script name directly):
 #   docker run --rm -v $(pwd)/run:/app/run cronos \
-#       python3 prepare_simulations.py --user_config_path config/user_config.py
+#       prepare_simulations.py --user_config_path config/user_config.py
 #
 # Convert to Singularity/Apptainer for HPC:
 #   singularity pull cronos.sif docker://hendrik1704/cronos:latest
@@ -79,6 +79,8 @@ RUN cd ipglasma && mkdir build && cd build && cmake .. -DdisableMPI=ON && \
     make -j$(nproc) && make install && cd .. && rm -r build && cd ..
 
 RUN cd KoMPoST && make -j$(nproc) && cd ..
+
+RUN cd KoMPoST-3D && make -j$(nproc) && cd ..
 
 RUN cd MUSIC && mkdir build && cd build && \
     cmake .. -DCMAKE_PREFIX_PATH=/usr/share/eigen3/cmake && \

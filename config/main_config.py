@@ -13,7 +13,7 @@ general = {
     # Memory monitoring settings
     "memory_threshold_mb": 4096,  # Memory threshold in MB for warnings (default: 4GB)
     # List of modules to connect/load.
-    # Possible modules: from_file_IC, KoMPoST, entropy_matching, MUSIC, iSS, SMASH, afterburner_toolkit
+    # Possible modules: from_file_IC, IPGlasma, KoMPoST, KoMPoST3D, entropy_matching, MUSIC, iSS, SMASH, afterburner_toolkit
     "modules": [],
     "number_of_jobs": 1,
     "number_events_per_job": 1,
@@ -35,7 +35,7 @@ from_file_IC = {
     # Example patterns (with input_prefix="Tmunu.PsiPlus_ID"):
     #   Tmunu.PsiPlus_ID1_someTag.dat, Tmunu.PsiPlus_ID2_otherTag.dat, ...
     "input_prefix": "Tmunu",
-    "boost_invariant": 0,  # 0: no boost invariance, 1: boost invariance
+    "boost_invariant": 1,  # 0: no boost invariance, 1: boost invariance
     "Nx": 151,  # Number of grid points in x and y direction
     "Neta": 101,  # Number of grid points in eta direction
     "dx": 0.1,  # Grid spacing in x and y direction
@@ -150,7 +150,7 @@ IPGlasma = {
 
 KoMPoST = {
     "tIn": 0.2,
-    "tOut": 0.8,
+    "tOut": 0.8,  # must equal MUSIC Initial_time_tau_0 when MUSIC follows (checked)
     "EtaOverS": 0.16,  # specific shear viscosity
     "EtaOverSTemperatureScale": 0.0,
     "NuEffective": 40.0,
@@ -166,6 +166,32 @@ KoMPoST = {
     "xEND": 511,  # The last grid point to include in the x direction
     "ySTART": 0,  # The first grid point to include in the y direction
     "yEND": 511,  # The last grid point to include in the y direction
+}
+
+# KoMPoST-3D for 3D (non boost-invariant) initial conditions. The input file
+# (from from_file_IC with boost_invariant 0) must already be in the KoMPoST-3D
+# T^munu format. One event needs ~9 GB of memory (response tables).
+KoMPoST3D = {
+    "tIn": 0.2,
+    "tOut": 0.8,
+    "EtaOverS": 0.16,  # specific shear viscosity
+    "EtaOverSTemperatureScale": 0.0,
+    "NuEffective": 40.0,
+    "EVOLUTION_MODE": 1,  # only 1 (kinetic theory, RTA) is supported
+    "ENERGY_PERTURBATIONS": 1,
+    "MOMENTUM_PERTURBATIONS": 0,  # only 0 is supported
+    "Regulator": "TwoPass",
+    "normFactor": 1.0,  # scaling of the input tau*Tmunu
+    "afm": 0.21,  # transverse lattice spacing in fm
+    "deta": 0.25,  # lattice spacing in spatial rapidity
+    "Ns": 128,  # number of grid points in x and y
+    "Neta": 65,  # number of grid points in spatial rapidity
+    "xSTART": 0,  # The first grid point to include in the x direction
+    "xEND": 127,  # The last grid point to include in the x direction
+    "ySTART": 0,  # The first grid point to include in the y direction
+    "yEND": 127,  # The last grid point to include in the y direction
+    "etaSTART": 0,  # The first grid point to include in the eta direction
+    "etaEND": 64,  # The last grid point to include in the eta direction
 }
 
 entropy_matching = {
@@ -188,7 +214,9 @@ MUSIC = {
     "s_factor": 1.0,  # normalization factor for initial profile
     "preEqVisFactor": 1.0,  # additional scale factor for initial viscous tensor
     "boost_invariant": 1,  # 0: no boost invariance, 1: boost invariance
-    "Initial_time_tau_0": 0.4,  # starting time of the hydrodynamic evolution (fm/c)
+    "Initial_time_tau_0": 0.4,  # starting time of the hydrodynamic evolution (fm/c);
+    # MUSIC ignores the time in the initial-profile header, so with KoMPoST this
+    # must equal KoMPoST tOut (checked by check_settings)
     "Total_evolution_time_tau": 50.0,  # the maximum allowed running evolution time (fm/c)
     "Delta_Tau": 0.005,  # time step to use in the evolution [fm/c]
     "Eta_grid_size": 14.0,  # spatial rapidity range
@@ -265,13 +293,11 @@ MUSIC = {
     "freeze_Ncell_x_step": 1,
     "freeze_Ncell_y_step": 1,
     "freeze_Ncell_eta_step": 1,
-    "freeze_eps_flag": 0,
-    "N_freeze_out": 1,
     "use_eps_for_freeze_out": 0,  # flag to use energy density as criteria to
     # find freeze-out surface
     # 0: use temperature, 1: use energy density
     "T_freeze": 0.155,  # freeze out temperature
-    "N_freeze_out": 1,
+    "N_freeze_out": 1,  # number of freeze-out surfaces (iSS needs exactly 1)
     "eps_switch": 0.18,
     "eps_freeze_max": 0.18,
     "eps_freeze_min": 0.18,
@@ -280,10 +306,13 @@ MUSIC = {
 }
 
 iSS = {
-    "hydro_mode": 2,  # mode for reading in freeze out information
+    "hydro_mode": 1,  # mode for reading in freeze out information
     # 1: reads outputs from MUSIC assuming boost-invariant
     # 2: reads outputs from MUSIC full (3+1)-d
+    # (must match MUSIC boost_invariant, see src/check_settings.py)
     "afterburner_type": 2,  # 0: PDG_Decay, 1: UrQMD, 2: SMASH
+    # MUSIC EOS_to_use 9 forces 1 (UrQMD), 91 forces 2 (SMASH). Use 2 (SMASH)
+    # only with the SMASH module, iSS skips resonance decays for it.
     "turn_on_bulk": 0,  # read in bulk viscous pressure
     "turn_on_rhob": 0,  # read in net baryon chemical potential
     "turn_on_diff": 0,  # read in baryon diffusion current

@@ -1,3 +1,4 @@
+import sys
 import pytest
 import time
 import os
@@ -9,6 +10,7 @@ from src.module_base import (
     time_execution,
     check_memory_threshold,
     monitor_subprocess_memory,
+    run_external_command,
 )
 from src.configuration import Configuration
 
@@ -216,6 +218,53 @@ class TestMonitorSubprocessMemory:
         assert "peak_memory_percent" in result
         assert "samples" in result
         assert result["monitoring_active"] is True
+
+
+class TestRunExternalCommand:
+    """Test the subprocess runner used by the modules."""
+
+    def test_run_external_command_success(self):
+        result = run_external_command(
+            [sys.executable, "-c", "pass"], "test_module", timeout=10
+        )
+        assert result["return_code"] == 0
+        assert result["success"] is True
+
+    def test_run_external_command_failure_raises(self):
+        import subprocess
+
+        with pytest.raises(subprocess.CalledProcessError):
+            run_external_command(
+                [sys.executable, "-c", "import sys; sys.exit(1)"],
+                "test_module",
+            )
+
+    @pytest.mark.parametrize("capture_output", [False, True])
+    def test_run_external_command_timeout_kills_process(self, capture_output):
+        import subprocess
+
+        real_popen = subprocess.Popen
+        created = []
+
+        def spy_popen(*args, **kwargs):
+            # timeout must not be forwarded to Popen (TypeError otherwise)
+            assert "timeout" not in kwargs
+            created.append(real_popen(*args, **kwargs))
+            return created[-1]
+
+        start = time.time()
+        with patch("subprocess.Popen", side_effect=spy_popen):
+            with pytest.raises(subprocess.TimeoutExpired):
+                run_external_command(
+                    [sys.executable, "-c", "import time; time.sleep(30)"],
+                    "test_module",
+                    timeout=0.5,
+                    capture_output=capture_output,
+                )
+        assert time.time() - start < 10
+        # the child process must have been killed and reaped
+        assert len(created) == 1
+        assert created[0].returncode is not None
 
 
 if __name__ == "__main__":
