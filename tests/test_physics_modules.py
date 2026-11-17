@@ -451,7 +451,7 @@ class TestKoMPoST3D(TestPhysicsModuleBase):
             os.path.join(self.event_dir, "KoMPoST3D", "output_0.dat")
         )
 
-    @patch("src.modules.KoMPoST3D.run_external_command")
+    @patch.object(sys.modules["src.modules.KoMPoST3D"], "run_external_command")
     def test_run_method(self, mock_run_command):
         """Test KoMPoST3D runs the executable with its parameter file."""
         full_config = Configuration(
@@ -476,7 +476,7 @@ class TestKoMPoST3D(TestPhysicsModuleBase):
             "parameters_KoMPoST3D.ini",
         ]
 
-    @patch("src.modules.KoMPoST3D.run_external_command")
+    @patch.object(sys.modules["src.modules.KoMPoST3D"], "run_external_command")
     def test_run_raises_when_kompost3d_fails(self, mock_run_command):
         """A failed run (e.g. out of memory) is not passed on silently."""
         mock_run_command.side_effect = subprocess.CalledProcessError(
