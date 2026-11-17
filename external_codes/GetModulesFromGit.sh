@@ -6,7 +6,7 @@ echo "Download IP-Glasma from GitHub:"
 # IP-Glasma 2.0 (devel branch, not released yet)
 git clone https://github.com/schenke/ipglasma -b devel
 cd ipglasma
-git checkout 1f1f4aeb43af1800c5ec77894471ef9cbab17871
+git checkout d3088aa8de19a5cb78135f6e9e46dc6989c9fa48
 cd nucleusConfigurations && bash download_nucleusTables.sh
 
 # Basic sanity check: make sure a key nucleus configuration exists

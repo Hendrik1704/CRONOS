@@ -84,13 +84,14 @@ IPGlasma = {
     'forceDMin': 1,  # flag to force d_min for deformed nuclei
     'dMin': 0.9,  # fm
     'nucleonModel': "gaussian",  # gaussian, hotspots (Nq hot spots) or strings
-    'subNucleonParamType': 0,  # 0: do not use posterior parameter sets
-    # 1: use subnucleon parameters from variant Nq posterior distribution
-    # 2: use subnucleon parameters from fixed Nq = 3 posterior distribution
-    # (posterior sets require nucleonModel hotspots)
-    'subNucleonParamSet': -1,  # -1: choose a random set from the posterior distribution
-    # 0: choose the MAP parameter set
-    # positive intergers: choose a fixed set of parameter for sub-nucleonic structure
+    'posteriorFile': "none",  # "none" or a posterior table whose parameter sets replace
+    # the values set here (IP-Glasma's tables/README.md describes them), e.g.
+    #   "tables/posterior_jpsi_2202.01998_Nq_free.csv": variable Nq (formerly SubNucleonParamType 1)
+    #   "tables/posterior_jpsi_2202.01998_Nq_3.csv": fixed Nq = 3 (formerly SubNucleonParamType 2)
+    #   "tables/posterior5020_Nq3.csv": LHC energies, Nq = 3 (not recommended for new calculations)
+    # (the hot-spot posteriors require nucleonModel hotspots)
+    'posteriorSet': -1,  # only with a posterior file: -1 draws a random set every event,
+    # 0 is the MAP parameter set, a positive integer selects a fixed set
     'm': 0.2,  # infrared cut-off mass (GeV)
     'BG': 4.,
     'protonAnisotropy': 0,  # only with nucleonModel gaussian
@@ -101,6 +102,7 @@ IPGlasma = {
     'Nq': 3,  # number of hot spots (nucleonModel hotspots)
     'NqFluc': 0.0,
     'shiftConstituentQuarkProtonOrigin': 1,
+    'stringHotSpotPower': 0,  # nucleonModel strings: hot-spot positions on the strings follow (k+1) t^k
     'QsMuRatio': 0.8,
     'smearQs': 1,
     'smearingWidth': 0.6,
@@ -138,6 +140,7 @@ IPGlasma = {
     'jimwlkC': 0.2,
     'jimwlkMass': 0.4,
     'jimwlkAlphaS': 0,  # 0: running coupling
+    'jimwlkRunningCoupling': 1,  # with jimwlkAlphaS 0: 1 "square root", 2 "noise" running coupling
     'jimwlkDs': 0.005,
     'jimwlkInitialX': 0.01,
     'jimwlkSaveSnapshots': 0,
