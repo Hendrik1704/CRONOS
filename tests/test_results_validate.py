@@ -60,3 +60,47 @@ def test_results_validate_directory_input_with_pattern(tmp_path: Path):
     pattern = str(tmp_path / "run" / "job_*" / "event_*.h5")
     rc = rv.main([str(tmp_path / "run"), "--pattern", pattern])
     assert rc == 0
+
+
+@pytest.mark.unit
+def test_results_validate_reports_unreadable_file(tmp_path: Path, capsys):
+    project_root = Path(__file__).resolve().parents[1]
+    rv = _import_results_validate_module(project_root)
+
+    good = tmp_path / "run" / "job_0" / "event_0.h5"
+    broken = tmp_path / "run" / "job_0" / "event_1.h5"
+    _write_event_h5(good, list(rv.DEFAULT_REQUIRED_DATASETS))
+    broken.write_bytes(b"truncated hdf5")
+
+    rc = rv.main([str(good), str(broken)])
+    assert rc == 2
+    out = capsys.readouterr().out
+    assert f"{broken}: unreadable" in out
+    assert f"{good}:" not in out
+
+
+@pytest.mark.unit
+def test_results_validate_pattern_relative_to_directory(
+    tmp_path: Path, monkeypatch
+):
+    project_root = Path(__file__).resolve().parents[1]
+    rv = _import_results_validate_module(project_root)
+
+    run = tmp_path / "run"
+    _write_event_h5(run / "job_0" / "event_0.h5", ["x"])
+    _write_event_h5(run / "job_1" / "event_0.h5", ["x"])
+    # A file in the CWD that would match the pattern relative to the CWD.
+    other = tmp_path / "cwd"
+    _write_event_h5(other / "job_7" / "event_0.h5", ["x"])
+    monkeypatch.chdir(other)
+
+    files = rv.iter_event_files([str(run)], "job_*/event_*.h5")
+    assert files == [
+        (run / "job_0" / "event_0.h5").resolve(),
+        (run / "job_1" / "event_0.h5").resolve(),
+    ]
+
+    # Documented form with the directory repeated in the pattern still works.
+    monkeypatch.chdir(tmp_path)
+    files = rv.iter_event_files(["run"], "run/job_*/event_*.h5")
+    assert len(files) == 2

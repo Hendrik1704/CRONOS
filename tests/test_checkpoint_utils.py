@@ -141,3 +141,24 @@ class TestCheckpointUtils:
 
 if __name__ == "__main__":
     pytest.main([__file__])
+
+
+def test_inspect_and_list_show_bad_and_failed_events(tmp_path, capsys):
+    from src.checkpoint_manager import CheckpointManager
+    from utilities.checkpoint_utils import main
+
+    job_dir = tmp_path / "run" / "job_0"
+    job_dir.mkdir(parents=True)
+    manager = CheckpointManager(str(job_dir))
+    manager.mark_event_bad("event_0", "no vn files")
+    manager.mark_module_failed("event_1", "MUSIC", "MUSIC crashed")
+
+    inspect_checkpoint(str(job_dir))
+    out = capsys.readouterr().out
+    assert "event_0: " in out and "BAD" in out
+    assert "FAILED" in out
+
+    with patch("sys.argv", ["checkpoint_utils.py", "list", str(tmp_path / "run")]):
+        main()
+    out = capsys.readouterr().out
+    assert "job_0:" in out and "FAILED (1 failed)" in out and "1 bad" in out

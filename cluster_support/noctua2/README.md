@@ -32,7 +32,14 @@ lang/Python/3.10.4-GCCcore-11.3.0
 numlib/FFTW/3.3.10-GCC-12.3.0
 ```
 
-It then calls `GetModulesFromGit.sh` and `CompileFramework.sh` automatically. The job requests 10 cores on the `normal` partition with a 15-minute wall time.
+It then calls `GetModulesFromGit.sh` and `CompileFramework.sh` automatically. The job requests 10 cores on the `normal` partition with a 15-minute wall time; if the job is killed before `Finished building all the modules successfully` appears in its output, increase `#SBATCH -t` in the script and resubmit.
+
+Install the Python dependencies with the same Python module that the jobs will use (from the repository root):
+
+```bash
+module load lang/Python/3.10.4-GCCcore-11.3.0
+python3 -m pip install --user -r requirements.txt
+```
 
 ## 2. Prepare simulations
 
@@ -46,7 +53,7 @@ python3 prepare_simulations.py \
     --cluster noctua2
 ```
 
-This creates `run/` with `job_*` subdirectories and a `submit_job.sh` tailored for Noctua2.
+This creates `run/` with `job_*` subdirectories, a `log/` directory, copies of the two configuration files (`run/main_config.py`, `run/user_config.py`, used by the jobs) and a `submit_job.sh` tailored for Noctua2. The script uses absolute paths, so it can be submitted from any directory.
 
 ## 3. Submit jobs
 
