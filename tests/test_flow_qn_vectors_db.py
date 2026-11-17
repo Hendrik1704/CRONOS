@@ -127,3 +127,57 @@ def test_flow_qn_vectors_from_event_file(tmp_path: Path):
     y_path = out_dir / "particle_yield_and_meanpT_job_0_event_0.dat"
     assert qn_path.exists()
     assert y_path.exists()
+
+
+def _write_vndata_event(event_file: Path, flow):
+    event_file.parent.mkdir(parents=True, exist_ok=True)
+    vndata_text = (
+        "# pT dN v1r v1i v2r v2i totalN\n"
+        "0.2 10.0 0.01 0.0 0.02 0.0 100.0\n"
+        "1.0 5.0 0.01 0.0 0.02 0.0 100.0\n"
+        "3.0 1.0 0.01 0.0 0.02 0.0 100.0\n"
+    )
+    with h5py.File(event_file, "w") as f:
+        g = f.create_group(event_file.stem)
+        _write_text_dataset(g, flow.CH_VNDATA_KEY, vndata_text)
+
+
+@pytest.mark.unit
+def test_flow_qn_vectors_label_uses_closest_job_dir(tmp_path: Path):
+    project_root = Path(__file__).resolve().parents[1]
+    flow = _import_flow_module(project_root)
+
+    ev = flow.EventInput(path=Path("/scratch/job_99/run/job_3/event_1.h5"))
+    assert ev.label == "job_3_event_1"
+
+
+@pytest.mark.unit
+def test_flow_qn_vectors_skips_unreadable_file(tmp_path: Path):
+    project_root = Path(__file__).resolve().parents[1]
+    flow = _import_flow_module(project_root)
+
+    good = tmp_path / "run" / "job_0" / "event_0.h5"
+    broken = tmp_path / "run" / "job_0" / "event_1.h5"
+    _write_vndata_event(good, flow)
+    broken.write_bytes(b"truncated")
+
+    out_dir = tmp_path / "out"
+    rc = flow.main(
+        [str(tmp_path / "run"), "--pattern", "job_*/event_*.h5"]
+        + ["--out-dir", str(out_dir)]
+    )
+    assert rc == 2
+    assert (out_dir / "Qn_vectors_job_0_event_0.dat").exists()
+    assert not (out_dir / "Qn_vectors_job_0_event_1.dat").exists()
+
+
+@pytest.mark.unit
+def test_flow_qn_vectors_db_sees_combined_conflicting_events(tmp_path: Path):
+    project_root = Path(__file__).resolve().parents[1]
+    flow = _import_flow_module(project_root)
+
+    with h5py.File(tmp_path / "db.h5", "w") as f:
+        f.create_group("job_0/event_0")
+        f.create_group("job_0/event_0__1")
+        paths = [gp for gp, _ in flow.iter_database_event_groups(f)]
+    assert paths == ["/job_0/event_0", "/job_0/event_0__1"]

@@ -146,8 +146,11 @@ def check_cronos_processes():
             cmdline = (
                 " ".join(proc.info["cmdline"]) if proc.info["cmdline"] else ""
             )
-            name = proc.info["name"].lower()
+            name = (proc.info["name"] or "").lower()
 
+            # Attributes we may not read (AccessDenied) are returned as None.
+            if proc.info["memory_info"] is None:
+                continue
             memory_mb = proc.info["memory_info"].rss / 1024 / 1024
 
             # Look for CRONOS Python processes

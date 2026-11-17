@@ -53,7 +53,7 @@ class KoMPoST(BaseModule):
             event_dir (str): Path to event-specific directory where KoMPoST will execute.
 
         Raises:
-            SystemExit: If KoMPoST executable or EKT tables are missing.
+            FileNotFoundError: If KoMPoST executable or EKT tables are missing.
         """
         logging.info(f"[KoMPoST] Preparing environment in {event_dir}...")
         kompost_ekt_path = os.path.join(
@@ -64,10 +64,9 @@ class KoMPoST(BaseModule):
                 kompost_ekt_path, os.path.join(event_dir, "KoMPoST", "EKT")
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[KoMPoST] Required directory {kompost_ekt_path} does not exist."
             )
-            exit(1)
 
         kompost_exe_path = os.path.join(
             self.project_root, "external_codes", "KoMPoST", "KoMPoST.exe"
@@ -78,10 +77,9 @@ class KoMPoST(BaseModule):
                 os.path.join(event_dir, "KoMPoST", "KoMPoST.exe"),
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[KoMPoST] Required executable {kompost_exe_path} does not exist."
             )
-            exit(1)
 
     def prepare_input(self, event_dir):
         """Generate KoMPoST configuration file and establish input data links.
@@ -118,10 +116,9 @@ class KoMPoST(BaseModule):
 
         kompost_dir = os.path.join(event_dir, "KoMPoST")
         if not os.path.exists(kompost_dir):
-            logging.error(
+            raise FileNotFoundError(
                 f"[KoMPoST] Required directory {kompost_dir} does not exist."
             )
-            exit(1)
         ini_file = os.path.join(kompost_dir, "parameters_KoMPoST.ini")
 
         with open(ini_file, "w") as f:
@@ -249,6 +246,7 @@ class KoMPoST(BaseModule):
             )
         except subprocess.CalledProcessError as e:
             logging.error(f"[KoMPoST] Execution failed: {e}")
+            raise
         finally:
             os.chdir(cwd)
 
