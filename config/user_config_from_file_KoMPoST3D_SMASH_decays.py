@@ -53,7 +53,6 @@ entropy_matching = {
 # and the grid extent must match KoMPoST3D (checked by check_settings):
 # Grid_size_in_eta = Neta, Eta_grid_size = (Neta-1)*deta, X/Y_grid_size_in_fm = (Ns-1)*afm
 MUSIC = {
-    "hydro_mode": 2,  # mode for reading in freeze out information
     "boost_invariant": 0,  # 0: no boost invariance, 1: boost invariance
     "Initial_profile": 95,  # full T^munu and bulk (3+1D) from file
     "Initial_time_tau_0": 0.8,  # must match KoMPoST3D tOut (fm/c)

@@ -53,7 +53,7 @@ class KoMPoST3D(BaseModule):
             event_dir (str): Path to event-specific directory where KoMPoST-3D will execute.
 
         Raises:
-            SystemExit: If KoMPoST-3D executable or RTA tables are missing.
+            FileNotFoundError: If KoMPoST-3D executable or RTA tables are missing.
         """
         logging.info(f"[KoMPoST3D] Preparing environment in {event_dir}...")
         kompost_rta_path = os.path.join(
@@ -64,10 +64,9 @@ class KoMPoST3D(BaseModule):
                 kompost_rta_path, os.path.join(event_dir, "KoMPoST3D", "RTA")
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[KoMPoST3D] Required directory {kompost_rta_path} does not exist."
             )
-            exit(1)
 
         kompost_exe_path = os.path.join(
             self.project_root, "external_codes", "KoMPoST-3D", "KoMPoST.exe"
@@ -78,10 +77,9 @@ class KoMPoST3D(BaseModule):
                 os.path.join(event_dir, "KoMPoST3D", "KoMPoST.exe"),
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[KoMPoST3D] Required executable {kompost_exe_path} does not exist."
             )
-            exit(1)
 
     def prepare_input(self, event_dir):
         """Generate KoMPoST-3D configuration file and establish input data links.
@@ -115,10 +113,9 @@ class KoMPoST3D(BaseModule):
 
         kompost_dir = os.path.join(event_dir, "KoMPoST3D")
         if not os.path.exists(kompost_dir):
-            logging.error(
+            raise FileNotFoundError(
                 f"[KoMPoST3D] Required directory {kompost_dir} does not exist."
             )
-            exit(1)
         ini_file = os.path.join(kompost_dir, "parameters_KoMPoST3D.ini")
 
         with open(ini_file, "w") as f:

@@ -29,9 +29,7 @@ echo "Build KoMPoST code for pre-equilibrium stage"
 )
 
 echo "Build KoMPoST-3D code for 3D pre-equilibrium stage"
-cd KoMPoST-3D &&
-make -j"$NUM_CPUS" &&
-cd ..
+(cd KoMPoST-3D && make -j"$NUM_CPUS")
 
 echo "Configure Eigen (used for MUSIC and SMASH)"
 (

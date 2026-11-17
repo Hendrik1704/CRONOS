@@ -169,6 +169,20 @@ def check_settings(config):
         if kompost3d.MOMENTUM_PERTURBATIONS != 0:
             logging.error("KoMPoST3D only supports MOMENTUM_PERTURBATIONS = 0.")
             valid = False
+        if kompost3d.ENERGY_PERTURBATIONS not in (0, 1):
+            logging.error("KoMPoST3D 'ENERGY_PERTURBATIONS' must be 0 or 1.")
+            valid = False
+        # Other regulator names are ignored by KoMPoST-3D (no regulation)
+        if kompost3d.Regulator not in ("TwoPass", "KoMPoSTAddition", "NoRegulator"):
+            logging.error(
+                "KoMPoST3D 'Regulator' must be TwoPass, KoMPoSTAddition or "
+                "NoRegulator."
+            )
+            valid = False
+        # KoMPoST-3D smears with a width of 0.1 / (tOut - tIn)
+        if not kompost3d.tIn < kompost3d.tOut:
+            logging.error("KoMPoST3D requires 'tIn' < 'tOut'.")
+            valid = False
         # KoMPoST-3D writes the full grid but only evolves the cells inside
         # the bounds, and the bounds index the grid without range checks
         for start, end, size in [
@@ -206,11 +220,21 @@ def check_settings(config):
             valid = False
         if "MUSIC" in active_modules and hasattr(config, "MUSIC"):
             music = config.MUSIC
-            if music.boost_invariant != 0:
+            # KoMPoST-3D writes 18 columns; MUSIC's profile 95 also reads the
+            # bulk pressure, which entropy_matching appends
+            next_module = (
+                active_modules[kompost3d_index + 1]
+                if kompost3d_index + 1 < len(active_modules)
+                else None
+            )
+            if next_module != "entropy_matching":
                 logging.error(
-                    "KoMPoST3D requires 'boost_invariant' = 0 in MUSIC."
+                    "entropy_matching must directly follow KoMPoST3D when "
+                    "MUSIC is used."
                 )
                 valid = False
+            # (MUSIC boost_invariant 0 follows from the general rule for
+            # Initial_profile 95)
             if music.Initial_profile != 95:
                 logging.error(
                     "KoMPoST3D output requires 'Initial_profile' = 95 in MUSIC."

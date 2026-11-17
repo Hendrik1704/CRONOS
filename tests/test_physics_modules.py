@@ -412,7 +412,7 @@ class TestKoMPoST3D(TestPhysicsModuleBase):
             self._config(), full_config, self.project_root, "event_0"
         )
 
-        with pytest.raises(SystemExit):
+        with pytest.raises(FileNotFoundError):
             module.prepare_environment(self.event_dir)
 
     def test_prepare_input_creates_parameter_file(self):
