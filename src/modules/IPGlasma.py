@@ -1,6 +1,7 @@
 from src.module_base import BaseModule, time_execution, run_external_command
 import logging
 import os
+import re
 import subprocess
 import shutil
 
@@ -225,8 +226,12 @@ class IPGlasma(BaseModule):
             logging.error(f"[IPGlasma] Execution failed: {e}")
             if log_file is not None:
                 log_file.close()
-                with open("ipglasma.log") as f:
-                    tail = f.readlines()[-20:]
+                with open("ipglasma.log", errors="replace") as f:
+                    # without IP-Glasma's terminal color codes
+                    tail = [
+                        re.sub(r"\x1b\[[0-9;]*m", "", line)
+                        for line in f.readlines()[-20:]
+                    ]
                 logging.error(
                     "[IPGlasma] Last lines of "
                     f"{os.path.join(ipglasma_dir, 'ipglasma.log')}:\n"
@@ -245,22 +250,16 @@ class IPGlasma(BaseModule):
     # ------------------------------------------------------------------
 
     def _find_tmunu(self, ipglasma_dir):
-        """Return path to the Tmunu output file, or ``None``."""
-        import glob
+        """Return path to the Tmunu output file, or ``None``.
 
+        Only the file at maxTime is accepted: files at other times (e.g. from
+        outputTimes) must not be passed on.
+        """
         maxtime = float(self.config.maxTime)
         # IP-Glasma writes the time like C++ streams do, e.g. 0.4 or 1
         candidate = os.path.join(ipglasma_dir, f"Tmunu-t{maxtime:g}-0.dat")
         if os.path.exists(candidate):
             return candidate
-        # Fallback: glob for float-formatting differences
-        matches = glob.glob(os.path.join(ipglasma_dir, "Tmunu-t*-0.dat"))
-        if matches:
-            logging.info(
-                f"[IPGlasma] Found Tmunu output: "
-                f"{os.path.basename(matches[0])}"
-            )
-            return matches[0]
         return None
 
     def _find_epsilon_u(self, ipglasma_dir):

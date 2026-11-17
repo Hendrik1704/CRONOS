@@ -21,7 +21,7 @@ general = {
     "keep_intermediate_results": False,
     "keep_particle_files": False,  # If the afterburner_toolkit module is used, keep the particle files from iSS or the afterburner
     # Seed for random number generation
-    "random_seed": 42,  # set to -1 for random seed based on system time
+    "random_seed": 42,  # -1: every code draws its own random seed; otherwise each event uses random_seed + its global event index
 }
 
 from_file_IC = {
@@ -112,7 +112,7 @@ IPGlasma = {
     'jacobianMass': 0.35,
     'useFluctuatingX': 1,
     'sqrtS': 200.,
-    'projectileX': 0.01,  # Bjorken x of the projectile (useFluctuatingX 0 or JIMWLK; with JIMWLK it must be below jimwlkInitialX)
+    'projectileX': 0.01,  # Bjorken x of the projectile (useFluctuatingX 0 or JIMWLK; with JIMWLK at most jimwlkInitialX, equal means no evolution)
     'targetX': 0.01,  # Bjorken x of the target (useFluctuatingX 0 or JIMWLK)
     'xQsFactor': 1,
     'runningCoupling': 0,

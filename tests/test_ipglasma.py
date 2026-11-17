@@ -1,6 +1,7 @@
 import logging
 import os
 import subprocess
+import sys
 from unittest.mock import patch
 
 import pytest
@@ -31,6 +32,8 @@ def _kompost_after_ipglasma_config():
     config.KoMPoST.tIn = config.IPGlasma.maxTime
     config.KoMPoST.Ns = config.IPGlasma.sizeOutput
     config.KoMPoST.afm = config.IPGlasma.LOutput / config.IPGlasma.sizeOutput
+    config.KoMPoST.xEND = config.KoMPoST.yEND = config.KoMPoST.Ns - 1
+    config.KoMPoST.tOut = config.MUSIC.Initial_time_tau_0 = 1.0
     return config
 
 
@@ -102,35 +105,58 @@ def test_format_ipglasma_value(value, expected):
 
 
 @pytest.mark.parametrize(
-    "change",
+    "change, message",
     [
-        {"seed": 7},
-        {"writeTmunuBinary": 1},
-        {"useFluctuatingX": 1},
-        {"writeHydro": 0},
-        {"maxTime": 0.6},  # MUSIC starts at 0.4
+        ({"seed": 7}, "set by CRONOS"),
+        ({"writeTmunuBinary": 1}, "set by CRONOS"),
+        ({"useFluctuatingX": 1}, "useFluctuatingX"),
+        ({"writeHydro": 0}, "writeHydro"),
+        ({"maxTime": 0.6}, "Initial_time_tau_0"),  # MUSIC starts at 0.4
+        ({"runEvolution": 0}, "runEvolution"),
+        ({"inverseQsForMaxTime": 1}, "inverseQsForMaxTime"),
+        ({"projectileX": 0.02}, "above 'jimwlkInitialX'"),
     ],
 )
-def test_check_settings_rejects_inconsistent_ipglasma_settings(change):
+def test_check_settings_rejects_inconsistent_ipglasma_settings(
+    change, message, caplog
+):
     config = _load_config(["IPGlasma", "MUSIC"])
     for key, value in change.items():
         config.IPGlasma[key] = value
-    assert not check_settings(config)
+    with caplog.at_level(logging.ERROR):
+        assert not check_settings(config)
+    assert message in caplog.text
+
+
+def test_check_settings_rejects_music_profile_with_bulk_after_ipglasma(caplog):
+    """The IP-Glasma hydro file has no bulk column (profile 94 reads one)."""
+    config = _load_config(["IPGlasma", "MUSIC"])
+    config.MUSIC.Initial_profile = 94
+    with caplog.at_level(logging.ERROR):
+        assert not check_settings(config)
+    assert "Initial_profile" in caplog.text
 
 
 @pytest.mark.parametrize(
-    "section, key, value",
+    "section, key, value, message",
     [
-        ("IPGlasma", "writeTmunu", 0),
-        ("KoMPoST", "tIn", 0.2),
-        ("KoMPoST", "Ns", 512),
-        ("KoMPoST", "afm", 0.08),
+        ("IPGlasma", "writeTmunu", 0, "writeTmunu"),
+        ("KoMPoST", "tIn", 0.2, "'tIn'"),
+        ("KoMPoST", "Ns", 512, "'Ns' and 'afm'"),
+        ("KoMPoST", "afm", 0.08, "'Ns' and 'afm'"),
+        # KoMPoST indexes its grid without range checks
+        ("KoMPoST", "xEND", 511, "xEND"),
     ],
 )
-def test_check_settings_checks_kompost_after_ipglasma(section, key, value):
+def test_check_settings_checks_kompost_after_ipglasma(
+    section, key, value, message, caplog
+):
     config = _kompost_after_ipglasma_config()
+    assert check_settings(config)
     config[section][key] = value
-    assert not check_settings(config)
+    with caplog.at_level(logging.ERROR):
+        assert not check_settings(config)
+    assert message in caplog.text
 
 
 def test_check_settings_warns_if_jimwlk_does_not_evolve(caplog):
@@ -138,7 +164,7 @@ def test_check_settings_warns_if_jimwlk_does_not_evolve(caplog):
     config.IPGlasma.projectileX = config.IPGlasma.jimwlkInitialX
     with caplog.at_level(logging.WARNING):
         assert check_settings(config)
-    assert "JIMWLK only evolves" in caplog.text
+    assert "JIMWLK does not evolve it" in caplog.text
 
 
 @pytest.mark.parametrize(
@@ -184,11 +210,30 @@ def test_run_reports_ipglasma_output_on_failure(tmp_path, caplog):
         kwargs["stdout"].flush()
         raise subprocess.CalledProcessError(1, cmd)
 
-    with patch(
-        "src.modules.IPGlasma.run_external_command", side_effect=failing_run
+    with patch.object(
+        sys.modules["src.modules.IPGlasma"],
+        "run_external_command",
+        side_effect=failing_run
     ):
         with pytest.raises(subprocess.CalledProcessError):
             module.run(str(tmp_path))
 
     assert "maxtime was renamed to maxTime" in caplog.text
     assert (tmp_path / "IPGlasma" / "ipglasma.log").exists()
+
+
+def test_fetch_output_ignores_tmunu_at_other_times(tmp_path):
+    """Only the file at maxTime is passed on (not e.g. an outputTimes file)."""
+    config = Configuration(
+        {"general": {"modules": ["IPGlasma", "KoMPoST", "MUSIC"]}}
+    )
+    ipglasma_config = Configuration(
+        {"writeHydro": 0, "writeTmunu": 1, "maxTime": 0.4}
+    )
+    ipglasma_dir = tmp_path / "IPGlasma"
+    ipglasma_dir.mkdir()
+    (ipglasma_dir / "Tmunu-t0.05-0.dat").write_text("early")
+    module = IPGlasma(ipglasma_config, config, PROJECT_ROOT, "event_0")
+
+    with pytest.raises(FileNotFoundError):
+        module.fetch_output(str(tmp_path))

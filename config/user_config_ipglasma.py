@@ -20,7 +20,7 @@ general = {
     "number_events_per_job": 1,
     "keep_intermediate_results": False,
     "keep_particle_files": False,
-    "random_seed": -1,  # set to -1 for random seed based on system time
+    "random_seed": -1,  # -1: every code draws its own random seed
 }
 
 IPGlasma = {

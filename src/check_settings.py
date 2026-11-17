@@ -166,14 +166,22 @@ def check_settings(config):
                     "IPGlasma 'useJIMWLK' 1 requires 'useFluctuatingX' 0."
                 )
                 valid = False
-            if (
-                max(ipglasma.projectileX, ipglasma.targetX)
-                >= ipglasma.jimwlkInitialX
-            ):
-                logging.warning(
-                    "IPGlasma: JIMWLK only evolves to an x below 'jimwlkInitialX', "
-                    "but 'projectileX' or 'targetX' is not below it."
-                )
+            # (with readInitialWilsonLines, the evolution starts at the x of
+            # the read Wilson lines instead)
+            final_x = max(ipglasma.projectileX, ipglasma.targetX)
+            if ipglasma.readInitialWilsonLines == 0:
+                if final_x > ipglasma.jimwlkInitialX:
+                    # IP-Glasma rejects this
+                    logging.error(
+                        "IPGlasma: JIMWLK evolves to smaller x, but "
+                        "'projectileX' or 'targetX' is above 'jimwlkInitialX'."
+                    )
+                    valid = False
+                elif final_x == ipglasma.jimwlkInitialX:
+                    logging.warning(
+                        "IPGlasma: 'projectileX' or 'targetX' equals "
+                        "'jimwlkInitialX', so JIMWLK does not evolve it."
+                    )
         # The next module needs the matching IP-Glasma output file, time
         # and grid
         ipglasma_index = active_modules.index("IPGlasma")
@@ -182,6 +190,21 @@ def check_settings(config):
             if ipglasma_index + 1 < len(active_modules)
             else None
         )
+        if next_module is not None:
+            if ipglasma.runEvolution != 1:
+                logging.error(
+                    f"{next_module} after IPGlasma requires 'runEvolution' = 1 "
+                    "(otherwise IP-Glasma writes no initial conditions)."
+                )
+                valid = False
+            if ipglasma.inverseQsForMaxTime != 0:
+                # The final time then differs per event, so neither the output
+                # file name nor the start time of the next module is known
+                logging.error(
+                    f"{next_module} after IPGlasma requires "
+                    "'inverseQsForMaxTime' = 0."
+                )
+                valid = False
         if next_module == "KoMPoST" and hasattr(config, "KoMPoST"):
             kompost = config.KoMPoST
             if ipglasma.writeTmunu != 1:
@@ -206,12 +229,30 @@ def check_settings(config):
             if ipglasma.writeHydro != 1:
                 logging.error("MUSIC after IPGlasma requires 'writeHydro' = 1.")
                 valid = False
+            # The IP-Glasma hydro file has 18 columns; Initial_profile 94 would
+            # also read a bulk pressure column
+            if config.MUSIC.Initial_profile not in (9, 91, 92, 93):
+                logging.error(
+                    "MUSIC after IPGlasma requires 'Initial_profile' 9, 91, 92 "
+                    "or 93."
+                )
+                valid = False
             if not math.isclose(
                 config.MUSIC.Initial_time_tau_0, ipglasma.maxTime
             ):
                 logging.error(
                     "Mismatch between IPGlasma 'maxTime' and MUSIC "
                     "'Initial_time_tau_0'."
+                )
+                valid = False
+
+    if "KoMPoST" in active_modules and hasattr(config, "KoMPoST"):
+        kompost = config.KoMPoST
+        # KoMPoST indexes its Ns x Ns grid without range checks
+        for start, end in [("xSTART", "xEND"), ("ySTART", "yEND")]:
+            if not 0 <= kompost[start] <= kompost[end] <= kompost.Ns - 1:
+                logging.error(
+                    f"KoMPoST requires 0 <= {start} <= {end} <= 'Ns' - 1."
                 )
                 valid = False
 
