@@ -2,11 +2,28 @@
 
 set -euo pipefail
 
+# Run a download command again if it fails: the tables are fetched from
+# Bitbucket, which sometimes answers with a server error
+with_retries() {
+	local attempt
+	for attempt in 1 2 3 4 5; do
+		if "$@"; then
+			return 0
+		fi
+		echo "'$*' failed (attempt $attempt of 5)" >&2
+		if [ "$attempt" -lt 5 ]; then
+			sleep 30
+		fi
+	done
+	return 1
+}
+
 echo "Download IP-Glasma from GitHub:"
 git clone https://github.com/chunshen1987/ipglasma -b ipglasma_jimwlk
 cd ipglasma
 git checkout bf92fe1758a61acc5cf84dff2428b83570ea81fa
-cd nucleusConfigurations && bash download_nucleusTables.sh
+# (the download script reports success even if its git clone fails)
+cd nucleusConfigurations && with_retries bash -c 'bash download_nucleusTables.sh && [ -f Pb208.bin.in ]'
 
 # Basic sanity check: make sure a key nucleus configuration exists
 if [ ! -f "Pb208.bin.in" ]; then
@@ -27,8 +44,8 @@ git clone --branch chun_dev_4D --single-branch https://github.com/Hendrik1704/MU
 cd MUSIC
 git checkout 227d81363bc579a15ee4b5f19830db7f6d168033
 cd EOS
-bash download_hotQCD.sh SMASH_binary
-bash download_hotQCD.sh
+with_retries bash download_hotQCD.sh SMASH_binary
+with_retries bash download_hotQCD.sh
 
 # Verify hotQCD EOS tables were downloaded correctly
 if [ ! -f "hotQCD/hrg_hotqcd_eos_SMASH_binary.dat" ] || [ ! -f "hotQCD/hrg_hotqcd_eos_binary.dat" ]; then
