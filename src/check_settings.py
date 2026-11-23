@@ -1,5 +1,11 @@
+import difflib
 import logging
 import math
+
+from src.modules.music_parameters import (
+    MUSIC_CRONOS_CONTROLLED_PARAMETERS,
+    MUSIC_PARAMETERS,
+)
 
 # MUSIC Initial_profile values that read the initial state from a file.
 # 9 and 91-94 read one transverse slice (boost-invariant), 95 reads a (3+1)D
@@ -28,6 +34,41 @@ def iss_effective_afterburner_type(music_eos, iss_afterburner_type):
     if iss_afterburner_type in (ISS_AFTERBURNER_URQMD, ISS_AFTERBURNER_SMASH):
         return iss_afterburner_type
     return ISS_AFTERBURNER_PDG_DECAY
+
+
+def music_parameter_errors(music_config):
+    """Return the problems with the keys and values of the MUSIC section.
+
+    MUSIC ignores keys it does not read and reads one token per value, so a
+    misspelled key or a value with spaces would be dropped without a warning.
+    """
+    errors = []
+    spelling = {key.lower(): key for key in MUSIC_PARAMETERS}
+    for key, value in music_config.to_dict().items():
+        if key in MUSIC_CRONOS_CONTROLLED_PARAMETERS:
+            errors.append(
+                f"MUSIC parameter '{key}' is set by CRONOS, remove it from "
+                "the configuration."
+            )
+        elif key not in MUSIC_PARAMETERS:
+            if key.lower() in spelling:
+                hint = f" MUSIC spells it '{spelling[key.lower()]}'."
+            else:
+                close = difflib.get_close_matches(key, MUSIC_PARAMETERS, n=1)
+                hint = f" Did you mean '{close[0]}'?" if close else ""
+            errors.append(
+                f"MUSIC does not read the parameter '{key}'.{hint} The "
+                "parameters MUSIC reads are listed in "
+                "src/modules/music_parameters.py."
+            )
+        elif not isinstance(value, (bool, int, float, str)) or (
+            isinstance(value, str) and (not value or len(value.split()) != 1)
+        ):
+            errors.append(
+                f"MUSIC parameter '{key}' must be a number or a string "
+                f"without spaces, not {value!r}."
+            )
+    return errors
 
 
 def check_settings(config):
@@ -72,6 +113,10 @@ def check_settings(config):
             valid = False
 
     if active("MUSIC"):
+        for error in music_parameter_errors(config.MUSIC):
+            logging.error(error)
+            valid = False
+
         music_boost_invariant = config.MUSIC.boost_invariant != 0
         # The file profiles are either one transverse slice or a (3+1)D profile
         profile = config.MUSIC.Initial_profile

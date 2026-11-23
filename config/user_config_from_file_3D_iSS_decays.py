@@ -41,7 +41,6 @@ MUSIC = {
     "Include_Bulk_Visc_Yes_1_No_0": 1,
     "T_dependent_zeta_over_s": 1,
     "freeze_Ncell_x_step": 2,
-    "freeze_Ncell_y_step": 2,
 }
 
 iSS = {

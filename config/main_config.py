@@ -254,8 +254,7 @@ MUSIC = {
     "output_evolution_ideal_only": 0,
     "outputBinaryEvolution": 1,  # output evolution file in binary format
     "output_evolution_every_N_eta": 1,  # output evolution file every Neta steps
-    "output_evolution_every_N_y": 1,  # output evolution file every Ny steps
-    "output_evolution_every_N_x": 1,  # output evolution file every Nx steps
+    "output_evolution_every_N_x": 1,  # output evolution file every Nx (and Ny) steps
     "output_evolution_every_N_timesteps": 10,  # output evolution every Ntime steps
     # parameters for freeze out and Cooper-Frye
     "Do_FreezeOut_Yes_1_No_0": 1,  # flag to find freeze-out surface
@@ -264,8 +263,7 @@ MUSIC = {
     "freeze_out_method": 4,  # method for hyper-surface finder, 4 Cornelius
     "freeze_surface_in_binary": 1,  # switch to output surface file in binary format
     "average_surface_over_this_many_time_steps": 10,  # the step skipped in the tau
-    "freeze_Ncell_x_step": 1,
-    "freeze_Ncell_y_step": 1,
+    "freeze_Ncell_x_step": 1,  # MUSIC uses this step in x and y
     "freeze_Ncell_eta_step": 1,
     "use_eps_for_freeze_out": 0,  # flag to use energy density as criteria to
     # find freeze-out surface
