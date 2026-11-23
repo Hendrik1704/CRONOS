@@ -65,7 +65,7 @@ echo "Build iSS sampler to perform freeze out"
 
 echo "Build Pythia which is used in SMASH for the hadronic afterburner phase"
 (
-    cd pythia8315 &&
+    cd pythia8316 &&
     ./configure --cxx-common='-std=c++17 -march=native -O3 -fPIC -pthread' &&
     make -j"$NUM_CPUS"
 )
@@ -79,7 +79,7 @@ echo "Build SMASH as an hadronic afterburner"
     cmake .. \
         -DTRY_USE_ROOT=OFF \
         -DTRY_USE_HEPMC=OFF \
-        -DPythia_CONFIG_EXECUTABLE=../../pythia8315/bin/pythia8-config \
+        -DPythia_CONFIG_EXECUTABLE=../../pythia8316/bin/pythia8-config \
         -DEIGEN3_INCLUDE_DIR="$EIGEN_INC" &&
     make smash -j"$NUM_CPUS"
 )

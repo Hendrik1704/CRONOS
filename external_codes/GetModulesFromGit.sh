@@ -45,11 +45,11 @@ git checkout ef5c307801a2be887536d71db6bf085e0533a093
 cd ..
 
 echo "Download SMASH from GitHub:"
-git clone https://github.com/smash-transport/smash.git --branch SMASH-3.2.2
+git clone https://github.com/smash-transport/smash.git --branch SMASH-3.4.2
 
 echo "Download Pythia (used for SMASH):"
-wget https://pythia.org/releases/pythia83/pythia8315.tgz
-tar xf pythia8315.tgz
+wget https://pythia.org/releases/pythia83/pythia8316.tgz
+tar xf pythia8316.tgz
 
 echo "Download stable Eigen library version 3.4.0:"
 wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz
