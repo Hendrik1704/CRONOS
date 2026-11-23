@@ -201,21 +201,11 @@ MUSIC = {
     "Grid_size_in_x": 201,  # number of the grid points in x direction
     "gridPadding": 3,  # grid padding size in the transverse plane (fm)
     "EOS_to_use": 91,  # type of the equation of state
-    # 0: ideal gas
-    # 1: EOS-Q from azhydro
-    # 2: lattice EOS s95p-v1
-    #    (from Huovinen and Petreczky)
-    # 3: lattice EOS s95p with partial
-    #    chemical equilibrium (PCE) at 150 MeV
-    #    (see https://wiki.bnl.gov/TECHQM
-    #         /index.php/QCD_Equation_of_State)
-    # 4: lattice EOS s95p PCE at 155 MeV
-    # 5: lattice EOS s95p PCE at 160 MeV
-    # 6: lattice EOS s95p PCE at 165 MeV
-    # 7: lattice EOS s95p-v1.2 for UrQMD
-    # 9: lattice EOS hotQCD with UrQMD
-    # 91: lattice EOS hotQCD with SMASH
-    # 14: lattice EOS hotQCD at finite muB
+    # 9: lattice EOS hotQCD with UrQMD (use with iSS decays, without SMASH)
+    # 91: lattice EOS hotQCD with SMASH (use with SMASH)
+    # Only these two are supported (checked by check_settings):
+    # GetModulesFromGit.sh downloads only their tables, and iSS needs a hadron
+    # list that matches the EoS.
     # transport coefficients
     "quest_revert_strength": 1.0,
     "FlagResumTransportCoeff": 0,  # switch to use resummed transport coeff.

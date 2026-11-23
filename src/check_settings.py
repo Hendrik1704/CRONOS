@@ -13,6 +13,11 @@ from src.modules.music_parameters import (
 MUSIC_2D_FILE_PROFILES = (9, 91, 92, 93, 94)
 MUSIC_3D_FILE_PROFILES = (95,)
 
+# MUSIC EOS_to_use values CRONOS supports: the hotQCD EoS matched to the UrQMD
+# (9) or SMASH (91) hadron list. GetModulesFromGit.sh downloads only these
+# tables, and iSS samples the hadrons of the matching list.
+MUSIC_SUPPORTED_EOS = (9, 91)
+
 # iSS afterburner types (iSS readindata.cpp)
 ISS_AFTERBURNER_PDG_DECAY = 0
 ISS_AFTERBURNER_URQMD = 1
@@ -117,6 +122,16 @@ def check_settings(config):
             logging.error(error)
             valid = False
 
+        if config.MUSIC.EOS_to_use not in MUSIC_SUPPORTED_EOS:
+            logging.error(
+                f"MUSIC EOS_to_use {config.MUSIC.EOS_to_use} is not "
+                "supported: use 9 (hotQCD matched to UrQMD hadrons, for iSS "
+                "decays) or 91 (hotQCD matched to SMASH hadrons). Another EoS "
+                "needs its tables in external_codes/GetModulesFromGit.sh and "
+                "a hadron list in iSS that matches it."
+            )
+            valid = False
+
         music_boost_invariant = config.MUSIC.boost_invariant != 0
         # The file profiles are either one transverse slice or a (3+1)D profile
         profile = config.MUSIC.Initial_profile
@@ -181,16 +196,14 @@ def check_settings(config):
             if afterburner_type != ISS_AFTERBURNER_SMASH:
                 logging.error(
                     "With SMASH, iSS must sample SMASH hadrons: set MUSIC "
-                    "EOS_to_use to 91, or iSS afterburner_type to 2 with a "
-                    "MUSIC EOS_to_use other than 9."
+                    "EOS_to_use to 91."
                 )
                 valid = False
         elif afterburner_type == ISS_AFTERBURNER_SMASH:
             # iSS skips resonance decays for the SMASH afterburner type
             logging.error(
-                "Without SMASH, iSS would skip the resonance decays: MUSIC "
-                "EOS_to_use 91 or iSS afterburner_type 2 (with a MUSIC "
-                "EOS_to_use other than 9) select the SMASH afterburner type."
+                "Without SMASH, iSS would skip the resonance decays: set MUSIC "
+                "EOS_to_use to 9."
             )
             valid = False
 
