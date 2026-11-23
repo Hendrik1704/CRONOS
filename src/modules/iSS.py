@@ -5,6 +5,29 @@ import subprocess
 import shutil
 
 
+# iSS output settings that CRONOS sets for the next module
+ISS_OUTPUT_FOR_SMASH = {
+    "use_OSCAR_format": 1,
+    "use_OSCAR2013": 1,
+    # particles sampled from one cell of a (3+1)D surface share their
+    # position, and SMASH rejects events with more than two particles at the
+    # same position (compared to 1e-6 fm). A shift of up to 1e-3 fm in x, y
+    # and z keeps even 16 500 particles from one cell apart, 1e-5 fm does not.
+    "OSCAR2013_position_jitter": 1e-3,
+    "use_gzip_format": 0,
+    "use_binary_format": 0,
+    "perform_decays": 0,  # SMASH decays the resonances
+}
+ISS_OUTPUT_WITHOUT_SMASH = {
+    "use_OSCAR_format": 0,
+    "use_OSCAR2013": 0,
+    "OSCAR2013_position_jitter": 0,
+    "use_gzip_format": 0,
+    "use_binary_format": 1,
+    "perform_decays": 1,
+}
+
+
 def format_iss_value(value):
     """Format a configuration value for the iSS parameter file.
 
@@ -94,19 +117,17 @@ class iSS(BaseModule):
         """Return the parameters CRONOS writes to the iSS parameter file.
 
         Every key of the iSS section is passed on (check_settings rejects the
-        keys iSS does not read). CRONOS sets the random seed and, without
-        SMASH, the output format and the resonance decays.
+        keys iSS does not read). CRONOS sets the random seed and the output
+        that the next module reads: with SMASH, an OSCAR 2013 particle list
+        that SMASH reads directly; without SMASH, the binary particle list
+        with resonance decays.
         """
         parameters = self.config.to_dict()
         parameters["randomSeed"] = self.full_config.general.random_seed
-        if "SMASH" not in self.full_config.general.modules:
-            parameters.update(
-                {
-                    "use_OSCAR_format": 0,
-                    "use_binary_format": 1,
-                    "perform_decays": 1,
-                }
-            )
+        if "SMASH" in self.full_config.general.modules:
+            parameters.update(ISS_OUTPUT_FOR_SMASH)
+        else:
+            parameters.update(ISS_OUTPUT_WITHOUT_SMASH)
         return parameters
 
     def prepare_input(self, event_dir):
@@ -117,7 +138,7 @@ class iSS(BaseModule):
         hadronic afterburner will be used in the simulation chain.
 
         Configuration Adaptation:
-            - If SMASH detected: Use OSCAR format for particle output
+            - If SMASH detected: OSCAR 2013 particle list that SMASH reads
             - If no SMASH: Use binary format with built-in decay handling
 
         Physics Parameters:
@@ -153,11 +174,6 @@ class iSS(BaseModule):
         ini_file = os.path.join(iSS_dir, "parameters_iSS.ini")
 
         parameters = self.parameters()
-        if "SMASH" not in self.full_config.general.modules:
-            logging.info(
-                "[iSS] SMASH module not detected. Setting use_OSCAR_format=0, "
-                "use_binary_format=1, perform_decays=1."
-            )
 
         with open(ini_file, "w") as f:
             for key, value in parameters.items():

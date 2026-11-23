@@ -5,9 +5,9 @@ src/read_in_parameters.cpp. It ignores keys it does not read and uses
 defaults for missing ones, so a misspelled key would be ignored without a
 warning. check_settings uses this list to reject such keys.
 
-Generated from MUSIC f5c8717 (external_codes/GetModulesFromGit.sh). Update it
-when the MUSIC pin changes; tests/test_music_parameters.py compares it with
-the MUSIC source.
+Generated from MUSIC 227d813 (Hendrik1704/MUSIC branch chun_dev_4D, see
+external_codes/GetModulesFromGit.sh). Update it when the MUSIC pin changes;
+tests/test_music_parameters.py compares it with the MUSIC source.
 """
 
 # Parameters MUSIC reads. MUSIC compares the names case-insensitively, CRONOS
@@ -86,6 +86,7 @@ MUSIC_PARAMETERS = frozenset(
         "Include_deltaf",
         "Include_deltaf_bulk",
         "Include_deltaf_qmu",
+        "Include_QS_Yes_1_No_0",
         "Include_Rhob_Yes_1_No_0",
         "Include_second_order_terms",
         "Include_Shear_Visc_Yes_1_No_0",
@@ -133,6 +134,8 @@ MUSIC_PARAMETERS = frozenset(
         "pseudofreeze",
         "pt_steps",
         "quest_revert_strength",
+        "ratio_q",
+        "ratio_s",
         "reset_dtau_use_CFL_condition",
         "resumTransCoeffAlpha",
         "Runge_Kutta_order",
@@ -167,7 +170,9 @@ MUSIC_PARAMETERS = frozenset(
         "Total_evolution_time_tau",
         "turn_on_baryon_diffusion",
         "turn_on_bulk_chem",
+        "use_BQ_ratios",
         "use_eps_for_freeze_out",
+        "use_rhoQS_to_rhoB_ratios",
         "Viscosity_Flag_Yes_1_No_0",
         "X_grid_size_in_fm",
         "Y_grid_size_in_fm",

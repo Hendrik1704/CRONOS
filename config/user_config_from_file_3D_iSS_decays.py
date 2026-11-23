@@ -50,7 +50,6 @@ iSS = {
     "sample_upto_desired_particle_number": 0,  # 1: flag to run sampling until desired
     # particle numbers is reached
     "number_of_repeated_sampling": 100,  # number of repeated sampling
-    "perform_decays": 1,
 }
 
 afterburner_toolkit = {}

@@ -268,6 +268,8 @@ MUSIC = {
 }
 
 iSS = {
+    # CRONOS sets randomSeed and the output for the next module (OSCAR 2013
+    # for SMASH, binary with resonance decays otherwise), see src/modules/iSS.py
     "hydro_mode": 1,  # mode for reading in freeze out information
     # 1: reads outputs from MUSIC assuming boost-invariant
     # 2: reads outputs from MUSIC full (3+1)-d
@@ -305,7 +307,6 @@ iSS = {
     #      whole dN_dy.
     "dN_dy_sampling_para1": 0.16,  # Additional parameters for dN/dy sampling.
     # -- For dN_dy_sampling_model==10 or 20,
-    "perform_decays": 0,  # flag to perform resonance decay
     "perform_checks": 0,  # flag to perform tests for the sampler
     "include_spectators": 0,  # flag to include spectators
     "local_charge_conservation": 0,  # flag to impose local charge conservation
@@ -313,10 +314,6 @@ iSS = {
     "y_RB": 5.0,  # upper bound for y-sampling;
     "output_samples_into_files": 0,  # output particle samples into individual files
     "store_samples_in_memory": 1,  # flag to store particle samples in memory
-    "use_OSCAR_format": 1,  # output results in OSCAR format
-    "use_gzip_format": 0,  # output results in gzip format (only works with
-    # store_samples_in_memory = 1)
-    "use_binary_format": 0,
     "calculate_vn_to_order": 9,  # v_n's are calculated up to this order
     "use_pos_dN_only": 0,  # 1: all negative emission functions will be skipped.
     "grouping_particles": 1,  # 0/1: Particles will be re-order according to

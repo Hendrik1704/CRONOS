@@ -94,28 +94,6 @@ def test_kompost_to_music_rejects_unknown_matching(tmp_path: Path):
 
 
 @pytest.mark.unit
-def test_oscar_conversion_uses_own_event_multiplicity(tmp_path: Path):
-    conv = _import("convert_OSCAR1997A_to_OSCAR2013")
-    pdg = pd.DataFrame({"PDG_ID": [211], "charge": [1]})
-
-    def particle(i):
-        return f"{i} 211 0.1 0.2 0.3 1.0 0.14 1.0 2.0 3.0 4.0\n"
-
-    lines = ["OSC1999A\n", "final_id_p_x\n", "iSS header\n"]
-    lines += ["         1           2         0         0\n"]
-    lines += [particle(1), particle(2)]
-    lines += ["         2           3         0         0\n"]
-    lines += [particle(1), particle(2), particle(3)]
-    f_in = tmp_path / "OSCAR.DAT"
-    f_in.write_text("".join(lines))
-    f_out = tmp_path / "out.oscar"
-
-    assert conv.convert_oscar_streaming(f_in, pdg, f_out) == 2
-    headers = [ln for ln in f_out.read_text().splitlines() if " out " in ln]
-    assert headers == ["# event 1 out 2", "# event 2 out 3"]
-
-
-@pytest.mark.unit
 def test_mcdipper_tau0_regex_stops_at_non_numeric(tmp_path: Path):
     mcd = _import("McDipper_to_MUSIC")
     f = tmp_path / "energy.dat"

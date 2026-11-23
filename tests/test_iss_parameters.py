@@ -9,6 +9,7 @@ from src.configuration import Configuration, load_config
 from src.modules.iSS import format_iss_value, iSS
 from src.modules.iss_parameters import (
     ISS_CRONOS_CONTROLLED_PARAMETERS,
+    ISS_INTERNAL_PARAMETERS,
     ISS_PARAMETERS,
 )
 
@@ -42,7 +43,8 @@ def test_parameter_list_matches_iss_source():
         with open(path, errors="replace") as f:
             source += f.read()
     keys = re.findall(r'(?:getVal|exist)\(\s*"(\w+)"', source)
-    assert set(keys) == ISS_PARAMETERS
+    assert set(keys) - set(ISS_INTERNAL_PARAMETERS) == ISS_PARAMETERS
+    assert set(ISS_CRONOS_CONTROLLED_PARAMETERS) <= ISS_PARAMETERS
 
 
 def test_main_config_only_has_iss_parameters():
@@ -63,7 +65,11 @@ def test_prepare_input_writes_every_parameter(tmp_path, random_seed):
     )
     assert parameters["randomSeed"] == str(random_seed)
     assert parameters["include_spectators"] == "1"
-    assert parameters["use_OSCAR_format"] == "1"  # SMASH reads OSCAR
+    # SMASH reads the OSCAR 2013 particle list directly
+    assert parameters["use_OSCAR_format"] == "1"
+    assert parameters["use_OSCAR2013"] == "1"
+    assert float(parameters["OSCAR2013_position_jitter"]) == 1e-3
+    assert parameters["perform_decays"] == "0"
     assert (tmp_path / "iSS" / "results" / "surface.dat").is_symlink()
 
 
@@ -71,6 +77,7 @@ def test_prepare_input_without_smash_performs_decays(tmp_path):
     config = _load_config(["from_file_IC", "MUSIC", "iSS"])
     parameters = _write_parameter_file(tmp_path, config)
     assert parameters["use_OSCAR_format"] == "0"
+    assert parameters["use_OSCAR2013"] == "0"
     assert parameters["use_binary_format"] == "1"
     assert parameters["perform_decays"] == "1"
 
@@ -112,6 +119,8 @@ def test_format_iss_value(value, expected):
         ("Hydro_Mode", 1, "iSS spells it 'hydro_mode'"),
         ("global_momentum_conservation", 0, "does not read"),
         ("randomSeed", 7, "set by CRONOS"),
+        ("perform_decays", 1, "set by CRONOS"),
+        ("use_OSCAR2013", 0, "set by CRONOS"),
         ("y_LB", "-5", "must be a number"),
         ("y_RB", [5.0], "must be a number"),
     ],

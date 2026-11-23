@@ -23,9 +23,9 @@ git checkout 5d35aed36635ffa92f9ba9d97531f209097dacb0
 cd ..
 
 echo "Download MUSIC from GitHub:"
-git clone --branch chun_dev --single-branch https://github.com/Hendrik1704/MUSIC
+git clone --branch chun_dev_4D --single-branch https://github.com/Hendrik1704/MUSIC
 cd MUSIC
-git checkout f5c8717a77b28686ae69e93ea682589ccca8ab72
+git checkout 227d81363bc579a15ee4b5f19830db7f6d168033
 cd EOS
 bash download_hotQCD.sh SMASH_binary
 bash download_hotQCD.sh
@@ -39,9 +39,9 @@ fi
 cd ../..
 
 echo "Download iSS from GitHub:"
-git clone https://github.com/chunshen1987/iSS.git
+git clone --branch cronos --single-branch https://github.com/Hendrik1704/iSS.git
 cd iSS
-git checkout 8b3e43b26dade8252e2671907518a0d111625fd1
+git checkout ef5c307801a2be887536d71db6bf085e0533a093
 cd ..
 
 echo "Download SMASH from GitHub:"

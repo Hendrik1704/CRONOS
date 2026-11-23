@@ -1010,17 +1010,15 @@ class TestModuleFailuresPropagate(TestPhysicsModuleBase):
         with pytest.raises(subprocess.CalledProcessError):
             module.run(self.event_dir)
 
-    @patch.object(
-        sys.modules["src.modules.SMASH"], "run_external_command", side_effect=failing_command
-    )
-    def test_smash_converter(self, mock_run_command):
+    def test_smash_rejects_input_that_is_not_oscar2013(self):
         os.makedirs(os.path.join(self.event_dir, "SMASH"))
-        open(os.path.join(self.event_dir, "results", "output_0.dat"), "w")
+        with open(os.path.join(self.event_dir, "results", "output_0.dat"), "w") as f:
+            f.write("OSC1997A\nfinal_id_p_x\n")
         full_config = Configuration(
             {"general": general_config(["iSS", "SMASH"])}
         )
         module = SMASH(Configuration({}), full_config, self.project_root, "0")
-        with pytest.raises(subprocess.CalledProcessError):
+        with pytest.raises(ValueError, match="not an OSCAR 2013"):
             module.prepare_input(self.event_dir)
         assert not os.path.exists(
             os.path.join(self.event_dir, "SMASH", "parameters_SMASH.yaml")
@@ -1121,9 +1119,22 @@ class TestModuleResume(TestPhysicsModuleBase):
         with open(os.path.join(self.event_dir, "results", "output_1.dat")) as f:
             assert f.read() == "particles"
 
-    def test_smash_event_count_is_not_kept_in_the_config(self):
+    def test_smash_reads_the_iss_oscar2013_output(self):
         os.makedirs(os.path.join(self.event_dir, "SMASH"))
-        open(os.path.join(self.event_dir, "results", "output_0.dat"), "w")
+        lines = [
+            "#!OSCAR2013 particle_lists t x y z mass p0 px py pz pdg ID charge",
+            "# Units: fm fm fm fm GeV GeV GeV GeV GeV none none e",
+        ]
+        # iSS skips empty events, so the event numbers can have gaps
+        for event in [1, 2, 4, 5, 6, 7, 9]:
+            lines += [
+                f"# event {event} out 1",
+                "1.0 0.1 0.2 0.3 0.138 0.5 0.1 0.2 0.3 211 1 1",
+                f"# event {event} end 0 impact 0.000",
+            ]
+        input_file = os.path.join(self.event_dir, "results", "output_0.dat")
+        with open(input_file, "w") as f:
+            f.write("\n".join(lines) + "\n")
         full_config = Configuration(
             {"general": general_config(["iSS", "SMASH"])}
         )
@@ -1131,15 +1142,17 @@ class TestModuleResume(TestPhysicsModuleBase):
             {"Delta_Time": 0.1, "End_Time": 100.0, "No_Collisions": 1}
         )
         module = SMASH(config, full_config, self.project_root, "0")
-        with patch.object(
-            sys.modules["src.modules.SMASH"], "run_external_command",
-            return_value={"return_code": 0, "stdout": "7\n"},
-        ):
-            module.prepare_input(self.event_dir)
-        with open(
-            os.path.join(self.event_dir, "SMASH", "parameters_SMASH.yaml")
-        ) as f:
-            assert "Nevents:       7\n" in f.read()
+
+        module.prepare_input(self.event_dir)
+
+        smash_dir = os.path.join(self.event_dir, "SMASH")
+        with open(os.path.join(smash_dir, "parameters_SMASH.yaml")) as f:
+            parameters = f.read()
+        assert "Nevents:       7\n" in parameters
+        assert 'File_Prefix: "OSCAR"' in parameters
+        assert os.path.realpath(os.path.join(smash_dir, "OSCAR0")) == (
+            os.path.realpath(input_file)
+        )
         assert "Nevents" not in config.to_dict()
 
 
