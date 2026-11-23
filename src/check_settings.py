@@ -6,6 +6,7 @@ from src.modules.iss_parameters import (
     ISS_CRONOS_CONTROLLED_PARAMETERS,
     ISS_PARAMETERS,
 )
+from src.modules.SMASH import SMASH_PARTICLE_FORMATS
 from src.modules.music_parameters import (
     MUSIC_CRONOS_CONTROLLED_PARAMETERS,
     MUSIC_PARAMETERS,
@@ -258,6 +259,27 @@ def check_settings(config):
                 "EOS_to_use to 9."
             )
             valid = False
+
+    if active("SMASH"):
+        particles_format = getattr(
+            config.SMASH, "Particles_Format", SMASH_PARTICLE_FORMATS[0]
+        )
+        if particles_format not in SMASH_PARTICLE_FORMATS:
+            logging.error(
+                f"SMASH Particles_Format {particles_format!r} is not supported: "
+                "use 'Oscar2013_bin' (binary) or 'Oscar2013' (text)."
+            )
+            valid = False
+
+    if active("afterburner_toolkit") and "read_in_mode" in (
+        config.afterburner_toolkit.to_dict()
+    ):
+        logging.error(
+            "afterburner_toolkit read_in_mode is set by CRONOS for the output "
+            "of the previous module (choose the SMASH output with SMASH "
+            "Particles_Format); remove it from the configuration."
+        )
+        valid = False
 
     # Add more checks as needed for other configuration sections
 

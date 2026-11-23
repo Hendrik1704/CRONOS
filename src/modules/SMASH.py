@@ -9,6 +9,18 @@ SMASH_OUTPUT_DIR = os.path.join("data", "0")
 # SMASH List modus reads the files <File_Prefix><n>, starting at Shift_Id
 SMASH_INPUT_PREFIX = "OSCAR"
 OSCAR2013_HEADER = "#!OSCAR2013"
+# SMASH formats for the final particle list: binary or human-readable text
+SMASH_PARTICLE_FORMATS = ("Oscar2013_bin", "Oscar2013")
+DEFAULT_SMASH_PARTICLE_FORMAT = "Oscar2013_bin"
+
+
+def smash_particle_file(particles_format, extended):
+    """Return the name of the particle list SMASH writes in its output dir."""
+    if particles_format == "Oscar2013":
+        return "particle_lists.oscar"
+    if extended:
+        return "particles_oscar2013_extended.bin"
+    return "particles_oscar2013.bin"
 
 
 def count_oscar2013_events(path):
@@ -63,6 +75,12 @@ class SMASH(BaseModule):
         >>> smash.run(event_dir)  # Hadronic afterburner
         >>> smash.fetch_output(event_dir)  # Final hadron distributions
     """
+
+    def particles_format(self):
+        """Return the SMASH format of the final particle list."""
+        return getattr(
+            self.config, "Particles_Format", DEFAULT_SMASH_PARTICLE_FORMAT
+        )
 
     def prepare_environment(self, event_dir):
         """Set up SMASH execution environment with executable and data files.
@@ -175,7 +193,7 @@ class SMASH(BaseModule):
             f.write(f"Output:\n")
             f.write(f"    Output_Interval: 100.0\n")
             f.write(f"    Particles:\n")
-            f.write(f'        Format:          ["Oscar2013"]\n')
+            f.write(f'        Format:          ["{self.particles_format()}"]\n')
             if afterburner_toolkit:
                 f.write(f"        Extended:          true\n")
 
@@ -314,7 +332,13 @@ class SMASH(BaseModule):
         logging.info("[SMASH] Data successfully processed...")
         current_module_index = self.full_config.general.modules.index("SMASH")
         src_file = os.path.join(
-            event_dir, "SMASH", SMASH_OUTPUT_DIR, "particle_lists.oscar"
+            event_dir,
+            "SMASH",
+            SMASH_OUTPUT_DIR,
+            smash_particle_file(
+                self.particles_format(),
+                "afterburner_toolkit" in self.full_config.general.modules,
+            ),
         )
         dst_file = os.path.join(
             event_dir, "results", f"output_{current_module_index}.dat"

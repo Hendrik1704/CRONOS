@@ -1024,11 +1024,41 @@ class TestModuleFailuresPropagate(TestPhysicsModuleBase):
             os.path.join(self.event_dir, "SMASH", "parameters_SMASH.yaml")
         )
 
-    def make_afterburner(self, modules):
+    def make_afterburner(self, modules, smash_format="Oscar2013"):
         os.makedirs(os.path.join(self.event_dir, "afterburner_toolkit"))
-        full_config = Configuration({"general": general_config(modules)})
+        full_config = Configuration(
+            {
+                "general": general_config(modules),
+                "SMASH": {"Particles_Format": smash_format},
+            }
+        )
         config = Configuration({"input_filename": "output_1.dat"})
         return afterburner_toolkit(config, full_config, self.project_root, "0")
+
+    @pytest.mark.parametrize(
+        "modules, smash_format, read_in_mode, staged_file",
+        [
+            (["SMASH", "afterburner_toolkit"], "Oscar2013_bin", 8, "particles_binary.bin"),
+            (["iSS", "afterburner_toolkit"], "Oscar2013_bin", 9, "particle_list.bin"),
+        ],
+    )
+    def test_afterburner_reads_binary_lists_directly(
+        self, modules, smash_format, read_in_mode, staged_file
+    ):
+        module = self.make_afterburner(modules, smash_format)
+        assert module.read_in_mode() == read_in_mode
+        toolkit_dir = os.path.join(self.event_dir, "afterburner_toolkit")
+        with open(os.path.join(toolkit_dir, "output_1.dat"), "w") as f:
+            f.write("particles")
+        with patch.object(
+            sys.modules["src.modules.afterburner_toolkit"], "run_external_command"
+        ) as mock_run_command:
+            module.run(self.event_dir)
+        # only the analysis runs, no converter
+        mock_run_command.assert_called_once()
+        assert "hadronic_afterburner_tools" in mock_run_command.call_args[0][0][0]
+        with open(os.path.join(toolkit_dir, "results", staged_file)) as f:
+            assert f.read() == "particles"
 
     @patch.object(
         sys.modules["src.modules.afterburner_toolkit"], "run_external_command",
@@ -1110,7 +1140,12 @@ class TestModuleResume(TestPhysicsModuleBase):
         full_config = Configuration(
             {"general": general_config(["iSS", "SMASH"])}
         )
-        module = SMASH(Configuration({}), full_config, self.project_root, "0")
+        module = SMASH(
+            Configuration({"Particles_Format": "Oscar2013"}),
+            full_config,
+            self.project_root,
+            "0",
+        )
         with patch.object(
             sys.modules["src.modules.SMASH"], "run_external_command", side_effect=run_smash
         ):

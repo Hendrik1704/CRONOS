@@ -58,7 +58,7 @@ tar xf eigen-3.4.0.tar.gz
 echo "Download hadronic_afterburner_toolkit from GitHub:"
 git clone https://github.com/Hendrik1704/hadronic_afterburner_toolkit.git
 cd hadronic_afterburner_toolkit
-git checkout ccfec0e1bba8662d8b5d6544f94cd81be2d11fee
+git checkout a3d031f740802d1bdace7d5a7f62f4f695514bd6
 cd ..
 
 echo "Downloaded all the modules successfully"

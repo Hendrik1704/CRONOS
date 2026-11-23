@@ -361,22 +361,17 @@ SMASH = {
     "Delta_Time": 0.1,
     "End_Time": 2000.0,
     "No_Collisions": 0,  # 1: disable collisions, decays only
+    "Particles_Format": "Oscar2013_bin",  # final particle list:
+    # "Oscar2013_bin": binary OSCAR 2013 list, which afterburner_toolkit
+    #   reads directly
+    # "Oscar2013": human-readable OSCAR 2013 text, which afterburner_toolkit
+    #   converts first
 }
 
 afterburner_toolkit = {
+    # CRONOS sets read_in_mode for the particle list of the previous module
+    # (SMASH binary or text output, or the iSS binary list without SMASH)
     "echo_level": 9,  # control the amount of print messages
-    "read_in_mode": 7,  # mode for reading in particle information
-    # 0: reads outputs from OSCAR outputs
-    # 1: reads outputs from UrQMD outputs
-    # 2: reads outputs from zipped UrQMD outputs
-    # 21: reads outputs from binary UrQMD outputs
-    # 3: reads outputs from Sangwook's UrQMD outputs
-    #    (without header lines)
-    # 4: reads outputs from UrQMD 3.3p2 outputs
-    # 7: reads outputs from gzipped SMASH outputs
-    # 8: read outputs from SMASH binary format
-    # 9: reads outputs from binary outputs (iSS)
-    # 10: reads outputs from gzip outputs (iSS)
     "ecoOutput": 1,  # 1: only save Qn without errors
     "analyze_flow": 4,  # 0/1: flag to perform flow analysis
     "analyze_HBT": 0,  # 0/1: flag to perform HBT analysis
