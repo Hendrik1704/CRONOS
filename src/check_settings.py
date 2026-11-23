@@ -2,6 +2,10 @@ import difflib
 import logging
 import math
 
+from src.modules.iss_parameters import (
+    ISS_CRONOS_CONTROLLED_PARAMETERS,
+    ISS_PARAMETERS,
+)
 from src.modules.music_parameters import (
     MUSIC_CRONOS_CONTROLLED_PARAMETERS,
     MUSIC_PARAMETERS,
@@ -41,39 +45,82 @@ def iss_effective_afterburner_type(music_eos, iss_afterburner_type):
     return ISS_AFTERBURNER_PDG_DECAY
 
 
+def _parameter_errors(code, section, known, controlled, list_file, is_valid):
+    """Return the problems with the keys and values of a module section.
+
+    The external code ignores keys it does not read, so a misspelled key would
+    be dropped without a warning.
+    """
+    errors = []
+    spelling = {key.lower(): key for key in known}
+    for key, value in section.to_dict().items():
+        if key in controlled:
+            errors.append(
+                f"{code} parameter '{key}' is set by CRONOS, remove it from "
+                "the configuration."
+            )
+        elif key not in known:
+            if key.lower() in spelling:
+                hint = f" {code} spells it '{spelling[key.lower()]}'."
+            else:
+                close = difflib.get_close_matches(key, known, n=1)
+                hint = f" Did you mean '{close[0]}'?" if close else ""
+            errors.append(
+                f"{code} does not read the parameter '{key}'.{hint} The "
+                f"parameters {code} reads are listed in {list_file}."
+            )
+        else:
+            message = is_valid(value)
+            if message:
+                errors.append(
+                    f"{code} parameter '{key}' must be {message}, "
+                    f"not {value!r}."
+                )
+    return errors
+
+
 def music_parameter_errors(music_config):
     """Return the problems with the keys and values of the MUSIC section.
 
-    MUSIC ignores keys it does not read and reads one token per value, so a
-    misspelled key or a value with spaces would be dropped without a warning.
+    MUSIC reads one token per value, so a value with spaces would be cut.
     """
-    errors = []
-    spelling = {key.lower(): key for key in MUSIC_PARAMETERS}
-    for key, value in music_config.to_dict().items():
-        if key in MUSIC_CRONOS_CONTROLLED_PARAMETERS:
-            errors.append(
-                f"MUSIC parameter '{key}' is set by CRONOS, remove it from "
-                "the configuration."
-            )
-        elif key not in MUSIC_PARAMETERS:
-            if key.lower() in spelling:
-                hint = f" MUSIC spells it '{spelling[key.lower()]}'."
-            else:
-                close = difflib.get_close_matches(key, MUSIC_PARAMETERS, n=1)
-                hint = f" Did you mean '{close[0]}'?" if close else ""
-            errors.append(
-                f"MUSIC does not read the parameter '{key}'.{hint} The "
-                "parameters MUSIC reads are listed in "
-                "src/modules/music_parameters.py."
-            )
-        elif not isinstance(value, (bool, int, float, str)) or (
-            isinstance(value, str) and (not value or len(value.split()) != 1)
+
+    def is_valid(value):
+        if isinstance(value, (bool, int, float)) or (
+            isinstance(value, str) and len(value.split()) == 1
         ):
-            errors.append(
-                f"MUSIC parameter '{key}' must be a number or a string "
-                f"without spaces, not {value!r}."
-            )
-    return errors
+            return None
+        return "a number or a string without spaces"
+
+    return _parameter_errors(
+        "MUSIC",
+        music_config,
+        MUSIC_PARAMETERS,
+        MUSIC_CRONOS_CONTROLLED_PARAMETERS,
+        "src/modules/music_parameters.py",
+        is_valid,
+    )
+
+
+def iss_parameter_errors(iss_config):
+    """Return the problems with the keys and values of the iSS section.
+
+    iSS converts every value to a number.
+    """
+
+    def is_valid(value):
+        if isinstance(value, (bool, int, float)):
+            return None
+        return "a number"
+
+    return _parameter_errors(
+        "iSS",
+        iss_config,
+        ISS_PARAMETERS,
+        ISS_CRONOS_CONTROLLED_PARAMETERS,
+        "src/modules/iss_parameters.py",
+        is_valid,
+    )
 
 
 def check_settings(config):
@@ -175,6 +222,11 @@ def check_settings(config):
             f"must equal KoMPoST tOut ({config.KoMPoST.tOut})."
         )
         valid = False
+
+    if active("iSS"):
+        for error in iss_parameter_errors(config.iSS):
+            logging.error(error)
+            valid = False
 
     if active("MUSIC") and active("iSS"):
         # iSS hydro_mode 1 reads a boost-invariant MUSIC surface,

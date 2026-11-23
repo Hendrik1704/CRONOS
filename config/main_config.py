@@ -278,7 +278,6 @@ iSS = {
     "turn_on_bulk": 0,  # read in bulk viscous pressure
     "turn_on_rhob": 0,  # read in net baryon chemical potential
     "turn_on_diff": 0,  # read in baryon diffusion current
-    "regulateEOS": 1,  # flag to regulate T and mu with pure HRG EOS
     "include_deltaf_shear": 1,  # include delta f contribution from shear
     "include_deltaf_bulk": 1,  # include delta f contribution from bulk
     "include_deltaf_diffusion": 0,  # include delta f contribution from diffusion
@@ -286,8 +285,6 @@ iSS = {
     "restrict_deltaf": 0,  # flag to apply restriction on the size of delta f
     "deltaf_max_ratio": 1.0,  # the maximum allowed size of delta f w.r.t f0
     "quantum_statistics": 1,  # include quantum statistics (1: yes, 0: no)
-    "calculate_polarization": 0,  # switch to compute Lambda's polarization
-    "polarizationRapType": 1,  # 0: rapidity; 1: pseudorapidity; 2: both
     "calculate_vn": 0,  # 1/0: whether to calculate the
     "MC_sampling": 4,  # 0/1/2/3: whether to perform Monte-Carlo sampling
     # (not required for spectra calculation).
@@ -312,7 +309,6 @@ iSS = {
     "perform_checks": 0,  # flag to perform tests for the sampler
     "include_spectators": 0,  # flag to include spectators
     "local_charge_conservation": 0,  # flag to impose local charge conservation
-    "global_momentum_conservation": 0,  # flag to impose GMC
     "y_LB": -5.0,  # lower bound for y-sampling;
     "y_RB": 5.0,  # upper bound for y-sampling;
     "output_samples_into_files": 0,  # output particle samples into individual files
@@ -338,21 +334,6 @@ iSS = {
     # be smaller than this value, then it
     # is replaced by this value.
     "use_historic_flow_output_format": 0,
-    "eta_s_LB": -0.5,  # lower bound for eta_s sampling; used only when
-    # sampling using total energy flux
-    "eta_s_RB": 0.5,  # upper bound for eta_s sampling.
-    "use_dynamic_maximum": 0,  # 0/1: Whether to automatically reduce the
-    # guessed maximum after some calculations.
-    # Work only when MC_sampling is set to 2.
-    "adjust_maximum_after": 100000,  # Used only when use_dynamic_maximum=1.
-    # After the number of sampling given by
-    # this parameter the guessed maximum is
-    # adjusted.
-    "adjust_maximum_to": 1.2,  # [1,inf]: When guessed maximum is adjusted,
-    # it is adjusted to the "observed maximum"
-    # multiplied by this value. Note that the
-    # "observed maximum" is measured relative to
-    # the guessed maximum. See code for details.
     "calculate_dN_dtau": 0,  # Output dN_dtau table. Only applicable
     # if MC_sampling parameter is set to 1.
     "bin_tau0": 0.6,  # used to generate bins for
