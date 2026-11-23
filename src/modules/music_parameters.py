@@ -5,7 +5,7 @@ src/read_in_parameters.cpp. It ignores keys it does not read and uses
 defaults for missing ones, so a misspelled key would be ignored without a
 warning. check_settings uses this list to reject such keys.
 
-Generated from MUSIC 954ec73 (external_codes/GetModulesFromGit.sh). Update it
+Generated from MUSIC f5c8717 (external_codes/GetModulesFromGit.sh). Update it
 when the MUSIC pin changes; tests/test_music_parameters.py compares it with
 the MUSIC source.
 """
@@ -48,12 +48,16 @@ MUSIC_PARAMETERS = frozenset(
         "Do_FreezeOut_lowtemp",
         "Do_FreezeOut_Yes_1_No_0",
         "dtaudxRatio",
+        "Du_from_ideal_EoM",
+        "Du_from_ideal_EoM_e_dilute",
+        "dynamicGridDetermination",
         "echo_level",
         "ecm",
         "EOS_to_use",
         "eps_freeze_max",
         "eps_freeze_min",
         "eps_switch",
+        "epsFO_low",
         "epsilon_freeze",
         "Eta_fall_off",
         "Eta_grid_size",
@@ -117,6 +121,7 @@ MUSIC_PARAMETERS = frozenset(
         "output_hydro_params_header",
         "output_initial_density_profiles",
         "output_movie_flag",
+        "output_OAM_density_Evolution",
         "output_outofequilibriumsize",
         "output_vorticity",
         "outputBinaryEvolution",
@@ -151,6 +156,7 @@ MUSIC_PARAMETERS = frozenset(
         "string_quench_factor",
         "string_source_sigma_eta",
         "string_source_sigma_x",
+        "string_tilt_update",
         "stringPreEqFlowFactor",
         "stringTransverseShiftFrac",
         "T_dependent_Bulk_to_S_ratio",
