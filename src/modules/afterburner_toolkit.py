@@ -1,9 +1,21 @@
 from src.module_base import BaseModule, time_execution, run_external_command
+from src.modules.SMASH import DEFAULT_SMASH_PARTICLE_FORMAT
 import logging
 import os
 import subprocess
 import shutil
 
+
+
+# afterburner_toolkit read_in_mode for the particle lists CRONOS produces,
+# and the file name the toolkit reads in its results directory
+READ_IN_SMASH_TEXT = 7  # SMASH OSCAR 2013 text, converted by the toolkit
+READ_IN_SMASH_BINARY = 8  # SMASH extended binary OSCAR 2013 list
+READ_IN_ISS_BINARY = 9  # binary iSS list
+READ_IN_FILE_NAMES = {
+    READ_IN_SMASH_BINARY: "particles_binary.bin",
+    READ_IN_ISS_BINARY: "particle_list.bin",
+}
 
 
 def _link(target, link_path):
@@ -47,6 +59,23 @@ class afterburner_toolkit(BaseModule):
         >>> toolkit.run(event_dir)  # Flow and correlation analysis
         >>> toolkit.fetch_output(event_dir)  # Organized analysis results
     """
+
+    def read_in_mode(self):
+        """Return the toolkit read_in_mode for the previous module's output.
+
+        With SMASH, the toolkit reads the binary SMASH list directly (8) or
+        the converted SMASH text list (7); without SMASH, the binary iSS list
+        with the resonance decays (9).
+        """
+        if "SMASH" not in self.full_config.general.modules:
+            return READ_IN_ISS_BINARY
+        smash_config = getattr(self.full_config, "SMASH", None)
+        particles_format = getattr(
+            smash_config, "Particles_Format", DEFAULT_SMASH_PARTICLE_FORMAT
+        )
+        if particles_format == "Oscar2013":
+            return READ_IN_SMASH_TEXT
+        return READ_IN_SMASH_BINARY
 
     def prepare_environment(self, event_dir):
         """Set up afterburner_toolkit execution environment with executables and data tables.
@@ -212,27 +241,12 @@ class afterburner_toolkit(BaseModule):
         logging.debug(f"Created symlink: {symlink_path} -> {input_file}")
         ini_file = os.path.join(afterburner_toolkit_dir, "parameters.dat")
 
-        # If SMASH is used, then read_in_mode should be 7
-        if (
-            "SMASH" in self.full_config.general.modules
-            and self.config.read_in_mode != 7
-        ):
-            self.config.read_in_mode = 7
-            logging.info(
-                "[afterburner_toolkit] SMASH module detected. Setting read_in_mode to 7."
-            )
-        elif (
-            "SMASH" not in self.full_config.general.modules
-            and self.config.read_in_mode == 7
-        ):
-            self.config.read_in_mode = 9
-            logging.info(
-                "[afterburner_toolkit] SMASH module not detected. Setting read_in_mode to default 9. Assuming iSS output format."
-            )
+        read_in_mode = self.read_in_mode()
+        logging.info(f"[afterburner_toolkit] Using read_in_mode {read_in_mode}.")
 
         with open(ini_file, "w") as f:
             f.write(f"echo_level = {self.config.echo_level} #\n")
-            f.write(f"read_in_mode = {self.config.read_in_mode} #\n")
+            f.write(f"read_in_mode = {read_in_mode} #\n")
             f.write(f"ecoOutput = {self.config.ecoOutput} #\n")
             f.write(f"analyze_flow = {self.config.analyze_flow} #\n")
             f.write(f"analyze_HBT = {self.config.analyze_HBT} #\n")
@@ -397,8 +411,9 @@ class afterburner_toolkit(BaseModule):
         logging.info("[afterburner_toolkit] Running afterburner_toolkit...")
 
         cwd = os.getcwd()
-        # Converter step for SMASH output
-        if "SMASH" in self.full_config.general.modules:
+        read_in_mode = self.read_in_mode()
+        # Converter step for the SMASH text output
+        if read_in_mode == READ_IN_SMASH_TEXT:
             try:
                 os.chdir(afterburner_toolkit_dir)
                 kwargs = {"check": True}
@@ -445,14 +460,16 @@ class afterburner_toolkit(BaseModule):
             finally:
                 os.chdir(cwd)
         else:
-            # If there is no SMASH, then we assume that the input file is already in the correct format and just move it to results/particle_list.dat
+            # The SMASH binary list and the iSS binary list are read directly
             results_dir = os.path.join(afterburner_toolkit_dir, "results")
             if not os.path.exists(results_dir):
                 os.makedirs(results_dir)
             src_file = os.path.join(
                 afterburner_toolkit_dir, self.config.input_filename
             )
-            dst_file = os.path.join(results_dir, "particle_list.bin")
+            dst_file = os.path.join(
+                results_dir, READ_IN_FILE_NAMES[read_in_mode]
+            )
             if os.path.exists(src_file):
                 shutil.copy2(src_file, dst_file)
                 logging.info(

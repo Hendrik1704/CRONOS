@@ -17,6 +17,17 @@ MUSIC_FINISHED_MESSAGE = "Finished."
 MUSIC_MAX_TIME_MESSAGE = "Maximum allowed time reached."
 
 
+def format_music_value(value):
+    """Format a configuration value for the MUSIC parameter file.
+
+    MUSIC reads one token per parameter and converts it with stoi or stod, so
+    booleans are written as 0 or 1.
+    """
+    if isinstance(value, bool):
+        return str(int(value))
+    return str(value)
+
+
 def music_evolution_finished(log_path):
     """Return True if the MUSIC log shows that the evolution ended normally.
 
@@ -136,15 +147,10 @@ class MUSIC(BaseModule):
 
         Key tasks:
         - Determines input filename from module execution order
-        - Generates comprehensive MUSIC parameter file with all physics settings
+        - Writes every key of the MUSIC configuration section to the
+          parameter file (check_settings rejects keys MUSIC does not read)
         - Links initial conditions from previous module output
         - Copies parameter file to results directory for iSS module access
-
-        The parameter file includes settings for:
-        - Grid configuration (size, spacing, dimensions)
-        - Evolution parameters (time step, duration, freeze-out criteria)
-        - Physics options (viscosity, EOS, transport coefficients)
-        - Output settings (evolution data, freeze-out surface format)
 
         Args:
             event_dir (str): Path to event-specific directory containing results
@@ -155,9 +161,6 @@ class MUSIC(BaseModule):
         """
         logging.info(f"[MUSIC] Create input file...")
         current_module_index = self.full_config.general.modules.index("MUSIC")
-        self.config.Initial_Distribution_input_filename = (
-            f"output_{current_module_index-1}.dat"
-        )
 
         MUSIC_dir = os.path.join(event_dir, "MUSIC")
         if not os.path.exists(MUSIC_dir):
@@ -166,160 +169,16 @@ class MUSIC(BaseModule):
             )
         ini_file = os.path.join(MUSIC_dir, "parameters_MUSIC.ini")
 
+        # Every MUSIC setting is passed on, check_settings has rejected the
+        # keys MUSIC does not read
+        parameters = self.config.to_dict()
+        parameters["Initial_Distribution_input_filename"] = (
+            f"../results/output_{current_module_index - 1}.dat"
+        )
         with open(ini_file, "w") as f:
-            f.write(f"echo_level {self.config.echo_level}\n")
-            f.write(f"mode {self.config.mode}\n")
-            f.write(f"beastMode {self.config.beastMode}\n")
-            f.write(f"Initial_profile {self.config.Initial_profile}\n")
-            f.write(
-                f"initialize_with_entropy {self.config.initialize_with_entropy}\n"
-            )
-            f.write(
-                f"Initial_Distribution_input_filename ../results/{self.config.Initial_Distribution_input_filename}\n"
-            )
-            f.write(f"s_factor {self.config.s_factor}\n")
-            f.write(f"preEqVisFactor {self.config.preEqVisFactor}\n")
-            f.write(f"boost_invariant {self.config.boost_invariant}\n")
-            f.write(f"Initial_time_tau_0 {self.config.Initial_time_tau_0}\n")
-            f.write(
-                f"Total_evolution_time_tau {self.config.Total_evolution_time_tau}\n"
-            )
-            f.write(f"Delta_Tau {self.config.Delta_Tau}\n")
-            f.write(f"Eta_grid_size {self.config.Eta_grid_size}\n")
-            f.write(f"Grid_size_in_eta {self.config.Grid_size_in_eta}\n")
-            f.write(f"X_grid_size_in_fm {self.config.X_grid_size_in_fm}\n")
-            f.write(f"Y_grid_size_in_fm {self.config.Y_grid_size_in_fm}\n")
-            f.write(f"Grid_size_in_x {self.config.Grid_size_in_x}\n")
-            f.write(f"Grid_size_in_y {self.config.Grid_size_in_y}\n")
-            f.write(f"gridPadding {self.config.gridPadding}\n")
-            f.write(f"EOS_to_use {self.config.EOS_to_use}\n")
-            f.write(
-                f"quest_revert_strength {self.config.quest_revert_strength}\n"
-            )
-            f.write(
-                f"FlagResumTransportCoeff {self.config.FlagResumTransportCoeff}\n"
-            )
-            f.write(f"FlagResetCausality {self.config.FlagResetCausality}\n")
-            f.write(
-                f"resumTransCoeffAlpha {self.config.resumTransCoeffAlpha}\n"
-            )
-            f.write(f"turn_on_bulk_chem {self.config.turn_on_bulk_chem}\n")
-            f.write(f"chem_rate_C {self.config.chem_rate_C}\n")
-            f.write(
-                f"Viscosity_Flag_Yes_1_No_0 {self.config.Viscosity_Flag_Yes_1_No_0}\n"
-            )
-            f.write(
-                f"Include_Shear_Visc_Yes_1_No_0 {self.config.Include_Shear_Visc_Yes_1_No_0}\n"
-            )
-            f.write(f"Shear_to_S_ratio {self.config.Shear_to_S_ratio}\n")
-            f.write(
-                f"T_dependent_Shear_to_S_ratio {self.config.T_dependent_Shear_to_S_ratio}\n"
-            )
-            f.write(
-                f"shear_viscosity_3_eta_over_s_T_kink_in_GeV {self.config.shear_viscosity_3_eta_over_s_T_kink_in_GeV}\n"
-            )
-            f.write(
-                f"shear_viscosity_3_eta_over_s_low_T_slope_in_GeV {self.config.shear_viscosity_3_eta_over_s_low_T_slope_in_GeV}\n"
-            )
-            f.write(
-                f"shear_viscosity_3_eta_over_s_high_T_slope_in_GeV {self.config.shear_viscosity_3_eta_over_s_high_T_slope_in_GeV}\n"
-            )
-            f.write(
-                f"shear_viscosity_3_eta_over_s_at_kink {self.config.shear_viscosity_3_eta_over_s_at_kink}\n"
-            )
-            f.write(
-                f"Include_Bulk_Visc_Yes_1_No_0 {self.config.Include_Bulk_Visc_Yes_1_No_0}\n"
-            )
-            f.write(
-                f"T_dependent_zeta_over_s {self.config.T_dependent_zeta_over_s}\n"
-            )
-            f.write(
-                f"bulk_viscosity_10_max {self.config.bulk_viscosity_10_max}\n"
-            )
-            f.write(
-                f"bulk_viscosity_10_width_high {self.config.bulk_viscosity_10_width_high}\n"
-            )
-            f.write(
-                f"bulk_viscosity_10_width_low {self.config.bulk_viscosity_10_width_low}\n"
-            )
-            f.write(
-                f"bulk_viscosity_10_T_peak {self.config.bulk_viscosity_10_T_peak}\n"
-            )
-            f.write(
-                f"Include_second_order_terms {self.config.Include_second_order_terms}\n"
-            )
-            f.write(
-                f"Include_vorticity_terms {self.config.Include_vorticity_terms}\n"
-            )
-            f.write(
-                f"Include_Rhob_Yes_1_No_0 {self.config.Include_Rhob_Yes_1_No_0}\n"
-            )
-            f.write(
-                f"turn_on_baryon_diffusion {self.config.turn_on_baryon_diffusion}\n"
-            )
-            f.write(f"kappa_coefficient {self.config.kappa_coefficient}\n")
-            f.write(
-                f"output_hydro_debug_info {self.config.output_hydro_debug_info}\n"
-            )
-            f.write(
-                f"output_evolution_data {self.config.output_evolution_data}\n"
-            )
-            f.write(f"output_movie_flag {self.config.output_movie_flag}\n")
-            f.write(
-                f"output_evolution_T_cut {self.config.output_evolution_T_cut}\n"
-            )
-            f.write(
-                f"output_evolution_e_cut {self.config.output_evolution_e_cut}\n"
-            )
-            f.write(
-                f"output_evolution_ideal_only {self.config.output_evolution_ideal_only}\n"
-            )
-            f.write(
-                f"outputBinaryEvolution {self.config.outputBinaryEvolution}\n"
-            )
-            f.write(
-                f"output_evolution_every_N_eta {self.config.output_evolution_every_N_eta}\n"
-            )
-            f.write(
-                f"output_evolution_every_N_y {self.config.output_evolution_every_N_y}\n"
-            )
-            f.write(
-                f"output_evolution_every_N_x {self.config.output_evolution_every_N_x}\n"
-            )
-            f.write(
-                f"output_evolution_every_N_timesteps {self.config.output_evolution_every_N_timesteps}\n"
-            )
-            f.write(
-                f"Do_FreezeOut_Yes_1_No_0 {self.config.Do_FreezeOut_Yes_1_No_0}\n"
-            )
-            f.write(
-                f"Do_FreezeOut_lowtemp {self.config.Do_FreezeOut_lowtemp}\n"
-            )
-            f.write(
-                f"freeze_out_tau_start_max {self.config.freeze_out_tau_start_max}\n"
-            )
-            f.write(f"freeze_out_method {self.config.freeze_out_method}\n")
-            f.write(
-                f"freeze_surface_in_binary {self.config.freeze_surface_in_binary}\n"
-            )
-            f.write(
-                f"average_surface_over_this_many_time_steps {self.config.average_surface_over_this_many_time_steps}\n"
-            )
-            f.write(f"freeze_Ncell_x_step {self.config.freeze_Ncell_x_step}\n")
-            f.write(f"freeze_Ncell_y_step {self.config.freeze_Ncell_y_step}\n")
-            f.write(
-                f"freeze_Ncell_eta_step {self.config.freeze_Ncell_eta_step}\n"
-            )
-            f.write(f"freeze_eps_flag {self.config.freeze_eps_flag}\n")
-            f.write(f"N_freeze_out {self.config.N_freeze_out}\n")
-            f.write(
-                f"use_eps_for_freeze_out {self.config.use_eps_for_freeze_out}\n"
-            )
-            f.write(f"T_freeze {self.config.T_freeze}\n")
-            f.write(f"eps_switch {self.config.eps_switch}\n")
-            f.write(f"eps_freeze_max {self.config.eps_freeze_max}\n")
-            f.write(f"eps_freeze_min {self.config.eps_freeze_min}\n")
-            f.write(f"EndOfData\n")
+            for key, value in parameters.items():
+                f.write(f"{key} {format_music_value(value)}\n")
+            f.write("EndOfData\n")
 
         logging.info("[MUSIC] Input file created successfully.")
 

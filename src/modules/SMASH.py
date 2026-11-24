@@ -6,6 +6,39 @@ import shutil
 
 # SMASH output directory relative to the SMASH working directory
 SMASH_OUTPUT_DIR = os.path.join("data", "0")
+# SMASH List modus reads the files <File_Prefix><n>, starting at Shift_Id
+SMASH_INPUT_PREFIX = "OSCAR"
+OSCAR2013_HEADER = "#!OSCAR2013"
+# SMASH formats for the final particle list: binary or human-readable text
+SMASH_PARTICLE_FORMATS = ("Oscar2013_bin", "Oscar2013")
+DEFAULT_SMASH_PARTICLE_FORMAT = "Oscar2013_bin"
+
+
+def smash_particle_file(particles_format, extended):
+    """Return the name of the particle list SMASH writes in its output dir."""
+    if particles_format == "Oscar2013":
+        return "particle_lists.oscar"
+    if extended:
+        return "particles_oscar2013_extended.bin"
+    return "particles_oscar2013.bin"
+
+
+def count_oscar2013_events(path):
+    """Return the number of events in an OSCAR 2013 particle list.
+
+    Raises:
+        ValueError: If the file is not an OSCAR 2013 particle list.
+    """
+    with open(path, "rb") as f:
+        if not f.readline().startswith(OSCAR2013_HEADER.encode()):
+            raise ValueError(
+                f"{path} is not an OSCAR 2013 particle list; SMASH reads "
+                "the OSCAR 2013 output of iSS."
+            )
+        # event footers: "# event <n> end 0 impact 0.000"
+        return sum(
+            1 for line in f if line.startswith(b"# event") and b" end " in line
+        )
 
 
 class SMASH(BaseModule):
@@ -25,8 +58,8 @@ class SMASH(BaseModule):
     - Extended output for analysis toolkit compatibility
 
     Module workflow:
-    1. Links SMASH executable, particle tables, and conversion scripts
-    2. Converts iSS output from OSCAR1997A to OSCAR2013 format
+    1. Links SMASH executable
+    2. Links the OSCAR 2013 particle list of iSS as SMASH input
     3. Generates SMASH parameter file with collision settings
     4. Executes SMASH hadronic evolution with memory monitoring
     5. Outputs final particle distributions for analysis
@@ -43,37 +76,24 @@ class SMASH(BaseModule):
         >>> smash.fetch_output(event_dir)  # Final hadron distributions
     """
 
+    def particles_format(self):
+        """Return the SMASH format of the final particle list."""
+        return getattr(
+            self.config, "Particles_Format", DEFAULT_SMASH_PARTICLE_FORMAT
+        )
+
     def prepare_environment(self, event_dir):
         """Set up SMASH execution environment with executable and data files.
 
-        Creates SMASH directory structure and establishes symbolic links to:
-        - SMASH executable (smash)
-        - Particle data tables (iSS_tables for format conversion)
-        - OSCAR format conversion script (convert_OSCAR1997A_to_OSCAR2013.py)
-
-        The conversion script is needed to transform iSS output from OSCAR1997A
-        format to OSCAR2013 format that SMASH can process.
+        Links the SMASH executable into the SMASH directory.
 
         Args:
             event_dir (str): Path to event-specific directory where SMASH will execute.
 
         Raises:
-            FileNotFoundError: If SMASH executable or required scripts are missing.
+            FileNotFoundError: If the SMASH executable is missing.
         """
         logging.info(f"[SMASH] Preparing environment in {event_dir}...")
-
-        # iSS tables needed for converter script
-        iss_tables_path = os.path.join(
-            self.project_root, "external_codes", "iSS", "iSS_tables"
-        )
-        if os.path.exists(iss_tables_path):
-            os.symlink(
-                iss_tables_path, os.path.join(event_dir, "SMASH", "iSS_tables")
-            )
-        else:
-            raise FileNotFoundError(
-                f"[SMASH] Required directory {iss_tables_path} does not exist."
-            )
 
         smash_exe_path = os.path.join(
             self.project_root, "external_codes", "smash", "build", "smash"
@@ -85,21 +105,6 @@ class SMASH(BaseModule):
         else:
             raise FileNotFoundError(
                 f"[SMASH] Required executable {smash_exe_path} does not exist."
-            )
-
-        oscar_script_path = os.path.join(
-            self.project_root, "utilities", "convert_OSCAR1997A_to_OSCAR2013.py"
-        )
-        if os.path.exists(oscar_script_path):
-            os.symlink(
-                oscar_script_path,
-                os.path.join(
-                    event_dir, "SMASH", "convert_OSCAR1997A_to_OSCAR2013.py"
-                ),
-            )
-        else:
-            raise FileNotFoundError(
-                f"[SMASH] Required script {oscar_script_path} does not exist."
             )
 
     def prepare_input(self, event_dir):
@@ -132,11 +137,12 @@ class SMASH(BaseModule):
 
         Notes:
             SMASH uses YAML format for configuration, unlike other modules
-            that use INI format. The particle input must be in OSCAR format.
+            that use INI format. The particle input is the OSCAR 2013
+            particle list of iSS.
         """
         logging.info(f"[SMASH] Create input file...")
         current_module_index = self.full_config.general.modules.index("SMASH")
-        self.config.input_filename = f"output_{current_module_index-1}.dat"
+        input_filename = f"output_{current_module_index-1}.dat"
 
         smash_dir = os.path.join(event_dir, "SMASH")
         if not os.path.exists(smash_dir):
@@ -144,48 +150,20 @@ class SMASH(BaseModule):
                 f"[SMASH] Required directory {smash_dir} does not exist."
             )
 
-        input_file = os.path.join(
-            event_dir, "results", self.config.input_filename
+        # iSS writes an OSCAR 2013 particle list, which SMASH reads directly
+        input_file = os.path.abspath(
+            os.path.join(event_dir, "results", input_filename)
         )
-        input_file = os.path.abspath(input_file)  # resolve relative path
-        symlink_path = os.path.join(smash_dir, self.config.input_filename)
-
+        symlink_path = os.path.join(smash_dir, f"{SMASH_INPUT_PREFIX}0")
         if os.path.exists(symlink_path) or os.path.islink(symlink_path):
             os.remove(symlink_path)
-
         os.symlink(input_file, symlink_path)
         logging.debug(f"Created symlink: {symlink_path} -> {input_file}")
 
-        # Convert the iSS output OSCAR1997A to OSCAR2013 using the provided script
-        convert_script = "convert_OSCAR1997A_to_OSCAR2013.py"
-        cwd = os.getcwd()
-        try:
-            os.chdir(smash_dir)
-            result = run_external_command(
-                [
-                    "python3",
-                    convert_script,
-                    "./iSS_tables/pdg-SMASH.dat",
-                    self.config.input_filename,
-                    "OSCAR0",
-                    "--seed",
-                    str(self.full_config.general.random_seed),
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-                memory_threshold_mb=self.full_config.general.memory_threshold_mb,
-                module_name="SMASH-convert",
-            )
-            num_events = int(result["stdout"].strip())
-            logging.info(
-                f"[SMASH] Number of events set to {num_events} from Cooper-Frye FO..."
-            )
-        except subprocess.CalledProcessError as e:
-            logging.error(f"[SMASH] Execution failed: {e}")
-            raise
-        finally:
-            os.chdir(cwd)
+        num_events = count_oscar2013_events(input_file)
+        logging.info(
+            f"[SMASH] Number of events set to {num_events} from Cooper-Frye FO..."
+        )
 
         ini_file = os.path.join(smash_dir, "parameters_SMASH.yaml")
 
@@ -215,7 +193,7 @@ class SMASH(BaseModule):
             f.write(f"Output:\n")
             f.write(f"    Output_Interval: 100.0\n")
             f.write(f"    Particles:\n")
-            f.write(f'        Format:          ["Oscar2013"]\n')
+            f.write(f'        Format:          ["{self.particles_format()}"]\n')
             if afterburner_toolkit:
                 f.write(f"        Extended:          true\n")
 
@@ -235,7 +213,7 @@ class SMASH(BaseModule):
                 f"        # ./smash -i <path to config file> -c 'Modi: {{ List: {{ File_Directory: <path to file that is read in> }} }}'\n"
             )
             f.write(f"        File_Directory: .\n")
-            f.write(f'        File_Prefix: "OSCAR"\n')
+            f.write(f'        File_Prefix: "{SMASH_INPUT_PREFIX}"\n')
             f.write(f"        Shift_Id: 0\n")
 
         logging.info("[SMASH] Input file created successfully.")
@@ -354,7 +332,13 @@ class SMASH(BaseModule):
         logging.info("[SMASH] Data successfully processed...")
         current_module_index = self.full_config.general.modules.index("SMASH")
         src_file = os.path.join(
-            event_dir, "SMASH", SMASH_OUTPUT_DIR, "particle_lists.oscar"
+            event_dir,
+            "SMASH",
+            SMASH_OUTPUT_DIR,
+            smash_particle_file(
+                self.particles_format(),
+                "afterburner_toolkit" in self.full_config.general.modules,
+            ),
         )
         dst_file = os.path.join(
             event_dir, "results", f"output_{current_module_index}.dat"

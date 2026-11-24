@@ -1204,6 +1204,32 @@ class TestModuleFailuresPropagate(TestPhysicsModuleBase):
         with pytest.raises(subprocess.CalledProcessError):
             module.run(self.event_dir)
 
+    @pytest.mark.parametrize(
+        "music, table",
+        [
+            ({"EOS_to_use": 9}, "hrg_hotqcd_eos_binary.dat"),
+            ({"EOS_to_use": 91}, "hrg_hotqcd_eos_SMASH_binary.dat"),
+            (None, "hrg_hotqcd_eos_SMASH_binary.dat"),
+        ],
+    )
+    def test_entropy_matching_uses_the_music_eos_table(self, music, table):
+        os.makedirs(os.path.join(self.event_dir, "entropy_matching"))
+        full_config = {
+            "general": general_config(["KoMPoST", "entropy_matching", "MUSIC"])
+        }
+        if music is not None:
+            full_config["MUSIC"] = music
+        config = Configuration({"matching_type": 0, "nu_eff": 40.0})
+        module = EntropyMatching(
+            config, Configuration(full_config), self.project_root, "0"
+        )
+        with patch.object(
+            sys.modules["src.modules.entropy_matching"], "run_external_command"
+        ) as mock_run_command:
+            module.run(self.event_dir)
+        cmd = mock_run_command.call_args[0][0]
+        assert cmd[4] == os.path.join("EOS", "hotQCD", table)
+
     @patch.object(sys.modules["src.modules.iSS"], "run_external_command", side_effect=failing_command)
     def test_iss_run(self, mock_run_command):
         os.makedirs(os.path.join(self.event_dir, "iSS"))
@@ -1222,27 +1248,55 @@ class TestModuleFailuresPropagate(TestPhysicsModuleBase):
         with pytest.raises(subprocess.CalledProcessError):
             module.run(self.event_dir)
 
-    @patch.object(
-        sys.modules["src.modules.SMASH"], "run_external_command", side_effect=failing_command
-    )
-    def test_smash_converter(self, mock_run_command):
+    def test_smash_rejects_input_that_is_not_oscar2013(self):
         os.makedirs(os.path.join(self.event_dir, "SMASH"))
-        open(os.path.join(self.event_dir, "results", "output_0.dat"), "w")
+        with open(os.path.join(self.event_dir, "results", "output_0.dat"), "w") as f:
+            f.write("OSC1997A\nfinal_id_p_x\n")
         full_config = Configuration(
             {"general": general_config(["iSS", "SMASH"])}
         )
         module = SMASH(Configuration({}), full_config, self.project_root, "0")
-        with pytest.raises(subprocess.CalledProcessError):
+        with pytest.raises(ValueError, match="not an OSCAR 2013"):
             module.prepare_input(self.event_dir)
         assert not os.path.exists(
             os.path.join(self.event_dir, "SMASH", "parameters_SMASH.yaml")
         )
 
-    def make_afterburner(self, modules):
+    def make_afterburner(self, modules, smash_format="Oscar2013"):
         os.makedirs(os.path.join(self.event_dir, "afterburner_toolkit"))
-        full_config = Configuration({"general": general_config(modules)})
+        full_config = Configuration(
+            {
+                "general": general_config(modules),
+                "SMASH": {"Particles_Format": smash_format},
+            }
+        )
         config = Configuration({"input_filename": "output_1.dat"})
         return afterburner_toolkit(config, full_config, self.project_root, "0")
+
+    @pytest.mark.parametrize(
+        "modules, smash_format, read_in_mode, staged_file",
+        [
+            (["SMASH", "afterburner_toolkit"], "Oscar2013_bin", 8, "particles_binary.bin"),
+            (["iSS", "afterburner_toolkit"], "Oscar2013_bin", 9, "particle_list.bin"),
+        ],
+    )
+    def test_afterburner_reads_binary_lists_directly(
+        self, modules, smash_format, read_in_mode, staged_file
+    ):
+        module = self.make_afterburner(modules, smash_format)
+        assert module.read_in_mode() == read_in_mode
+        toolkit_dir = os.path.join(self.event_dir, "afterburner_toolkit")
+        with open(os.path.join(toolkit_dir, "output_1.dat"), "w") as f:
+            f.write("particles")
+        with patch.object(
+            sys.modules["src.modules.afterburner_toolkit"], "run_external_command"
+        ) as mock_run_command:
+            module.run(self.event_dir)
+        # only the analysis runs, no converter
+        mock_run_command.assert_called_once()
+        assert "hadronic_afterburner_tools" in mock_run_command.call_args[0][0][0]
+        with open(os.path.join(toolkit_dir, "results", staged_file)) as f:
+            assert f.read() == "particles"
 
     @patch.object(
         sys.modules["src.modules.afterburner_toolkit"], "run_external_command",
@@ -1324,7 +1378,12 @@ class TestModuleResume(TestPhysicsModuleBase):
         full_config = Configuration(
             {"general": general_config(["iSS", "SMASH"])}
         )
-        module = SMASH(Configuration({}), full_config, self.project_root, "0")
+        module = SMASH(
+            Configuration({"Particles_Format": "Oscar2013"}),
+            full_config,
+            self.project_root,
+            "0",
+        )
         with patch.object(
             sys.modules["src.modules.SMASH"], "run_external_command", side_effect=run_smash
         ):
@@ -1333,9 +1392,22 @@ class TestModuleResume(TestPhysicsModuleBase):
         with open(os.path.join(self.event_dir, "results", "output_1.dat")) as f:
             assert f.read() == "particles"
 
-    def test_smash_event_count_is_not_kept_in_the_config(self):
+    def test_smash_reads_the_iss_oscar2013_output(self):
         os.makedirs(os.path.join(self.event_dir, "SMASH"))
-        open(os.path.join(self.event_dir, "results", "output_0.dat"), "w")
+        lines = [
+            "#!OSCAR2013 particle_lists t x y z mass p0 px py pz pdg ID charge",
+            "# Units: fm fm fm fm GeV GeV GeV GeV GeV none none e",
+        ]
+        # iSS skips empty events, so the event numbers can have gaps
+        for event in [1, 2, 4, 5, 6, 7, 9]:
+            lines += [
+                f"# event {event} out 1",
+                "1.0 0.1 0.2 0.3 0.138 0.5 0.1 0.2 0.3 211 1 1",
+                f"# event {event} end 0 impact 0.000",
+            ]
+        input_file = os.path.join(self.event_dir, "results", "output_0.dat")
+        with open(input_file, "w") as f:
+            f.write("\n".join(lines) + "\n")
         full_config = Configuration(
             {"general": general_config(["iSS", "SMASH"])}
         )
@@ -1343,15 +1415,17 @@ class TestModuleResume(TestPhysicsModuleBase):
             {"Delta_Time": 0.1, "End_Time": 100.0, "No_Collisions": 1}
         )
         module = SMASH(config, full_config, self.project_root, "0")
-        with patch.object(
-            sys.modules["src.modules.SMASH"], "run_external_command",
-            return_value={"return_code": 0, "stdout": "7\n"},
-        ):
-            module.prepare_input(self.event_dir)
-        with open(
-            os.path.join(self.event_dir, "SMASH", "parameters_SMASH.yaml")
-        ) as f:
-            assert "Nevents:       7\n" in f.read()
+
+        module.prepare_input(self.event_dir)
+
+        smash_dir = os.path.join(self.event_dir, "SMASH")
+        with open(os.path.join(smash_dir, "parameters_SMASH.yaml")) as f:
+            parameters = f.read()
+        assert "Nevents:       7\n" in parameters
+        assert 'File_Prefix: "OSCAR"' in parameters
+        assert os.path.realpath(os.path.join(smash_dir, "OSCAR0")) == (
+            os.path.realpath(input_file)
+        )
         assert "Nevents" not in config.to_dict()
 
 

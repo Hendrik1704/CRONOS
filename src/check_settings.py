@@ -1,11 +1,27 @@
+import difflib
 import logging
 import math
+
+from src.modules.iss_parameters import (
+    ISS_CRONOS_CONTROLLED_PARAMETERS,
+    ISS_PARAMETERS,
+)
+from src.modules.SMASH import SMASH_PARTICLE_FORMATS
+from src.modules.music_parameters import (
+    MUSIC_CRONOS_CONTROLLED_PARAMETERS,
+    MUSIC_PARAMETERS,
+)
 
 # MUSIC Initial_profile values that read the initial state from a file.
 # 9 and 91-94 read one transverse slice (boost-invariant), 95 reads a (3+1)D
 # profile (MUSIC init.cpp).
 MUSIC_2D_FILE_PROFILES = (9, 91, 92, 93, 94)
 MUSIC_3D_FILE_PROFILES = (95,)
+
+# MUSIC EOS_to_use values CRONOS supports: the hotQCD EoS matched to the UrQMD
+# (9) or SMASH (91) hadron list. GetModulesFromGit.sh downloads only these
+# tables, and iSS samples the hadrons of the matching list.
+MUSIC_SUPPORTED_EOS = (9, 91)
 
 # iSS afterburner types (iSS readindata.cpp)
 ISS_AFTERBURNER_PDG_DECAY = 0
@@ -28,6 +44,84 @@ def iss_effective_afterburner_type(music_eos, iss_afterburner_type):
     if iss_afterburner_type in (ISS_AFTERBURNER_URQMD, ISS_AFTERBURNER_SMASH):
         return iss_afterburner_type
     return ISS_AFTERBURNER_PDG_DECAY
+
+
+def _parameter_errors(code, section, known, controlled, list_file, is_valid):
+    """Return the problems with the keys and values of a module section.
+
+    The external code ignores keys it does not read, so a misspelled key would
+    be dropped without a warning.
+    """
+    errors = []
+    spelling = {key.lower(): key for key in known}
+    for key, value in section.to_dict().items():
+        if key in controlled:
+            errors.append(
+                f"{code} parameter '{key}' is set by CRONOS, remove it from "
+                "the configuration."
+            )
+        elif key not in known:
+            if key.lower() in spelling:
+                hint = f" {code} spells it '{spelling[key.lower()]}'."
+            else:
+                close = difflib.get_close_matches(key, known, n=1)
+                hint = f" Did you mean '{close[0]}'?" if close else ""
+            errors.append(
+                f"{code} does not read the parameter '{key}'.{hint} The "
+                f"parameters {code} reads are listed in {list_file}."
+            )
+        else:
+            message = is_valid(value)
+            if message:
+                errors.append(
+                    f"{code} parameter '{key}' must be {message}, "
+                    f"not {value!r}."
+                )
+    return errors
+
+
+def music_parameter_errors(music_config):
+    """Return the problems with the keys and values of the MUSIC section.
+
+    MUSIC reads one token per value, so a value with spaces would be cut.
+    """
+
+    def is_valid(value):
+        if isinstance(value, (bool, int, float)) or (
+            isinstance(value, str) and len(value.split()) == 1
+        ):
+            return None
+        return "a number or a string without spaces"
+
+    return _parameter_errors(
+        "MUSIC",
+        music_config,
+        MUSIC_PARAMETERS,
+        MUSIC_CRONOS_CONTROLLED_PARAMETERS,
+        "src/modules/music_parameters.py",
+        is_valid,
+    )
+
+
+def iss_parameter_errors(iss_config):
+    """Return the problems with the keys and values of the iSS section.
+
+    iSS converts every value to a number.
+    """
+
+    def is_valid(value):
+        if isinstance(value, (bool, int, float)):
+            return None
+        return "a number"
+
+    return _parameter_errors(
+        "iSS",
+        iss_config,
+        ISS_PARAMETERS,
+        ISS_CRONOS_CONTROLLED_PARAMETERS,
+        "src/modules/iss_parameters.py",
+        is_valid,
+    )
 
 
 def check_settings(config):
@@ -72,6 +166,20 @@ def check_settings(config):
             valid = False
 
     if active("MUSIC"):
+        for error in music_parameter_errors(config.MUSIC):
+            logging.error(error)
+            valid = False
+
+        if config.MUSIC.EOS_to_use not in MUSIC_SUPPORTED_EOS:
+            logging.error(
+                f"MUSIC EOS_to_use {config.MUSIC.EOS_to_use} is not "
+                "supported: use 9 (hotQCD matched to UrQMD hadrons, for iSS "
+                "decays) or 91 (hotQCD matched to SMASH hadrons). Another EoS "
+                "needs its tables in external_codes/GetModulesFromGit.sh and "
+                "a hadron list in iSS that matches it."
+            )
+            valid = False
+
         music_boost_invariant = config.MUSIC.boost_invariant != 0
         # The file profiles are either one transverse slice or a (3+1)D profile
         profile = config.MUSIC.Initial_profile
@@ -116,6 +224,11 @@ def check_settings(config):
         )
         valid = False
 
+    if active("iSS"):
+        for error in iss_parameter_errors(config.iSS):
+            logging.error(error)
+            valid = False
+
     if active("MUSIC") and active("iSS"):
         # iSS hydro_mode 1 reads a boost-invariant MUSIC surface,
         # hydro_mode 2 a (3+1)D MUSIC surface
@@ -136,16 +249,14 @@ def check_settings(config):
             if afterburner_type != ISS_AFTERBURNER_SMASH:
                 logging.error(
                     "With SMASH, iSS must sample SMASH hadrons: set MUSIC "
-                    "EOS_to_use to 91, or iSS afterburner_type to 2 with a "
-                    "MUSIC EOS_to_use other than 9."
+                    "EOS_to_use to 91."
                 )
                 valid = False
         elif afterburner_type == ISS_AFTERBURNER_SMASH:
             # iSS skips resonance decays for the SMASH afterburner type
             logging.error(
-                "Without SMASH, iSS would skip the resonance decays: MUSIC "
-                "EOS_to_use 91 or iSS afterburner_type 2 (with a MUSIC "
-                "EOS_to_use other than 9) select the SMASH afterburner type."
+                "Without SMASH, iSS would skip the resonance decays: set MUSIC "
+                "EOS_to_use to 9."
             )
             valid = False
 
@@ -173,7 +284,11 @@ def check_settings(config):
             logging.error("KoMPoST3D 'ENERGY_PERTURBATIONS' must be 0 or 1.")
             valid = False
         # Other regulator names are ignored by KoMPoST-3D (no regulation)
-        if kompost3d.Regulator not in ("TwoPass", "KoMPoSTAddition", "NoRegulator"):
+        if kompost3d.Regulator not in (
+            "TwoPass",
+            "KoMPoSTAddition",
+            "NoRegulator",
+        ):
             logging.error(
                 "KoMPoST3D 'Regulator' must be TwoPass, KoMPoSTAddition or "
                 "NoRegulator."
@@ -282,6 +397,27 @@ def check_settings(config):
                 "Mismatch between KoMPoST3D 'NuEffective' and entropy_matching 'nu_eff'."
             )
             valid = False
+
+    if active("SMASH"):
+        particles_format = getattr(
+            config.SMASH, "Particles_Format", SMASH_PARTICLE_FORMATS[0]
+        )
+        if particles_format not in SMASH_PARTICLE_FORMATS:
+            logging.error(
+                f"SMASH Particles_Format {particles_format!r} is not supported: "
+                "use 'Oscar2013_bin' (binary) or 'Oscar2013' (text)."
+            )
+            valid = False
+
+    if active("afterburner_toolkit") and "read_in_mode" in (
+        config.afterburner_toolkit.to_dict()
+    ):
+        logging.error(
+            "afterburner_toolkit read_in_mode is set by CRONOS for the output "
+            "of the previous module (choose the SMASH output with SMASH "
+            "Particles_Format); remove it from the configuration."
+        )
+        valid = False
 
     # Add more checks as needed for other configuration sections
 
