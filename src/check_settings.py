@@ -7,6 +7,11 @@ from src.modules.iss_parameters import (
     ISS_PARAMETERS,
 )
 from src.modules.SMASH import SMASH_PARTICLE_FORMATS
+from src.modules.kompost_parameters import (
+    KOMPOST3D_PARAMETERS,
+    KOMPOST_CRONOS_CONTROLLED_PARAMETERS,
+    KOMPOST_PARAMETERS,
+)
 from src.modules.music_parameters import (
     MUSIC_CRONOS_CONTROLLED_PARAMETERS,
     MUSIC_PARAMETERS,
@@ -124,6 +129,32 @@ def iss_parameter_errors(iss_config):
     )
 
 
+def kompost_parameter_errors(section_name, section_config, known):
+    """Return the problems with the keys and values of a KoMPoST section.
+
+    INIReader reads a value up to an inline comment, so a value must be a
+    number or one word.
+    """
+
+    def is_valid(value):
+        if isinstance(value, (bool, int, float)) or (
+            isinstance(value, str)
+            and len(value.split()) == 1
+            and not any(c in value for c in ";#")
+        ):
+            return None
+        return "a number or a string without spaces, ';' or '#'"
+
+    return _parameter_errors(
+        section_name,
+        section_config,
+        known,
+        KOMPOST_CRONOS_CONTROLLED_PARAMETERS,
+        "src/modules/kompost_parameters.py",
+        is_valid,
+    )
+
+
 def check_settings(config):
     """
     Check the configuration settings for consistency and validity.
@@ -224,6 +255,15 @@ def check_settings(config):
         )
         valid = False
 
+    for name, known in [
+        ("KoMPoST", KOMPOST_PARAMETERS),
+        ("KoMPoST3D", KOMPOST3D_PARAMETERS),
+    ]:
+        if active(name):
+            for error in kompost_parameter_errors(name, config[name], known):
+                logging.error(error)
+                valid = False
+
     if active("iSS"):
         for error in iss_parameter_errors(config.iSS):
             logging.error(error)
@@ -257,6 +297,144 @@ def check_settings(config):
             logging.error(
                 "Without SMASH, iSS would skip the resonance decays: set MUSIC "
                 "EOS_to_use to 9."
+            )
+            valid = False
+
+    if "KoMPoST3D" in active_modules and hasattr(config, "KoMPoST3D"):
+        kompost3d = config.KoMPoST3D
+        if "KoMPoST" in active_modules:
+            logging.error("KoMPoST and KoMPoST3D cannot be used together.")
+            valid = False
+        # The input must already be in the KoMPoST-3D T^munu format
+        kompost3d_index = active_modules.index("KoMPoST3D")
+        if (
+            kompost3d_index == 0
+            or active_modules[kompost3d_index - 1] != "from_file_IC"
+        ):
+            logging.error("KoMPoST3D must directly follow from_file_IC.")
+            valid = False
+        # KoMPoST-3D only implements the kinetic theory energy perturbations
+        if kompost3d.EVOLUTION_MODE != 1:
+            logging.error("KoMPoST3D only supports EVOLUTION_MODE = 1.")
+            valid = False
+        if kompost3d.MOMENTUM_PERTURBATIONS != 0:
+            logging.error("KoMPoST3D only supports MOMENTUM_PERTURBATIONS = 0.")
+            valid = False
+        if kompost3d.ENERGY_PERTURBATIONS not in (0, 1):
+            logging.error("KoMPoST3D 'ENERGY_PERTURBATIONS' must be 0 or 1.")
+            valid = False
+        # Other regulator names are ignored by KoMPoST-3D (no regulation)
+        if kompost3d.Regulator not in (
+            "TwoPass",
+            "KoMPoSTAddition",
+            "NoRegulator",
+        ):
+            logging.error(
+                "KoMPoST3D 'Regulator' must be TwoPass, KoMPoSTAddition or "
+                "NoRegulator."
+            )
+            valid = False
+        # KoMPoST-3D smears with a width of 0.1 / (tOut - tIn)
+        if not kompost3d.tIn < kompost3d.tOut:
+            logging.error("KoMPoST3D requires 'tIn' < 'tOut'.")
+            valid = False
+        # KoMPoST-3D writes the full grid but only evolves the cells inside
+        # the bounds, and the bounds index the grid without range checks
+        for start, end, size in [
+            ("xSTART", "xEND", "Ns"),
+            ("ySTART", "yEND", "Ns"),
+            ("etaSTART", "etaEND", "Neta"),
+        ]:
+            first, last, n = kompost3d[start], kompost3d[end], kompost3d[size]
+            if not 0 <= first <= last <= n - 1:
+                logging.error(
+                    f"KoMPoST3D requires 0 <= {start} <= {end} <= {size} - 1."
+                )
+                valid = False
+            elif first != 0 or last != n - 1:
+                logging.warning(
+                    f"KoMPoST3D only evolves {start}..{end} of the {n} grid "
+                    "points, the other cells of the output are zero."
+                )
+        # One event keeps the response tables in memory; the threshold is
+        # also the memory requested from SLURM
+        if config.general.memory_threshold_mb < 10240:
+            logging.warning(
+                "KoMPoST3D needs ~9 GB of memory per event, but "
+                "'memory_threshold_mb' is "
+                f"{config.general.memory_threshold_mb} MB."
+            )
+        if (
+            "from_file_IC" in active_modules
+            and hasattr(config, "from_file_IC")
+            and config.from_file_IC.boost_invariant != 0
+        ):
+            logging.error(
+                "KoMPoST3D requires 'boost_invariant' = 0 in from_file_IC."
+            )
+            valid = False
+        if "MUSIC" in active_modules and hasattr(config, "MUSIC"):
+            music = config.MUSIC
+            # KoMPoST-3D writes 18 columns; MUSIC's profile 95 also reads the
+            # bulk pressure, which entropy_matching appends
+            next_module = (
+                active_modules[kompost3d_index + 1]
+                if kompost3d_index + 1 < len(active_modules)
+                else None
+            )
+            if next_module != "entropy_matching":
+                logging.error(
+                    "entropy_matching must directly follow KoMPoST3D when "
+                    "MUSIC is used."
+                )
+                valid = False
+            # (MUSIC boost_invariant 0 follows from the general rule for
+            # Initial_profile 95)
+            if music.Initial_profile != 95:
+                logging.error(
+                    "KoMPoST3D output requires 'Initial_profile' = 95 in MUSIC."
+                )
+                valid = False
+            if not math.isclose(music.Initial_time_tau_0, kompost3d.tOut):
+                logging.error(
+                    "Mismatch between KoMPoST3D 'tOut' and MUSIC 'Initial_time_tau_0'."
+                )
+                valid = False
+            # MUSIC only takes Nx, Ny, dx and dy from the file header. The eta
+            # grid and the extent of the grid (used for the positions) come
+            # from the MUSIC parameters and must match the KoMPoST3D grid.
+            if music.Grid_size_in_eta != kompost3d.Neta or not math.isclose(
+                music.Eta_grid_size, (kompost3d.Neta - 1) * kompost3d.deta
+            ):
+                logging.error(
+                    "MUSIC 'Grid_size_in_eta' and 'Eta_grid_size' must equal "
+                    "KoMPoST3D 'Neta' and ('Neta' - 1) * 'deta'."
+                )
+                valid = False
+            transverse_size = (kompost3d.Ns - 1) * kompost3d.afm
+            if not (
+                math.isclose(
+                    music.X_grid_size_in_fm, transverse_size, rel_tol=1e-3
+                )
+                and math.isclose(
+                    music.Y_grid_size_in_fm, transverse_size, rel_tol=1e-3
+                )
+            ):
+                logging.error(
+                    "MUSIC 'X_grid_size_in_fm' and 'Y_grid_size_in_fm' must "
+                    "equal KoMPoST3D ('Ns' - 1) * 'afm'."
+                )
+                valid = False
+        if (
+            "entropy_matching" in active_modules
+            and hasattr(config, "entropy_matching")
+            and config.entropy_matching.matching_type == 1
+            and not math.isclose(
+                config.entropy_matching.nu_eff, kompost3d.NuEffective
+            )
+        ):
+            logging.error(
+                "Mismatch between KoMPoST3D 'NuEffective' and entropy_matching 'nu_eff'."
             )
             valid = False
 

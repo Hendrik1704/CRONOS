@@ -3,6 +3,7 @@ import os
 import re
 
 import pytest
+from cpp_source import read_cpp_sources
 
 from src.check_settings import check_settings, iss_parameter_errors
 from src.configuration import Configuration, load_config
@@ -38,10 +39,10 @@ def _write_parameter_file(tmp_path, config):
 )
 def test_parameter_list_matches_iss_source():
     """Regenerate iss_parameters.py when this fails after an iSS update."""
-    source = ""
-    for path in sorted(glob.glob(os.path.join(ISS_SOURCE_DIR, "*.[ch]*"))):
-        with open(path, errors="replace") as f:
-            source += f.read()
+    source = read_cpp_sources(
+        glob.glob(os.path.join(ISS_SOURCE_DIR, "*.cpp"))
+        + glob.glob(os.path.join(ISS_SOURCE_DIR, "*.h"))
+    )
     keys = re.findall(r'(?:getVal|exist)\(\s*"(\w+)"', source)
     assert set(keys) - set(ISS_INTERNAL_PARAMETERS) == ISS_PARAMETERS
     assert set(ISS_CRONOS_CONTROLLED_PARAMETERS) <= ISS_PARAMETERS

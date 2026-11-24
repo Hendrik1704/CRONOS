@@ -2,6 +2,7 @@ import os
 import re
 
 import pytest
+from cpp_source import read_cpp_sources
 
 from src.check_settings import check_settings, music_parameter_errors
 from src.configuration import Configuration, load_config
@@ -42,8 +43,7 @@ def _write_parameter_file(tmp_path, config):
 )
 def test_parameter_list_matches_music_source():
     """Regenerate music_parameters.py when this fails after a MUSIC update."""
-    with open(MUSIC_PARAMETER_SOURCE) as f:
-        source = f.read()
+    source = read_cpp_sources([MUSIC_PARAMETER_SOURCE])
     keys = re.findall(
         r'(?:getParameter|StringFind4)\(\s*input_file,\s*"(\w+)"', source
     )

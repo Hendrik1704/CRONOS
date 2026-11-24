@@ -24,7 +24,7 @@ CRONOS is a comprehensive framework designed to facilitate the simulation and an
 
 - **Initial Conditions**: `from_file_IC` (load from external files)
 - **IPGlasma**: `IPGlasma` (Initial conditions from IP-Glasma model)
-- **Pre-equilibrium**: `KoMPoST` (Kinetic Theory based pre-equilibrium evolution)
+- **Pre-equilibrium**: `KoMPoST` (Kinetic Theory based pre-equilibrium evolution), `KoMPoST3D` (3+1D version for non boost-invariant initial conditions; needs ~9 GB of memory per event)
 - **Entropy Matching**: `entropy_matching` (smooth transition between modules)
 - **Hydrodynamics**: `MUSIC` (3+1D relativistic hydrodynamics)
 - **Particlization**: `iSS` (Cooper-Frye particlization)

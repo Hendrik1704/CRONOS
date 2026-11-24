@@ -4,6 +4,7 @@ set -euo pipefail
 
 rm -rf ipglasma
 rm -rf KoMPoST
+rm -rf KoMPoST-3D
 rm -rf MUSIC
 rm -rf iSS
 rm -rf smash

@@ -1,6 +1,7 @@
 from src.modules.from_file_IC import FromFileIC
 from src.modules.IPGlasma import IPGlasma
 from src.modules.KoMPoST import KoMPoST
+from src.modules.KoMPoST3D import KoMPoST3D
 from src.modules.entropy_matching import EntropyMatching
 from src.modules.MUSIC import MUSIC
 from src.modules.iSS import iSS
@@ -11,6 +12,7 @@ __all__ = [
     "FromFileIC",
     "IPGlasma",
     "KoMPoST",
+    "KoMPoST3D",
     "EntropyMatching",
     "MUSIC",
     "iSS",
