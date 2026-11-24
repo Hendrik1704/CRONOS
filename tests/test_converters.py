@@ -23,10 +23,10 @@ def _import(name: str):
     return module
 
 
-def _write_eos(path: Path):
-    # Simple conformal-like table: e, p = e/3, s (unused), T ~ e^(1/4)
+def _write_eos(path: Path, p_over_e: float = 1.0 / 3.0):
+    # Simple table: e, p = p_over_e * e, s (unused), T ~ e^(1/4)
     e = np.linspace(0.01, 10.0, 200)
-    p = e / 3.0
+    p = p_over_e * e
     T = 0.2 * e**0.25
     np.stack([e, p, np.zeros_like(e), T], axis=1).astype(float).tofile(path)
 
@@ -50,10 +50,34 @@ def test_s_matching_sets_vacuum_below_eos_table(tmp_path: Path):
 
 
 @pytest.mark.unit
+def test_e_matching_writes_the_bulk_pressure(tmp_path: Path):
+    """Pi = e/3 - p_EOS(e): with p = e/4, Pi = e/12 (vacuum below the table)."""
+    k2m = _import("KoMPoST_to_MUSIC")
+    eos = tmp_path / "eos.dat"
+    _write_eos(eos, p_over_e=0.25)
+    e_kompost = np.array([np.nan, 0.0, 1e-3, 0.5, 2.0])
+    e_new, bulk = k2m.e_matching(e_kompost, str(eos))
+    np.testing.assert_array_equal(e_new, e_kompost)
+    np.testing.assert_array_equal(bulk[:3], [0.0, 0.0, 0.0])
+    np.testing.assert_allclose(bulk[3:], e_kompost[3:] / 12.0)
+
+
+@pytest.mark.unit
+def test_s_and_e_matching_use_the_same_bulk_pressure(tmp_path: Path):
+    """Both write the conformal KoMPoST pressure minus p_EOS(e_MUSIC)."""
+    k2m = _import("KoMPoST_to_MUSIC")
+    eos = tmp_path / "eos.dat"
+    _write_eos(eos, p_over_e=0.25)
+    e_kompost = np.array([0.5, 2.0])
+    e_new, bulk = k2m.s_matching(e_kompost, 40.0, str(eos))
+    np.testing.assert_allclose(bulk, e_kompost / 3.0 - e_new / 4.0)
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize("matching", ["0", "1"])
 def test_kompost_to_music_writes_19_columns(tmp_path: Path, matching: str):
     eos = tmp_path / "eos.dat"
-    _write_eos(eos)
+    _write_eos(eos, p_over_e=0.25)
     f_in = tmp_path / "in.txt"
     f_out = tmp_path / "out.txt"
     f_in.write_text(
@@ -71,7 +95,8 @@ def test_kompost_to_music_writes_19_columns(tmp_path: Path, matching: str):
     data = np.loadtxt(f_out, comments="#")
     assert data.shape == (2, 19)
     if matching == "0":
-        assert np.all(data[:, 18] == 0.0)
+        # Pi = e/3 - p_EOS(e) = e/12 for this EOS
+        np.testing.assert_allclose(data[:, 18], [1.0 / 12.0, 2.0 / 12.0])
         np.testing.assert_array_equal(data[:, 3], [1.0, 2.0])
 
 

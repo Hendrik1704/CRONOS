@@ -992,6 +992,32 @@ class TestModuleFailuresPropagate(TestPhysicsModuleBase):
         with pytest.raises(subprocess.CalledProcessError):
             module.run(self.event_dir)
 
+    @pytest.mark.parametrize(
+        "music, table",
+        [
+            ({"EOS_to_use": 9}, "hrg_hotqcd_eos_binary.dat"),
+            ({"EOS_to_use": 91}, "hrg_hotqcd_eos_SMASH_binary.dat"),
+            (None, "hrg_hotqcd_eos_SMASH_binary.dat"),
+        ],
+    )
+    def test_entropy_matching_uses_the_music_eos_table(self, music, table):
+        os.makedirs(os.path.join(self.event_dir, "entropy_matching"))
+        full_config = {
+            "general": general_config(["KoMPoST", "entropy_matching", "MUSIC"])
+        }
+        if music is not None:
+            full_config["MUSIC"] = music
+        config = Configuration({"matching_type": 0, "nu_eff": 40.0})
+        module = EntropyMatching(
+            config, Configuration(full_config), self.project_root, "0"
+        )
+        with patch.object(
+            sys.modules["src.modules.entropy_matching"], "run_external_command"
+        ) as mock_run_command:
+            module.run(self.event_dir)
+        cmd = mock_run_command.call_args[0][0]
+        assert cmd[4] == os.path.join("EOS", "hotQCD", table)
+
     @patch.object(sys.modules["src.modules.iSS"], "run_external_command", side_effect=failing_command)
     def test_iss_run(self, mock_run_command):
         os.makedirs(os.path.join(self.event_dir, "iSS"))
