@@ -258,27 +258,15 @@ class TestKoMPoST(TestPhysicsModuleBase):
         """Test prepare_input creates proper parameter file."""
         config = Configuration(
             {
-                "shear_viscosity": 0.08,
-                "tau0": 0.2,
-                "tauf": 1.0,
-                "dTau": 0.01,
-                "nx": 200,
-                "ny": 200,
-                "dx": 0.1,
-                "dy": 0.1,
-                # Required KoMPoST parameters
                 "tIn": 0.2,
                 "tOut": 1.0,
-                "InputFile": "input.dat",
-                "OutputFileTag": "output",
                 "EtaOverS": 0.08,
                 "EtaOverSTemperatureScale": 0.154,
                 "NuEffective": 47.5,
                 "EVOLUTION_MODE": 1,
                 "ENERGY_PERTURBATIONS": 0,
                 "MOMENTUM_PERTURBATIONS": 0,
-                "DECOMPOSITION_METHOD": 1,
-                "Regulator": 0.5,
+                "Regulator": "KoMPoSTAddition",
                 # EventInput parameters
                 "normFactor": 1.0,
                 "afm": 0.1,
@@ -316,9 +304,17 @@ class TestKoMPoST(TestPhysicsModuleBase):
         # Check parameter file content
         with open(param_file, "r") as f:
             content = f.read()
-            assert "0.08" in content  # shear viscosity
-            assert "0.2" in content  # tau0
-            assert "WriteTmunuBackup = 0" in content
+        for line in [
+            "[KoMPoSTInputs]\ntIn = 0.2\ntOut = 1.0\n",
+            "InputFile = output_0.dat\n",
+            "OutputFileTag = output_1\n",
+            "WriteTmunuBackup = 0\n",
+            "[KoMPoSTParameters]\nEtaOverS = 0.08\n",
+            "Regulator = KoMPoSTAddition\n",
+            "[EventInput]\nnormFactor = 1.0\n",
+            "yEND = 199\n",
+        ]:
+            assert line in content
 
     @patch.object(sys.modules["src.modules.KoMPoST"], "run_external_command")
     def test_run_method(self, mock_run_command):
@@ -437,14 +433,14 @@ class TestKoMPoST3D(TestPhysicsModuleBase):
         with open(param_file) as f:
             content = f.read()
         for line in [
-            "InputFile=output_0.dat",
-            "OutputFileTag=output_1",
-            "WriteTmunuBackup = 0",
-            "NuEffective = 40.0",
-            "normFactor = 1.0",
-            "deta = 0.25",
-            "Neta=65;",
-            "etaEND=64;",
+            "InputFile = output_0.dat\n",
+            "OutputFileTag = output_1\n",
+            "WriteTmunuBackup = 0\n",
+            "NuEffective = 40.0\n",
+            "normFactor = 1.0\n",
+            "deta = 0.25\n",
+            "Neta = 65\n",
+            "etaEND = 64\n",
         ]:
             assert line in content
         assert os.path.islink(

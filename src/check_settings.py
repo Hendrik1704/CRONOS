@@ -7,6 +7,11 @@ from src.modules.iss_parameters import (
     ISS_PARAMETERS,
 )
 from src.modules.SMASH import SMASH_PARTICLE_FORMATS
+from src.modules.kompost_parameters import (
+    KOMPOST3D_PARAMETERS,
+    KOMPOST_CRONOS_CONTROLLED_PARAMETERS,
+    KOMPOST_PARAMETERS,
+)
 from src.modules.music_parameters import (
     MUSIC_CRONOS_CONTROLLED_PARAMETERS,
     MUSIC_PARAMETERS,
@@ -124,6 +129,32 @@ def iss_parameter_errors(iss_config):
     )
 
 
+def kompost_parameter_errors(section_name, section_config, known):
+    """Return the problems with the keys and values of a KoMPoST section.
+
+    INIReader reads a value up to an inline comment, so a value must be a
+    number or one word.
+    """
+
+    def is_valid(value):
+        if isinstance(value, (bool, int, float)) or (
+            isinstance(value, str)
+            and len(value.split()) == 1
+            and not any(c in value for c in ";#")
+        ):
+            return None
+        return "a number or a string without spaces, ';' or '#'"
+
+    return _parameter_errors(
+        section_name,
+        section_config,
+        known,
+        KOMPOST_CRONOS_CONTROLLED_PARAMETERS,
+        "src/modules/kompost_parameters.py",
+        is_valid,
+    )
+
+
 def check_settings(config):
     """
     Check the configuration settings for consistency and validity.
@@ -223,6 +254,15 @@ def check_settings(config):
             f"must equal KoMPoST tOut ({config.KoMPoST.tOut})."
         )
         valid = False
+
+    for name, known in [
+        ("KoMPoST", KOMPOST_PARAMETERS),
+        ("KoMPoST3D", KOMPOST3D_PARAMETERS),
+    ]:
+        if active(name):
+            for error in kompost_parameter_errors(name, config[name], known):
+                logging.error(error)
+                valid = False
 
     if active("iSS"):
         for error in iss_parameter_errors(config.iSS):

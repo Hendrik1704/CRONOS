@@ -4,6 +4,11 @@ import os
 import subprocess
 import shutil
 
+from src.modules.kompost_parameters import (
+    KOMPOST_PARAMETERS,
+    write_kompost_parameters,
+)
+
 
 class KoMPoST(BaseModule):
     """KoMPoST pre-equilibrium evolution module using effective kinetic theory.
@@ -111,8 +116,7 @@ class KoMPoST(BaseModule):
         """
         logging.info(f"[KoMPoST] Create input file...")
         current_module_index = self.full_config.general.modules.index("KoMPoST")
-        self.config.InputFile = f"output_{current_module_index-1}.dat"
-        self.config.OutputFileTag = f"output_{current_module_index}"
+        input_file = f"output_{current_module_index-1}.dat"
 
         kompost_dir = os.path.join(event_dir, "KoMPoST")
         if not os.path.exists(kompost_dir):
@@ -121,67 +125,28 @@ class KoMPoST(BaseModule):
             )
         ini_file = os.path.join(kompost_dir, "parameters_KoMPoST.ini")
 
-        with open(ini_file, "w") as f:
-            # KoMPoSTInputs
-            f.write("[KoMPoSTInputs]\n")
-            f.write(f"tIn={self.config.tIn};\n\n")
-            f.write(f"tOut = {self.config.tOut};\n\n")
-            f.write(f"InputFile={self.config.InputFile}\n")
-            f.write(f"OutputFileTag={self.config.OutputFileTag}\n")
-            f.write("# The KoMPoST directory is removed in fetch_output, so skip\n")
-            f.write("# the input, full and background T^{munu} backup files\n")
-            f.write("WriteTmunuBackup = 0\n\n")
+        # Every KoMPoST setting is passed on (check_settings rejects the keys
+        # KoMPoST does not read). The KoMPoST directory is removed in
+        # fetch_output, so skip the input, full and background T^munu backups.
+        parameters = self.config.to_dict()
+        parameters.update(
+            {
+                "InputFile": input_file,
+                "OutputFileTag": f"output_{current_module_index}",
+                "WriteTmunuBackup": 0,
+            }
+        )
+        write_kompost_parameters(ini_file, parameters, KOMPOST_PARAMETERS)
 
-            # KoMPoSTParameters
-            f.write("[KoMPoSTParameters]\n")
-            f.write(f"EtaOverS = {self.config.EtaOverS}\n")
-            f.write(
-                f"EtaOverSTemperatureScale = {self.config.EtaOverSTemperatureScale}\n"
-            )
-            f.write(f"# Effective number of degrees of freedom\n")
-            f.write(f"NuEffective = {self.config.NuEffective}\n")
-            f.write(f'# 0 for free-streaming, 1 for "KoMPoST" EKT evolution\n')
-            f.write(f"EVOLUTION_MODE={self.config.EVOLUTION_MODE}\n\n")
-            f.write(f"# 0 or 1\n")
-            f.write(
-                f"ENERGY_PERTURBATIONS={self.config.ENERGY_PERTURBATIONS}\n\n"
-            )
-            f.write(f"# 0 or 1\n")
-            f.write(
-                f"MOMENTUM_PERTURBATIONS={self.config.MOMENTUM_PERTURBATIONS}\n\n"
-            )
-            f.write(
-                f"DECOMPOSITION_METHOD={self.config.DECOMPOSITION_METHOD}\n\n"
-            )
-            f.write(f"Regulator={self.config.Regulator}\n\n")
-
-            # EventInput
-            f.write("[EventInput]\n")
-            f.write(
-                f"# scaling parameter for the input energy momentum tensor\n"
-            )
-            f.write(f"normFactor = {self.config.normFactor}\n")
-            f.write(f"# lattice spacing in fm\n")
-            f.write(f"afm = {self.config.afm}\n")
-            f.write(f"# number of grid points on a square lattice\n")
-            f.write(f"Ns={self.config.Ns};\n\n")
-            f.write(f"# The first grid point to include in the x direction\n")
-            f.write(f"xSTART={self.config.xSTART};\n")
-            f.write(f"# The last grid point to include in the x direction\n")
-            f.write(f"xEND={self.config.xEND};\n\n")
-            f.write(f"#The first grid point to include in the y direction\n")
-            f.write(f"ySTART={self.config.ySTART};\n")
-            f.write(f"#The last grid point to include in the y direction\n")
-            f.write(f"yEND={self.config.yEND};\n")
         logging.info("[KoMPoST] Input file created successfully.")
 
         input_Tmunu_file = os.path.join(
-            event_dir, "results", self.config.InputFile
+            event_dir, "results", input_file
         )
         input_Tmunu_file = os.path.abspath(
             input_Tmunu_file
         )  # resolve relative path
-        symlink_path = os.path.join(kompost_dir, self.config.InputFile)
+        symlink_path = os.path.join(kompost_dir, input_file)
 
         if os.path.exists(symlink_path) or os.path.islink(symlink_path):
             os.remove(symlink_path)

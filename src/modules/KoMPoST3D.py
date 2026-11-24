@@ -4,6 +4,11 @@ import os
 import subprocess
 import shutil
 
+from src.modules.kompost_parameters import (
+    KOMPOST3D_PARAMETERS,
+    write_kompost_parameters,
+)
+
 
 class KoMPoST3D(BaseModule):
     """KoMPoST-3D pre-equilibrium evolution module for 3+1D initial conditions.
@@ -108,8 +113,7 @@ class KoMPoST3D(BaseModule):
         current_module_index = self.full_config.general.modules.index(
             "KoMPoST3D"
         )
-        self.config.InputFile = f"output_{current_module_index-1}.dat"
-        self.config.OutputFileTag = f"output_{current_module_index}"
+        input_file = f"output_{current_module_index-1}.dat"
 
         kompost_dir = os.path.join(event_dir, "KoMPoST3D")
         if not os.path.exists(kompost_dir):
@@ -118,73 +122,26 @@ class KoMPoST3D(BaseModule):
             )
         ini_file = os.path.join(kompost_dir, "parameters_KoMPoST3D.ini")
 
-        with open(ini_file, "w") as f:
-            # KoMPoSTInputs
-            f.write("[KoMPoSTInputs]\n")
-            f.write(f"tIn={self.config.tIn};\n\n")
-            f.write(f"tOut = {self.config.tOut};\n\n")
-            f.write(f"InputFile={self.config.InputFile}\n")
-            f.write(f"OutputFileTag={self.config.OutputFileTag}\n")
-            f.write(
-                "# The KoMPoST3D directory is removed in fetch_output, so skip\n"
-            )
-            f.write("# the input, full and background T^{munu} backup files\n")
-            f.write("WriteTmunuBackup = 0\n\n")
+        # Every KoMPoST3D setting is passed on (check_settings rejects the keys
+        # KoMPoST-3D does not read). The KoMPoST3D directory is removed in
+        # fetch_output, so skip the input, full and background T^munu backups.
+        parameters = self.config.to_dict()
+        parameters.update(
+            {
+                "InputFile": input_file,
+                "OutputFileTag": f"output_{current_module_index}",
+                "WriteTmunuBackup": 0,
+            }
+        )
+        write_kompost_parameters(ini_file, parameters, KOMPOST3D_PARAMETERS)
 
-            # KoMPoSTParameters
-            f.write("[KoMPoSTParameters]\n")
-            f.write(f"EtaOverS = {self.config.EtaOverS}\n")
-            f.write(
-                f"EtaOverSTemperatureScale = {self.config.EtaOverSTemperatureScale}\n"
-            )
-            f.write(f"# Effective number of degrees of freedom\n")
-            f.write(f"NuEffective = {self.config.NuEffective}\n")
-            f.write(f"# only 1 (kinetic theory) is supported by KoMPoST-3D\n")
-            f.write(f"EVOLUTION_MODE={self.config.EVOLUTION_MODE}\n\n")
-            f.write(f"# 0 or 1\n")
-            f.write(
-                f"ENERGY_PERTURBATIONS={self.config.ENERGY_PERTURBATIONS}\n\n"
-            )
-            f.write(f"# only 0 is supported by KoMPoST-3D\n")
-            f.write(
-                f"MOMENTUM_PERTURBATIONS={self.config.MOMENTUM_PERTURBATIONS}\n\n"
-            )
-            f.write(f"Regulator={self.config.Regulator}\n\n")
-
-            # EventInput
-            f.write("[EventInput]\n")
-            f.write(
-                f"# scaling parameter for the input energy momentum tensor\n"
-            )
-            f.write(f"normFactor = {self.config.normFactor}\n")
-            f.write(f"# transverse lattice spacing in fm\n")
-            f.write(f"afm = {self.config.afm}\n")
-            f.write(f"# lattice spacing in spatial rapidity\n")
-            f.write(f"deta = {self.config.deta}\n")
-            f.write(f"# number of grid points in x, y and eta\n")
-            f.write(f"Ns={self.config.Ns};\n")
-            f.write(f"Neta={self.config.Neta};\n\n")
-            f.write(f"# The first grid point to include in the x direction\n")
-            f.write(f"xSTART={self.config.xSTART};\n")
-            f.write(f"# The last grid point to include in the x direction\n")
-            f.write(f"xEND={self.config.xEND};\n\n")
-            f.write(f"#The first grid point to include in the y direction\n")
-            f.write(f"ySTART={self.config.ySTART};\n")
-            f.write(f"#The last grid point to include in the y direction\n")
-            f.write(f"yEND={self.config.yEND};\n\n")
-            f.write(f"#The first grid point to include in the eta direction\n")
-            f.write(f"etaSTART={self.config.etaSTART};\n")
-            f.write(f"#The last grid point to include in the eta direction\n")
-            f.write(f"etaEND={self.config.etaEND};\n")
         logging.info("[KoMPoST3D] Input file created successfully.")
 
-        input_Tmunu_file = os.path.join(
-            event_dir, "results", self.config.InputFile
-        )
+        input_Tmunu_file = os.path.join(event_dir, "results", input_file)
         input_Tmunu_file = os.path.abspath(
             input_Tmunu_file
         )  # resolve relative path
-        symlink_path = os.path.join(kompost_dir, self.config.InputFile)
+        symlink_path = os.path.join(kompost_dir, input_file)
 
         if os.path.exists(symlink_path) or os.path.islink(symlink_path):
             os.remove(symlink_path)
