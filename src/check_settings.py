@@ -3,6 +3,7 @@ import logging
 import math
 
 from src.modules.IPGlasma import CRONOS_CONTROLLED_PARAMETERS
+from src.modules.ipglasma_parameters import IPGLASMA_PARAMETERS
 from src.modules.iss_parameters import (
     ISS_CRONOS_CONTROLLED_PARAMETERS,
     ISS_PARAMETERS,
@@ -55,16 +56,20 @@ def iss_effective_afterburner_type(music_eos, iss_afterburner_type):
 def _parameter_errors(code, section, known, controlled, list_file, is_valid):
     """Return the problems with the keys and values of a module section.
 
-    The external code ignores keys it does not read, so a misspelled key would
-    be dropped without a warning.
+    Most external codes ignore keys they do not read, so a misspelled key
+    would be dropped without a warning. ``controlled`` lists the keys CRONOS
+    sets, or maps them to the reason.
     """
     errors = []
     spelling = {key.lower(): key for key in known}
     for key, value in section.to_dict().items():
         if key in controlled:
+            reason = (
+                f" ({controlled[key]})" if isinstance(controlled, dict) else ""
+            )
             errors.append(
-                f"{code} parameter '{key}' is set by CRONOS, remove it from "
-                "the configuration."
+                f"{code} parameter '{key}' is set by CRONOS{reason}, remove it "
+                "from the configuration."
             )
         elif key not in known:
             if key.lower() in spelling:
@@ -126,6 +131,36 @@ def iss_parameter_errors(iss_config):
         ISS_PARAMETERS,
         ISS_CRONOS_CONTROLLED_PARAMETERS,
         "src/modules/iss_parameters.py",
+        is_valid,
+    )
+
+
+def ipglasma_parameter_errors(ipglasma_config):
+    """Return the problems with the keys and values of the IPGlasma section.
+
+    IP-Glasma 2.0 rejects unknown keys itself, but only when an event runs.
+    Values are numbers, one word, or lists of numbers (written
+    comma-separated).
+    """
+
+    def is_valid(value):
+        if isinstance(value, (bool, int, float)) or (
+            isinstance(value, str) and len(value.split()) == 1
+        ):
+            return None
+        if isinstance(value, (list, tuple)) and all(
+            isinstance(v, (int, float)) and not isinstance(v, bool)
+            for v in value
+        ):
+            return None
+        return "a number, a string without spaces or a list of numbers"
+
+    return _parameter_errors(
+        "IPGlasma",
+        ipglasma_config,
+        IPGLASMA_PARAMETERS,
+        CRONOS_CONTROLLED_PARAMETERS,
+        "src/modules/ipglasma_parameters.py",
         is_valid,
     )
 
@@ -303,13 +338,9 @@ def check_settings(config):
 
     if "IPGlasma" in active_modules and hasattr(config, "IPGlasma"):
         ipglasma = config.IPGlasma
-        for key, reason in CRONOS_CONTROLLED_PARAMETERS.items():
-            if key in ipglasma.to_dict():
-                logging.error(
-                    f"IPGlasma parameter '{key}' is set by CRONOS ({reason}); "
-                    "remove it from the configuration."
-                )
-                valid = False
+        for error in ipglasma_parameter_errors(ipglasma):
+            logging.error(error)
+            valid = False
         if ipglasma.useJIMWLK == 1:
             if ipglasma.useFluctuatingX != 0:
                 logging.error(

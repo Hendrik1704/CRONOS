@@ -1,13 +1,16 @@
 import logging
 import os
+import re
 import subprocess
 import sys
 from unittest.mock import patch
 
 import pytest
+from cpp_source import read_cpp_sources
 
-from src.check_settings import check_settings
+from src.check_settings import check_settings, ipglasma_parameter_errors
 from src.configuration import Configuration, load_config
+from src.modules.ipglasma_parameters import IPGLASMA_PARAMETERS
 from src.modules.IPGlasma import (
     CRONOS_CONTROLLED_PARAMETERS,
     IPGlasma,
@@ -15,6 +18,9 @@ from src.modules.IPGlasma import (
 )
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+IPGLASMA_PARAMETER_TABLE = os.path.join(
+    PROJECT_ROOT, "external_codes", "ipglasma", "src", "ParameterTable.cpp"
+)
 
 
 def _load_config(modules):
@@ -213,7 +219,7 @@ def test_run_reports_ipglasma_output_on_failure(tmp_path, caplog):
     with patch.object(
         sys.modules["src.modules.IPGlasma"],
         "run_external_command",
-        side_effect=failing_run
+        side_effect=failing_run,
     ):
         with pytest.raises(subprocess.CalledProcessError):
             module.run(str(tmp_path))
@@ -237,3 +243,46 @@ def test_fetch_output_ignores_tmunu_at_other_times(tmp_path):
 
     with pytest.raises(FileNotFoundError):
         module.fetch_output(str(tmp_path))
+
+
+@pytest.mark.skipif(
+    not os.path.exists(IPGLASMA_PARAMETER_TABLE),
+    reason="IP-Glasma 2.0 source not downloaded",
+)
+def test_parameter_list_matches_ipglasma_source():
+    """Regenerate ipglasma_parameters.py when this fails after an update."""
+    source = read_cpp_sources([IPGLASMA_PARAMETER_TABLE])
+    keys = re.findall(r'\bparam\(\s*"(\w+)"', source)
+    assert set(keys) == IPGLASMA_PARAMETERS
+
+
+def test_shipped_configs_only_have_ipglasma_parameters():
+    assert ipglasma_parameter_errors(_load_config(["IPGlasma"]).IPGlasma) == []
+    assert set(CRONOS_CONTROLLED_PARAMETERS) <= IPGLASMA_PARAMETERS
+
+
+@pytest.mark.parametrize(
+    "key, value, message",
+    [
+        ("maxTIme", 0.4, "IPGlasma spells it 'maxTime'"),
+        ("jimwlkMuu0", 0.28, "Did you mean 'jimwlkMu0'"),
+        ("subNucleonParamType", 0, "does not read"),
+        ("seed", 7, "set by CRONOS (set from general.random_seed)"),
+        ("nucleonModel", "hot spots", "list of numbers"),
+        ("jimwlkXSnapshotList", ["0.005"], "list of numbers"),
+    ],
+)
+def test_check_settings_rejects_ipglasma_parameters(
+    key, value, message, caplog
+):
+    """Problems are found before the runs, not only when IP-Glasma starts."""
+    config = _load_config(["IPGlasma", "MUSIC"])
+    config.IPGlasma[key] = value
+    assert not check_settings(config)
+    assert message in caplog.text
+
+
+def test_check_settings_accepts_a_list_of_numbers():
+    config = _load_config(["IPGlasma", "MUSIC"])
+    config.IPGlasma["jimwlkXSnapshotList"] = [5e-3, 1e-3]
+    assert check_settings(config)
