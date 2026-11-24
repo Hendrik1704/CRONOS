@@ -7,9 +7,9 @@
 # Build (from repository root):
 #   docker build -f docker/Dockerfile -t cronos .
 #
-# Run:
+# Run (the entrypoint is python3, so pass the script name directly):
 #   docker run --rm -v $(pwd)/run:/app/run cronos \
-#       python3 prepare_simulations.py --user_config_path config/user_config.py
+#       prepare_simulations.py --user_config_path config/user_config.py
 #
 # Convert to Singularity/Apptainer for HPC:
 #   singularity pull cronos.sif docker://hendrik1704/cronos:latest
@@ -71,6 +71,10 @@ COPY external_codes/GetModulesFromGit.sh  ./GetModulesFromGit.sh
 # Clone all external modules
 RUN bash GetModulesFromGit.sh
 
+# SMASH 3.4 needs CMake >= 3.28 (Ubuntu 22.04 has 3.22). Stay on CMake 3,
+# because CMake 4 removed the compatibility with old CMake policies.
+RUN pip3 install --no-cache-dir "cmake>=3.28,<4"
+
 # Ensure Eigen is discoverable by CMake everywhere
 ENV CMAKE_PREFIX_PATH="/usr/share/eigen3/cmake"
 
@@ -87,7 +91,7 @@ RUN cd MUSIC && mkdir build && cd build && \
 RUN cd iSS && mkdir -p build && cd build && rm -fr * && cmake .. && \
     make -Bj$(nproc) && make install && cd .. && rm -fr build && cd ..
 
-RUN cd pythia8315 && \
+RUN cd pythia8316 && \
     ./configure --cxx-common='-std=c++17 -march=x86-64 -O2 -fPIC -pthread' && \
     make -j$(nproc) && cd ..
 
@@ -96,9 +100,8 @@ RUN cd smash && mkdir build && cd build && \
       -DTRY_USE_ROOT=OFF \
       -DTRY_USE_HEPMC=OFF \
       -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_CXX_FLAGS_RELEASE="-O2 -march=x86-64 -mtune=generic" \
-      -DCMAKE_C_FLAGS_RELEASE="-O2 -march=x86-64 -mtune=generic" \
-      -DPythia_CONFIG_EXECUTABLE=../../pythia8315/bin/pythia8-config \
+      -DSMASH_ARCH_FLAG=x86-64 \
+      -DPythia_CONFIG_EXECUTABLE=../../pythia8316/bin/pythia8-config \
       -DCMAKE_PREFIX_PATH=/usr/share/eigen3/cmake && \
     make smash -j$(nproc) && cd ../..
 
@@ -139,8 +142,9 @@ WORKDIR /app
 COPY --from=builder /build/external_codes /app/external_codes
 
 # Ensure shared libraries and Pythia8 data are found at runtime
-ENV LD_LIBRARY_PATH="/app/external_codes/MUSIC:/app/external_codes/iSS/lib:/app/external_codes/pythia8315/lib"
-ENV PYTHIA8DATA="/app/external_codes/pythia8315/share/Pythia8/xmldoc"
+# (SMASH links libsmash.so with an absolute run path into /build)
+ENV LD_LIBRARY_PATH="/app/external_codes/MUSIC:/app/external_codes/iSS/lib:/app/external_codes/pythia8316/lib:/app/external_codes/smash/build/src"
+ENV PYTHIA8DATA="/app/external_codes/pythia8316/share/Pythia8/xmldoc"
 
 # SMASH
 COPY --from=builder /build/external_codes/smash /app/external_codes/smash

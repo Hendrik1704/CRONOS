@@ -5,6 +5,14 @@ import subprocess
 import shutil
 
 
+# MUSIC hotQCD EOS table for each supported EOS_to_use (MUSIC eos_hotQCD.cpp)
+MUSIC_EOS_TABLES = {
+    9: "hrg_hotqcd_eos_binary.dat",  # HRG matched to UrQMD hadrons
+    91: "hrg_hotqcd_eos_SMASH_binary.dat",  # HRG matched to SMASH hadrons
+}
+DEFAULT_MUSIC_EOS = 91
+
+
 class EntropyMatching(BaseModule):
     """Entropy matching module for smooth KoMPoST to MUSIC transition.
 
@@ -39,6 +47,12 @@ class EntropyMatching(BaseModule):
         >>> entropy.fetch_output(event_dir)  # MUSIC initial conditions
     """
 
+    def eos_table(self):
+        """Return the EOS table MUSIC uses, for the matching to MUSIC."""
+        music_config = getattr(self.full_config, "MUSIC", None)
+        eos = getattr(music_config, "EOS_to_use", DEFAULT_MUSIC_EOS)
+        return MUSIC_EOS_TABLES.get(eos, MUSIC_EOS_TABLES[DEFAULT_MUSIC_EOS])
+
     def prepare_environment(self, event_dir):
         """Set up entropy matching environment with EOS tables and conversion script.
 
@@ -62,13 +76,13 @@ class EntropyMatching(BaseModule):
                 will be populated with EOS tables and conversion utilities
 
         Raises:
-            SystemExit: If required KoMPoST_to_MUSIC.py script is not found,
+            FileNotFoundError: If required KoMPoST_to_MUSIC.py script is not found,
                 as this is critical for entropy matching functionality
 
         Side Effects:
             - Creates symbolic links to external EOS tables and utilities
             - Logs environment preparation progress and any missing components
-            - May exit program if critical conversion script unavailable
+            - Raises if the EOS tables or the conversion script are unavailable
         """
         logging.info(
             f"[EntropyMatching] Preparing environment in {event_dir}..."
@@ -82,7 +96,7 @@ class EntropyMatching(BaseModule):
                 os.path.join(event_dir, "entropy_matching", "EOS"),
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[EntropyMatching] Required directory {entropy_eos_path} does not exist."
             )
 
@@ -97,10 +111,9 @@ class EntropyMatching(BaseModule):
                 ),
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[EntropyMatching] Required executable {entropy_matching_script_path} does not exist."
             )
-            exit(1)
 
     def prepare_input(self, event_dir):
         """Establish symbolic links to KoMPoST pre-equilibrium evolution output.
@@ -117,7 +130,7 @@ class EntropyMatching(BaseModule):
         Side Effects:
             - Creates symbolic link to previous module output
             - Validates input file existence
-            - Exits with error if required input missing
+            - Raises FileNotFoundError if required input missing
         """
         logging.info(f"[EntropyMatching] Create input file...")
         current_module_index = self.full_config.general.modules.index(
@@ -126,20 +139,20 @@ class EntropyMatching(BaseModule):
         pre_eq_evolved_path = os.path.join(
             event_dir, "results", f"output_{current_module_index-1}.dat"
         )
-        if os.path.exists(pre_eq_evolved_path):
-            os.symlink(
-                pre_eq_evolved_path,
-                os.path.join(
-                    event_dir,
-                    "entropy_matching",
-                    f"output_{current_module_index-1}.dat",
-                ),
-            )
-        else:
-            logging.error(
+        if not os.path.exists(pre_eq_evolved_path):
+            raise FileNotFoundError(
                 f"[EntropyMatching] Required file {pre_eq_evolved_path} does not exist."
             )
-            exit(1)
+        pre_eq_evolved_path = os.path.abspath(pre_eq_evolved_path)
+        symlink_path = os.path.join(
+            event_dir,
+            "entropy_matching",
+            f"output_{current_module_index-1}.dat",
+        )
+        # Remove a link left behind by an earlier (failed) attempt
+        if os.path.exists(symlink_path) or os.path.islink(symlink_path):
+            os.remove(symlink_path)
+        os.symlink(pre_eq_evolved_path, symlink_path)
 
     @time_execution
     def run(self, event_dir):
@@ -181,7 +194,7 @@ class EntropyMatching(BaseModule):
                     s_matching_script,
                     str(self.config.matching_type),
                     str(self.config.nu_eff),
-                    "./EOS/hotQCD/hrg_hotqcd_eos_SMASH_binary.dat",
+                    os.path.join("EOS", "hotQCD", self.eos_table()),
                     f"output_{current_module_index-1}.dat",
                     f"output_{current_module_index}.dat",
                 ],
@@ -191,6 +204,7 @@ class EntropyMatching(BaseModule):
             )
         except subprocess.CalledProcessError as e:
             logging.error(f"[EntropyMatching] Execution failed: {e}")
+            raise
         finally:
             os.chdir(cwd)
 

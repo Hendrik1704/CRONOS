@@ -13,14 +13,24 @@ Physics Background:
     on effective degrees of freedom and equation of state consistency.
 
 Matching Types:
-    0: Energy matching (direct energy transfer without thermodynamic adjustment)
-    1: Entropy matching (recommended - maintains thermodynamic consistency)
+    0: Energy matching (MUSIC starts with the KoMPoST energy density)
+    1: Entropy matching (MUSIC starts with the energy density that has the
+       KoMPoST entropy density in the EOS)
+
+Bulk pressure:
+    KoMPoST is conformal, its pressure is e_KoMPoST / 3. Both matching types
+    write the bulk pressure Pi = e_KoMPoST / 3 - p_EOS(e_MUSIC) as the 19th
+    column, which MUSIC reads with Initial_profile 94 (95 in 3D). For energy
+    matching this is the value MUSIC computes itself with Initial_profile 9.
 
 Entropy Matching Algorithm:
     1. Calculate KoMPoST entropy density using effective degrees of freedom
     2. Interpolate energy density from EOS entropy-energy relation
-    3. Calculate bulk pressure correction for viscous effects
+    3. Calculate the bulk pressure
     4. Update energy density and add bulk pressure column
+
+Cells below the EOS table are treated as vacuum: Pi = 0, and for entropy
+matching also e = 0 (a linear extrapolation would give negative energies).
 
 Usage:
     python KoMPoST_to_MUSIC.py <type> <nu_eff> <eos_file> <input> <output>
@@ -71,11 +81,56 @@ def read_file(filename):
     return np.array(data), comment_line
 
 
+def read_eos(file_path_eos):
+    """Read a MUSIC binary EOS table.
+
+    Returns:
+        tuple: (e, p, T) - energy density and pressure in GeV/fm^3,
+               temperature in GeV
+    """
+    raw = np.fromfile(file_path_eos, dtype=(float, 4))
+    # 4 columns (energy density, local pressure, entropy density, local temperature)
+    return raw[:, 0], raw[:, 1], raw[:, 3]
+
+
+def bulk_pressure(e_kompost, e_music, e_eos, p_eos):
+    """Return the bulk pressure of the conformal KoMPoST T^{mu nu} in MUSIC.
+
+    Pi = e_kompost / 3 - p_EOS(e_music) in GeV/fm^3: the conformal KoMPoST
+    pressure minus the equilibrium pressure at the energy density MUSIC starts
+    with.
+    """
+    # pressure as a function of energy [p(e)]
+    p_interp = interp1d(e_eos, p_eos, kind="linear", fill_value="extrapolate")
+    return e_kompost / 3 - p_interp(e_music)
+
+
+def e_matching(e_kompost, file_path_eos):
+    """Perform energy matching between KoMPoST and MUSIC.
+
+    MUSIC starts with the KoMPoST energy density.
+
+    Args:
+        e_kompost (array): KoMPoST energy density in GeV/fm^3
+        file_path_eos (str): Path to equation of state file
+
+    Returns:
+        tuple: (e_music, bulk_pressure) in GeV/fm^3
+    """
+    e, p, _ = read_eos(file_path_eos)
+    Bulk_pressure = bulk_pressure(e_kompost, e_kompost, e, p)
+    # Below the EOS table (and for invalid cells, e = nan) there is no
+    # equilibrium pressure: treat these (near-)empty cells as vacuum.
+    below_table = ~(e_kompost >= e[0])
+    Bulk_pressure = np.where(below_table, 0.0, Bulk_pressure)
+    return e_kompost, Bulk_pressure
+
+
 def s_matching(e_kompost, nu_eff, file_path_eos):
     """Perform entropy matching between KoMPoST and MUSIC using equation of state.
 
     Calculates thermodynamically consistent energy density for MUSIC based on
-    KoMPoST entropy and adds bulk pressure corrections for viscous effects.
+    KoMPoST entropy and the bulk pressure of the KoMPoST T^{mu nu}.
 
     Args:
         e_kompost (array): KoMPoST energy density in GeV/fm^3
@@ -94,24 +149,22 @@ def s_matching(e_kompost, nu_eff, file_path_eos):
     s_kompost = s_kompost * (HBARC ** (1 / 4.0))  # GeV/fm^2
 
     # EOS
-    raw = np.fromfile(file_path_eos, dtype=(float, 4))
-    # 4 columns (energy density, local pressure, entropy density, local temperature)
-    e = raw[:, 0]  # (GeV/fm^3)
-    p = raw[:, 1]  # (GeV/fm^3)
-    T = raw[:, 3]  # (GeV)
-
-    entropy = [HBARC * (p + e) / T for p, e, T in zip(p, e, T)]  # GeV/fm^2
+    e, p, T = read_eos(file_path_eos)
+    entropy = HBARC * (p + e) / T  # GeV/fm^2
     # energy as a function of entropy [e(s)]
     energy_interp = interp1d(
         entropy, e, kind="linear", fill_value="extrapolate"
     )
-    # pressure as a function of energy [p(e)]
-    p_interp = interp1d(e, p, kind="linear", fill_value="extrapolate")
 
     # Calculate the new energy and new bulk pressure
     e_Music = energy_interp(s_kompost)  # GeV/fm^3
+    Bulk_pressure = bulk_pressure(e_kompost, e_Music, e, p)  # GeV/fm^3
 
-    Bulk_pressure = e_kompost / 3 - p_interp(e_Music)  # GeV/fm^3
+    # Below the EOS table a linear extrapolation gives negative energies:
+    # treat these (near-)empty cells (and invalid ones, s = nan) as vacuum.
+    below_table = ~(s_kompost >= entropy[0])
+    e_Music = np.where(below_table, 0.0, e_Music)
+    Bulk_pressure = np.where(below_table, 0.0, Bulk_pressure)
 
     return e_Music, Bulk_pressure
 
@@ -143,35 +196,29 @@ def main():
     filename_in = sys.argv[4]
     filename_out = sys.argv[5]
 
-    # e matching
-    if type_of_matching == 0:
-        # read the input file
-        data, comment = read_file(filename_in)
-
-    # s matching
-    elif type_of_matching == 1:
-        # read the input file
-        data, comment = read_file(filename_in)
-
-        # get the energy and calculate the new energy
-        energy_density = data[:, 3]  # GeV/fm^3
-        e_new, bulk_pressure = s_matching(
-            energy_density, nu_eff, file_path_eos
-        )  # GeV/fm^3
-
-        # add the bulk pressure as a column in data
-        data = np.column_stack((data, bulk_pressure))
-
-        # Replace the column 4: change the energy from KoMPoST by the new energy
-        data[:, 3] = e_new
-
-    else:
+    if type_of_matching not in (0, 1):
         print(
-            "Problem with the variable type_of_matching, should be equal to 0 or 1."
+            "Problem with the variable type_of_matching, should be equal to 0 or 1.",
+            file=sys.stderr,
         )
+        sys.exit(1)
+
+    # read the input file
+    data, comment = read_file(filename_in)
+    energy_density = data[:, 3]  # GeV/fm^3
+    if type_of_matching == 0:
+        e_new, Pi = e_matching(energy_density, file_path_eos)
+    else:
+        e_new, Pi = s_matching(energy_density, nu_eff, file_path_eos)
+
+    # add the bulk pressure as a column in data
+    data = np.column_stack((data, Pi))
+    # Replace the column 4: the energy density MUSIC starts with
+    data[:, 3] = e_new
 
     # Write the final file: eta, x, y, new_energy, u^tau, u^x, u^y, u^eta,
-    # pi^tautau, pi^taux, pi^tauy, pi^taueta, pi^xx, pi^xy, pi^xeta, pi^yy, pi^yeta, pi^etaeta and Pi (in s matching).
+    # pi^tautau, pi^taux, pi^tauy, pi^taueta, pi^xx, pi^xy, pi^xeta, pi^yy, pi^yeta, pi^etaeta and Pi,
+    # i.e. the 19 columns read by MUSIC.
     with open(filename_out, "w") as file:
         file.write(comment + "\n")
         for row in data:

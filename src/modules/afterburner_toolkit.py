@@ -1,9 +1,29 @@
 from src.module_base import BaseModule, time_execution, run_external_command
+from src.modules.SMASH import DEFAULT_SMASH_PARTICLE_FORMAT
 import logging
 import os
 import subprocess
 import shutil
 
+
+
+# afterburner_toolkit read_in_mode for the particle lists CRONOS produces,
+# and the file name the toolkit reads in its results directory
+READ_IN_SMASH_TEXT = 7  # SMASH OSCAR 2013 text, converted by the toolkit
+READ_IN_SMASH_BINARY = 8  # SMASH extended binary OSCAR 2013 list
+READ_IN_ISS_BINARY = 9  # binary iSS list
+READ_IN_FILE_NAMES = {
+    READ_IN_SMASH_BINARY: "particles_binary.bin",
+    READ_IN_ISS_BINARY: "particle_list.bin",
+}
+
+
+def _link(target, link_path):
+    """Create a symlink, replacing an existing link (setup is repeated
+    after an interrupted cleanup of the module directory)."""
+    if os.path.islink(link_path) or os.path.exists(link_path):
+        os.remove(link_path)
+    os.symlink(target, link_path)
 
 class afterburner_toolkit(BaseModule):
     """Analysis toolkit module for flow and correlation measurements.
@@ -40,6 +60,23 @@ class afterburner_toolkit(BaseModule):
         >>> toolkit.fetch_output(event_dir)  # Organized analysis results
     """
 
+    def read_in_mode(self):
+        """Return the toolkit read_in_mode for the previous module's output.
+
+        With SMASH, the toolkit reads the binary SMASH list directly (8) or
+        the converted SMASH text list (7); without SMASH, the binary iSS list
+        with the resonance decays (9).
+        """
+        if "SMASH" not in self.full_config.general.modules:
+            return READ_IN_ISS_BINARY
+        smash_config = getattr(self.full_config, "SMASH", None)
+        particles_format = getattr(
+            smash_config, "Particles_Format", DEFAULT_SMASH_PARTICLE_FORMAT
+        )
+        if particles_format == "Oscar2013":
+            return READ_IN_SMASH_TEXT
+        return READ_IN_SMASH_BINARY
+
     def prepare_environment(self, event_dir):
         """Set up afterburner_toolkit execution environment with executables and data tables.
 
@@ -61,7 +98,7 @@ class afterburner_toolkit(BaseModule):
             event_dir (str): Path to event-specific directory where afterburner_toolkit will execute.
 
         Raises:
-            SystemExit: If any required afterburner_toolkit components are missing.
+            FileNotFoundError: If any required afterburner_toolkit components are missing.
 
         Side Effects:
             - Creates symbolic links to analysis executables and data
@@ -82,15 +119,14 @@ class afterburner_toolkit(BaseModule):
             "EOS",
         )
         if os.path.exists(afterburner_toolkit_EOS_path):
-            os.symlink(
+            _link(
                 afterburner_toolkit_EOS_path,
                 os.path.join(event_dir, "afterburner_toolkit", "EOS"),
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[afterburner_toolkit] Required directory {afterburner_toolkit_EOS_path} does not exist."
             )
-            exit(1)
 
         # Check if SMASH is in the module list
         if "SMASH" in self.full_config.general.modules:
@@ -102,7 +138,7 @@ class afterburner_toolkit(BaseModule):
                 "convert_to_binary_SMASH.e",
             )
             if os.path.exists(smash_converter_path):
-                os.symlink(
+                _link(
                     smash_converter_path,
                     os.path.join(
                         event_dir,
@@ -111,10 +147,9 @@ class afterburner_toolkit(BaseModule):
                     ),
                 )
             else:
-                logging.error(
+                raise FileNotFoundError(
                     f"[afterburner_toolkit] Required executable {smash_converter_path} does not exist."
                 )
-                exit(1)
         else:
             logging.debug(
                 "[afterburner_toolkit] SMASH module not found in configuration. Skipping SMASH converter linking."
@@ -128,7 +163,7 @@ class afterburner_toolkit(BaseModule):
             "hadronic_afterburner_tools.e",
         )
         if os.path.exists(afterburner_toolkit_exe_path):
-            os.symlink(
+            _link(
                 afterburner_toolkit_exe_path,
                 os.path.join(
                     event_dir,
@@ -137,10 +172,9 @@ class afterburner_toolkit(BaseModule):
                 ),
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[afterburner_toolkit] Required executable {afterburner_toolkit_exe_path} does not exist."
             )
-            exit(1)
 
     def prepare_input(self, event_dir):
         """Generate afterburner_toolkit configuration and establish particle input links.
@@ -176,6 +210,10 @@ class afterburner_toolkit(BaseModule):
             The toolkit can analyze both SMASH OSCAR format and binary
             particle formats, adapting automatically to the input type.
         """
+        # The links may be missing after an interrupted cleanup of the
+        # module directory (fetch_output removes it), so set them up again
+        os.makedirs(os.path.join(event_dir, "afterburner_toolkit"), exist_ok=True)
+        self.prepare_environment(event_dir)
         logging.info(f"[afterburner_toolkit] Create input file...")
         current_module_index = self.full_config.general.modules.index(
             "afterburner_toolkit"
@@ -184,10 +222,9 @@ class afterburner_toolkit(BaseModule):
 
         afterburner_toolkit_dir = os.path.join(event_dir, "afterburner_toolkit")
         if not os.path.exists(afterburner_toolkit_dir):
-            logging.error(
+            raise FileNotFoundError(
                 f"[afterburner_toolkit] Required directory {afterburner_toolkit_dir} does not exist."
             )
-            exit(1)
 
         input_file = os.path.join(
             event_dir, "results", self.config.input_filename
@@ -204,27 +241,12 @@ class afterburner_toolkit(BaseModule):
         logging.debug(f"Created symlink: {symlink_path} -> {input_file}")
         ini_file = os.path.join(afterburner_toolkit_dir, "parameters.dat")
 
-        # If SMASH is used, then read_in_mode should be 7
-        if (
-            "SMASH" in self.full_config.general.modules
-            and self.config.read_in_mode != 7
-        ):
-            self.config.read_in_mode = 7
-            logging.info(
-                "[afterburner_toolkit] SMASH module detected. Setting read_in_mode to 7."
-            )
-        elif (
-            "SMASH" not in self.full_config.general.modules
-            and self.config.read_in_mode == 7
-        ):
-            self.config.read_in_mode = 9
-            logging.info(
-                "[afterburner_toolkit] SMASH module not detected. Setting read_in_mode to default 9. Assuming iSS output format."
-            )
+        read_in_mode = self.read_in_mode()
+        logging.info(f"[afterburner_toolkit] Using read_in_mode {read_in_mode}.")
 
         with open(ini_file, "w") as f:
             f.write(f"echo_level = {self.config.echo_level} #\n")
-            f.write(f"read_in_mode = {self.config.read_in_mode} #\n")
+            f.write(f"read_in_mode = {read_in_mode} #\n")
             f.write(f"ecoOutput = {self.config.ecoOutput} #\n")
             f.write(f"analyze_flow = {self.config.analyze_flow} #\n")
             f.write(f"analyze_HBT = {self.config.analyze_HBT} #\n")
@@ -389,8 +411,9 @@ class afterburner_toolkit(BaseModule):
         logging.info("[afterburner_toolkit] Running afterburner_toolkit...")
 
         cwd = os.getcwd()
-        # Converter step for SMASH output
-        if "SMASH" in self.full_config.general.modules:
+        read_in_mode = self.read_in_mode()
+        # Converter step for the SMASH text output
+        if read_in_mode == READ_IN_SMASH_TEXT:
             try:
                 os.chdir(afterburner_toolkit_dir)
                 kwargs = {"check": True}
@@ -426,31 +449,34 @@ class afterburner_toolkit(BaseModule):
                         f"[afterburner_toolkit] Moved converted file to {os.path.join(results_dir, 'particle_list.dat')}"
                     )
                 else:
-                    logging.error(
+                    raise FileNotFoundError(
                         f"[afterburner_toolkit] Converted file {converted_file} does not exist."
                     )
             except subprocess.CalledProcessError as e:
                 logging.error(
                     f"[afterburner_toolkit] Converter execution failed: {e}"
                 )
+                raise
             finally:
                 os.chdir(cwd)
         else:
-            # If there is no SMASH, then we assume that the input file is already in the correct format and just move it to results/particle_list.dat
+            # The SMASH binary list and the iSS binary list are read directly
             results_dir = os.path.join(afterburner_toolkit_dir, "results")
             if not os.path.exists(results_dir):
                 os.makedirs(results_dir)
             src_file = os.path.join(
                 afterburner_toolkit_dir, self.config.input_filename
             )
-            dst_file = os.path.join(results_dir, "particle_list.bin")
+            dst_file = os.path.join(
+                results_dir, READ_IN_FILE_NAMES[read_in_mode]
+            )
             if os.path.exists(src_file):
                 shutil.copy2(src_file, dst_file)
                 logging.info(
                     f"[afterburner_toolkit] Copied input file to {dst_file}"
                 )
             else:
-                logging.error(
+                raise FileNotFoundError(
                     f"[afterburner_toolkit] Input file {src_file} does not exist."
                 )
 
@@ -472,6 +498,7 @@ class afterburner_toolkit(BaseModule):
             )
         except subprocess.CalledProcessError as e:
             logging.error(f"[afterburner_toolkit] Execution failed: {e}")
+            raise
         finally:
             os.chdir(cwd)
 
@@ -535,7 +562,8 @@ class afterburner_toolkit(BaseModule):
             s = os.path.join(results_dir, item)
             d = os.path.join(dst_dir, item)
             if os.path.isdir(s):
-                shutil.copytree(s, d, False, None)
+                # a rerun after an interrupted fetch_output may find d
+                shutil.copytree(s, d, dirs_exist_ok=True)
             else:
                 shutil.copy2(s, d)
         shutil.rmtree(afterburner_toolkit_dir)

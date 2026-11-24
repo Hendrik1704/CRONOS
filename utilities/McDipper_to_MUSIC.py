@@ -87,7 +87,7 @@ def read_energy_data(
         with open(filename, "r") as f:
             # Extract tau0 from comment header
             comment_line = f.readline()
-            match = re.search(r"#\s*tau0\s*=\s*([0-9.+-eE]+)", comment_line)
+            match = re.search(r"#\s*tau0\s*=\s*([0-9.eE+-]+)", comment_line)
             if match:
                 tau0 = float(match.group(1))
                 logging.info(f"Found initial time tau0 = {tau0} fm/c")
@@ -461,7 +461,11 @@ def parse_arguments() -> argparse.Namespace:
         "--energy-cut",
         type=float,
         default=1e-15,
-        help="Energy density cutoff below which cells are set to zero",
+        help=(
+            "Energy density cutoff below which the shear stress and bulk "
+            "pressure of a cell are set to zero (the energy density itself is "
+            "written unchanged)"
+        ),
     )
     parser.add_argument(
         "--verbose",

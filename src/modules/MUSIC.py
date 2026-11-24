@@ -5,6 +5,49 @@ import subprocess
 import shutil
 import glob
 
+# MUSIC's stdout is written here (and printed afterwards with
+# module_terminal_output). It must
+# not end in .dat, because MUSIC removes *.dat from its working directory.
+MUSIC_LOG_FILE = "MUSIC.log"
+# Messages MUSIC prints when the hydro evolution ends normally (Evolve::EvolveIt
+# in evolve.cpp). MUSIC also returns 0 after some failures (exit(0) calls in
+# advance.cpp, or failed hydro re-runs in main.cpp), so the return code alone
+# does not show that the evolution finished.
+MUSIC_FINISHED_MESSAGE = "Finished."
+MUSIC_MAX_TIME_MESSAGE = "Maximum allowed time reached."
+
+
+def format_music_value(value):
+    """Format a configuration value for the MUSIC parameter file.
+
+    MUSIC reads one token per parameter and converts it with stoi or stod, so
+    booleans are written as 0 or 1.
+    """
+    if isinstance(value, bool):
+        return str(int(value))
+    return str(value)
+
+
+def music_evolution_finished(log_path):
+    """Return True if the MUSIC log shows that the evolution ended normally.
+
+    Reaching Total_evolution_time_tau before all cells froze out counts as a
+    failure, since the freeze-out surface is then not closed.
+    """
+    with open(log_path, errors="replace") as f:
+        for line in f:
+            line = line.rstrip()
+            if line.endswith(f" {MUSIC_FINISHED_MESSAGE}"):
+                return True
+            if MUSIC_MAX_TIME_MESSAGE in line:
+                # The freeze-out surface is not closed, which is a failure
+                logging.error(
+                    "[MUSIC] Total_evolution_time_tau was reached before all "
+                    "cells froze out; the freeze-out surface is not closed."
+                )
+                return False
+    return False
+
 
 class MUSIC(BaseModule):
     """MUSIC relativistic hydrodynamics module for CRONOS simulation framework.
@@ -54,7 +97,7 @@ class MUSIC(BaseModule):
             event_dir (str): Path to event-specific directory where MUSIC will execute.
 
         Raises:
-            SystemExit: If any required MUSIC components are missing.
+            FileNotFoundError: If any required MUSIC components are missing.
 
         Example:
             >>> music.prepare_environment(\"/path/to/run/job_0/event_0/\")
@@ -67,10 +110,9 @@ class MUSIC(BaseModule):
         if os.path.exists(music_eos_path):
             os.symlink(music_eos_path, os.path.join(event_dir, "MUSIC", "EOS"))
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[MUSIC] Required directory {music_eos_path} does not exist."
             )
-            exit(1)
 
         music_tables_path = os.path.join(
             self.project_root, "external_codes", "MUSIC", "tables"
@@ -80,10 +122,9 @@ class MUSIC(BaseModule):
                 music_tables_path, os.path.join(event_dir, "MUSIC", "tables")
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[MUSIC] Required directory {music_tables_path} does not exist."
             )
-            exit(1)
 
         music_exe_path = os.path.join(
             self.project_root, "external_codes", "MUSIC", "MUSIChydro"
@@ -93,10 +134,9 @@ class MUSIC(BaseModule):
                 music_exe_path, os.path.join(event_dir, "MUSIC", "MUSIChydro")
             )
         else:
-            logging.error(
+            raise FileNotFoundError(
                 f"[MUSIC] Required executable {music_exe_path} does not exist."
             )
-            exit(1)
 
     def prepare_input(self, event_dir):
         """Generate MUSIC parameter file and link initial conditions data.
@@ -107,192 +147,38 @@ class MUSIC(BaseModule):
 
         Key tasks:
         - Determines input filename from module execution order
-        - Generates comprehensive MUSIC parameter file with all physics settings
+        - Writes every key of the MUSIC configuration section to the
+          parameter file (check_settings rejects keys MUSIC does not read)
         - Links initial conditions from previous module output
         - Copies parameter file to results directory for iSS module access
-
-        The parameter file includes settings for:
-        - Grid configuration (size, spacing, dimensions)
-        - Evolution parameters (time step, duration, freeze-out criteria)
-        - Physics options (viscosity, EOS, transport coefficients)
-        - Output settings (evolution data, freeze-out surface format)
 
         Args:
             event_dir (str): Path to event-specific directory containing results
                 from previous modules and MUSIC subdirectory.
 
         Raises:
-            SystemExit: If MUSIC directory doesn't exist or input linking fails.
+            FileNotFoundError: If MUSIC directory doesn't exist or input linking fails.
         """
         logging.info(f"[MUSIC] Create input file...")
         current_module_index = self.full_config.general.modules.index("MUSIC")
-        self.config.Initial_Distribution_input_filename = (
-            f"output_{current_module_index-1}.dat"
-        )
 
         MUSIC_dir = os.path.join(event_dir, "MUSIC")
         if not os.path.exists(MUSIC_dir):
-            logging.error(
+            raise FileNotFoundError(
                 f"[MUSIC] Required directory {MUSIC_dir} does not exist."
             )
-            exit(1)
         ini_file = os.path.join(MUSIC_dir, "parameters_MUSIC.ini")
 
+        # Every MUSIC setting is passed on, check_settings has rejected the
+        # keys MUSIC does not read
+        parameters = self.config.to_dict()
+        parameters["Initial_Distribution_input_filename"] = (
+            f"../results/output_{current_module_index - 1}.dat"
+        )
         with open(ini_file, "w") as f:
-            f.write(f"echo_level {self.config.echo_level}\n")
-            f.write(f"mode {self.config.mode}\n")
-            f.write(f"beastMode {self.config.beastMode}\n")
-            f.write(f"Initial_profile {self.config.Initial_profile}\n")
-            f.write(
-                f"initialize_with_entropy {self.config.initialize_with_entropy}\n"
-            )
-            f.write(
-                f"Initial_Distribution_input_filename ../results/{self.config.Initial_Distribution_input_filename}\n"
-            )
-            f.write(f"s_factor {self.config.s_factor}\n")
-            f.write(f"preEqVisFactor {self.config.preEqVisFactor}\n")
-            f.write(f"boost_invariant {self.config.boost_invariant}\n")
-            f.write(f"Initial_time_tau_0 {self.config.Initial_time_tau_0}\n")
-            f.write(
-                f"Total_evolution_time_tau {self.config.Total_evolution_time_tau}\n"
-            )
-            f.write(f"Delta_Tau {self.config.Delta_Tau}\n")
-            f.write(f"Eta_grid_size {self.config.Eta_grid_size}\n")
-            f.write(f"Grid_size_in_eta {self.config.Grid_size_in_eta}\n")
-            f.write(f"X_grid_size_in_fm {self.config.X_grid_size_in_fm}\n")
-            f.write(f"Y_grid_size_in_fm {self.config.Y_grid_size_in_fm}\n")
-            f.write(f"Grid_size_in_x {self.config.Grid_size_in_x}\n")
-            f.write(f"Grid_size_in_y {self.config.Grid_size_in_y}\n")
-            f.write(f"gridPadding {self.config.gridPadding}\n")
-            f.write(f"EOS_to_use {self.config.EOS_to_use}\n")
-            f.write(
-                f"quest_revert_strength {self.config.quest_revert_strength}\n"
-            )
-            f.write(
-                f"FlagResumTransportCoeff {self.config.FlagResumTransportCoeff}\n"
-            )
-            f.write(f"FlagResetCausality {self.config.FlagResetCausality}\n")
-            f.write(
-                f"resumTransCoeffAlpha {self.config.resumTransCoeffAlpha}\n"
-            )
-            f.write(f"turn_on_bulk_chem {self.config.turn_on_bulk_chem}\n")
-            f.write(f"chem_rate_C {self.config.chem_rate_C}\n")
-            f.write(
-                f"Viscosity_Flag_Yes_1_No_0 {self.config.Viscosity_Flag_Yes_1_No_0}\n"
-            )
-            f.write(
-                f"Include_Shear_Visc_Yes_1_No_0 {self.config.Include_Shear_Visc_Yes_1_No_0}\n"
-            )
-            f.write(f"Shear_to_S_ratio {self.config.Shear_to_S_ratio}\n")
-            f.write(
-                f"T_dependent_Shear_to_S_ratio {self.config.T_dependent_Shear_to_S_ratio}\n"
-            )
-            f.write(
-                f"shear_viscosity_3_eta_over_s_T_kink_in_GeV {self.config.shear_viscosity_3_eta_over_s_T_kink_in_GeV}\n"
-            )
-            f.write(
-                f"shear_viscosity_3_eta_over_s_low_T_slope_in_GeV {self.config.shear_viscosity_3_eta_over_s_low_T_slope_in_GeV}\n"
-            )
-            f.write(
-                f"shear_viscosity_3_eta_over_s_high_T_slope_in_GeV {self.config.shear_viscosity_3_eta_over_s_high_T_slope_in_GeV}\n"
-            )
-            f.write(
-                f"shear_viscosity_3_eta_over_s_at_kink {self.config.shear_viscosity_3_eta_over_s_at_kink}\n"
-            )
-            f.write(
-                f"Include_Bulk_Visc_Yes_1_No_0 {self.config.Include_Bulk_Visc_Yes_1_No_0}\n"
-            )
-            f.write(
-                f"T_dependent_zeta_over_s {self.config.T_dependent_zeta_over_s}\n"
-            )
-            f.write(
-                f"bulk_viscosity_10_max {self.config.bulk_viscosity_10_max}\n"
-            )
-            f.write(
-                f"bulk_viscosity_10_width_high {self.config.bulk_viscosity_10_width_high}\n"
-            )
-            f.write(
-                f"bulk_viscosity_10_width_low {self.config.bulk_viscosity_10_width_low}\n"
-            )
-            f.write(
-                f"bulk_viscosity_10_T_peak {self.config.bulk_viscosity_10_T_peak}\n"
-            )
-            f.write(
-                f"Include_second_order_terms {self.config.Include_second_order_terms}\n"
-            )
-            f.write(
-                f"Include_vorticity_terms {self.config.Include_vorticity_terms}\n"
-            )
-            f.write(
-                f"Include_Rhob_Yes_1_No_0 {self.config.Include_Rhob_Yes_1_No_0}\n"
-            )
-            f.write(
-                f"turn_on_baryon_diffusion {self.config.turn_on_baryon_diffusion}\n"
-            )
-            f.write(f"kappa_coefficient {self.config.kappa_coefficient}\n")
-            f.write(
-                f"output_hydro_debug_info {self.config.output_hydro_debug_info}\n"
-            )
-            f.write(
-                f"output_evolution_data {self.config.output_evolution_data}\n"
-            )
-            f.write(f"output_movie_flag {self.config.output_movie_flag}\n")
-            f.write(
-                f"output_evolution_T_cut {self.config.output_evolution_T_cut}\n"
-            )
-            f.write(
-                f"output_evolution_e_cut {self.config.output_evolution_e_cut}\n"
-            )
-            f.write(
-                f"output_evolution_ideal_only {self.config.output_evolution_ideal_only}\n"
-            )
-            f.write(
-                f"outputBinaryEvolution {self.config.outputBinaryEvolution}\n"
-            )
-            f.write(
-                f"output_evolution_every_N_eta {self.config.output_evolution_every_N_eta}\n"
-            )
-            f.write(
-                f"output_evolution_every_N_y {self.config.output_evolution_every_N_y}\n"
-            )
-            f.write(
-                f"output_evolution_every_N_x {self.config.output_evolution_every_N_x}\n"
-            )
-            f.write(
-                f"output_evolution_every_N_timesteps {self.config.output_evolution_every_N_timesteps}\n"
-            )
-            f.write(
-                f"Do_FreezeOut_Yes_1_No_0 {self.config.Do_FreezeOut_Yes_1_No_0}\n"
-            )
-            f.write(
-                f"Do_FreezeOut_lowtemp {self.config.Do_FreezeOut_lowtemp}\n"
-            )
-            f.write(
-                f"freeze_out_tau_start_max {self.config.freeze_out_tau_start_max}\n"
-            )
-            f.write(f"freeze_out_method {self.config.freeze_out_method}\n")
-            f.write(
-                f"freeze_surface_in_binary {self.config.freeze_surface_in_binary}\n"
-            )
-            f.write(
-                f"average_surface_over_this_many_time_steps {self.config.average_surface_over_this_many_time_steps}\n"
-            )
-            f.write(f"freeze_Ncell_x_step {self.config.freeze_Ncell_x_step}\n")
-            f.write(f"freeze_Ncell_y_step {self.config.freeze_Ncell_y_step}\n")
-            f.write(
-                f"freeze_Ncell_eta_step {self.config.freeze_Ncell_eta_step}\n"
-            )
-            f.write(f"freeze_eps_flag {self.config.freeze_eps_flag}\n")
-            f.write(f"N_freeze_out {self.config.N_freeze_out}\n")
-            f.write(
-                f"use_eps_for_freeze_out {self.config.use_eps_for_freeze_out}\n"
-            )
-            f.write(f"T_freeze {self.config.T_freeze}\n")
-            f.write(f"eps_switch {self.config.eps_switch}\n")
-            f.write(f"eps_freeze_max {self.config.eps_freeze_max}\n")
-            f.write(f"eps_freeze_min {self.config.eps_freeze_min}\n")
-            f.write(f"freeze_eps_flag {self.config.freeze_eps_flag}\n")
-            f.write(f"EndOfData\n")
+            for key, value in parameters.items():
+                f.write(f"{key} {format_music_value(value)}\n")
+            f.write("EndOfData\n")
 
         logging.info("[MUSIC] Input file created successfully.")
 
@@ -327,6 +213,8 @@ class MUSIC(BaseModule):
 
         Raises:
             subprocess.CalledProcessError: If MUSIC execution fails.
+            RuntimeError: If MUSIC exits without its completion message (only
+                checked when the output goes to the MUSIC log file).
 
         Note:
             Execution time and peak memory usage are automatically logged
@@ -339,15 +227,20 @@ class MUSIC(BaseModule):
 
         logging.info("[MUSIC] Running MUSIC...")
 
+        log_path = None
+        log_file = None
         cwd = os.getcwd()
         try:
             os.chdir(MUSIC_dir)
 
+            # MUSIC's output is always kept in a log file, since the
+            # completion check needs it
             kwargs = {"check": True}
-            if not self.full_config.general.module_terminal_output:
-                kwargs["stdout"] = subprocess.DEVNULL
-                kwargs["stderr"] = subprocess.DEVNULL
-                logging.debug("[MUSIC] Running with suppressed output...")
+            log_path = os.path.join(os.getcwd(), MUSIC_LOG_FILE)
+            log_file = open(log_path, "w")
+            kwargs["stdout"] = log_file
+            kwargs["stderr"] = subprocess.STDOUT
+            logging.debug(f"[MUSIC] Writing MUSIC output to {log_path}")
             run_external_command(
                 [f"./{MUSIC_exe}", ini_file],
                 memory_threshold_mb=self.full_config.general.memory_threshold_mb,
@@ -355,9 +248,22 @@ class MUSIC(BaseModule):
                 **kwargs,
             )
         except subprocess.CalledProcessError as e:
-            logging.error(f"[MUSIC] Execution failed: {e}")
+            logging.error(f"[MUSIC] Execution failed: {e}, see {log_path}")
+            raise
         finally:
+            if log_file is not None:
+                log_file.close()
             os.chdir(cwd)
+            # Show the output also when MUSIC failed
+            if self.full_config.general.module_terminal_output and log_path:
+                with open(log_path, errors="replace") as f:
+                    print(f.read(), end="")
+
+        if not music_evolution_finished(log_path):
+            raise RuntimeError(
+                f"[MUSIC] MUSIC exited without finishing the hydro evolution, "
+                f"see {log_path}"
+            )
 
         logging.info("[MUSIC] Execution finished.")
 
@@ -371,8 +277,9 @@ class MUSIC(BaseModule):
 
         The process:
         1. Searches for freeze-out surface files (surface_*.dat pattern)
-        2. Handles multiple surface files by selecting the first match
-        3. Moves surface to standardized output name for next module
+        2. Checks that all files belong to one isotherm (iSS samples one)
+        3. Moves the surface (or concatenates the per-thread parts of a
+           (3+1)D surface) to the standardized output name for next module
         4. Removes temporary MUSIC directory and working files
         5. Logs completion and file locations
 
@@ -381,11 +288,12 @@ class MUSIC(BaseModule):
                 output and results directory for standardized file placement.
 
         Raises:
-            Logs errors if no surface files found but continues execution.
+            FileNotFoundError: If MUSIC did not write a freeze-out surface.
+            RuntimeError: If surfaces for more than one isotherm exist.
 
         Example:
             >>> music.fetch_output(event_dir)
-            # Moves surface_0.dat to results/output_2.dat (if MUSIC is module 2)
+            # Moves surface_eps_0.18.dat to results/output_2.dat (if MUSIC is module 2)
             # Removes MUSIC/ directory and temporary files
         """
         logging.info("[MUSIC] Data successfully processed...")
@@ -395,75 +303,45 @@ class MUSIC(BaseModule):
         matching_files = sorted(glob.glob(src_pattern))
 
         if not matching_files:
-            logging.error(f"[MUSIC] No files found matching {src_pattern}")
-            return
-
-        # If exactly one surface file exists, move it directly and return
-        if len(matching_files) == 1:
-            single_src = matching_files[0]
-            results_dir = os.path.join(event_dir, "results")
-            os.makedirs(results_dir, exist_ok=True)
-            dst_file = os.path.join(
-                results_dir, f"output_{current_module_index}.dat"
+            raise FileNotFoundError(
+                f"[MUSIC] No freeze-out surface found matching {src_pattern}"
             )
-            shutil.move(single_src, dst_file)
-            try:
-                shutil.rmtree(MUSIC_dir)
-            except Exception:
-                logging.warning(
-                    f"[MUSIC] Failed to remove {MUSIC_dir} - leaving it for inspection"
-                )
-            logging.info(
-                f"[MUSIC] Moved single surface {single_src} to {dst_file}"
+
+        # MUSIC writes surface_eps_<e>.dat (boost-invariant) or one
+        # surface_eps_<e>_<thread>.dat per OpenMP thread ((3+1)D) for each
+        # isotherm <e>. iSS samples a single isotherm.
+        isotherms = sorted(
+            {
+                "_".join(os.path.basename(path)[: -len(".dat")].split("_")[:3])
+                for path in matching_files
+            }
+        )
+        if len(isotherms) > 1:
+            raise RuntimeError(
+                f"[MUSIC] Found freeze-out surfaces for several isotherms "
+                f"{isotherms}, but iSS needs exactly one (set N_freeze_out = 1)."
             )
-            return
 
-        # Group files by the first three underscore-separated fields of the filename
-        groups = {}
-        for path in matching_files:
-            name = os.path.basename(path)
-            stem = os.path.splitext(name)[0]
-            parts = stem.split("_")
-            if len(parts) >= 3:
-                key = "_".join(parts[:3])
-            else:
-                key = stem
-            groups.setdefault(key, []).append(path)
-
-        # Create group files by concatenating members of each group (streaming)
-        group_files = []
-        for key in sorted(groups.keys()):
-            group_path = os.path.join(MUSIC_dir, f"{key}.dat")
-            logging.info(
-                f"[MUSIC] Creating group file {group_path} from {len(groups[key])} parts"
-            )
-            # Overwrite if exists
-            with open(group_path, "wb") as out_f:
-                for src in groups[key]:
-                    # Skip if the source is the same as the intended group file
-                    if os.path.abspath(src) == os.path.abspath(group_path):
-                        continue
-                    with open(src, "rb") as in_f:
-                        shutil.copyfileobj(in_f, out_f)
-            group_files.append(group_path)
-
-        # Concatenate all group files into a single combined surface file
-        combined_path = os.path.join(MUSIC_dir, "__combined_surface__.dat")
-        with open(combined_path, "wb") as out_comb:
-            for gf in sorted(group_files):
-                with open(gf, "rb") as in_gf:
-                    shutil.copyfileobj(in_gf, out_comb)
-
-        # Ensure results directory exists
         results_dir = os.path.join(event_dir, "results")
         os.makedirs(results_dir, exist_ok=True)
-
         dst_file = os.path.join(
             results_dir, f"output_{current_module_index}.dat"
         )
 
-        # Move the combined file to the standardized results filename
-        shutil.move(combined_path, dst_file)
+        if len(matching_files) == 1:
+            shutil.move(matching_files[0], dst_file)
+        else:
+            # Concatenate the per-thread parts into the results file; write
+            # a temporary file first, so that output_N.dat is only ever
+            # complete (resume treats an existing output as finished)
+            # (inside MUSIC_dir, so a failed attempt leaves nothing in
+            # results/ and the file is removed with the directory)
+            combined = os.path.join(MUSIC_dir, "surface_combined.tmp")
+            with open(combined, "wb") as out_f:
+                for src in matching_files:
+                    with open(src, "rb") as in_f:
+                        shutil.copyfileobj(in_f, out_f)
+            os.replace(combined, dst_file)
 
         # Clean up MUSIC working directory entirely
         try:
@@ -473,4 +351,6 @@ class MUSIC(BaseModule):
                 f"[MUSIC] Failed to remove {MUSIC_dir} - leaving it for inspection"
             )
 
-        logging.info(f"[MUSIC] Moved combined surface(s) to {dst_file}")
+        logging.info(
+            f"[MUSIC] Moved surface ({len(matching_files)} file(s)) to {dst_file}"
+        )
