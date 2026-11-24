@@ -117,13 +117,13 @@ def test_iss_effective_afterburner_type(eos, afterburner_type, expected):
     [
         (91, 2, True, True),
         (91, 0, True, True),
-        (14, 2, True, True),
         (9, 2, True, False),  # UrQMD particles, SMASH converter
-        (14, 0, True, False),
+        (9, 0, True, False),
         (91, 0, False, False),  # decays skipped without SMASH
-        (14, 2, False, False),
         (9, 2, False, True),
-        (14, 0, False, True),
+        (9, 0, False, True),
+        (14, 2, True, False),  # EoS not supported
+        (14, 0, False, False),
     ],
 )
 def test_iss_afterburner_type(eos, afterburner_type, with_smash, valid):
@@ -134,3 +134,30 @@ def test_iss_afterburner_type(eos, afterburner_type, with_smash, valid):
         iSS={"afterburner_type": afterburner_type},
     )
     assert check_settings(config) == valid
+
+
+@pytest.mark.parametrize("eos", [0, 1, 2, 14, 15])
+def test_unsupported_music_eos_is_rejected(eos, caplog):
+    config = make_config(["MUSIC"], MUSIC={"EOS_to_use": eos})
+    assert not check_settings(config)
+    assert f"EOS_to_use {eos} is not supported" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "particles_format, valid",
+    [("Oscar2013_bin", True), ("Oscar2013", True), ("Binary", False)],
+)
+def test_smash_particles_format(particles_format, valid):
+    config = make_config(
+        BOOST_INVARIANT_CHAIN, SMASH={"Particles_Format": particles_format}
+    )
+    assert check_settings(config) == valid
+
+
+def test_toolkit_read_in_mode_is_set_by_cronos(caplog):
+    config = make_config(
+        BOOST_INVARIANT_CHAIN + ["afterburner_toolkit"],
+        afterburner_toolkit={"read_in_mode": 7},
+    )
+    assert not check_settings(config)
+    assert "read_in_mode is set by CRONOS" in caplog.text

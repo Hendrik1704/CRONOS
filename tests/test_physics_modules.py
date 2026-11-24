@@ -3,10 +3,12 @@ import sys
 import os
 import tempfile
 import shutil
+import subprocess
 from unittest.mock import Mock, patch, MagicMock
 from src.configuration import Configuration
 from src.modules.from_file_IC import FromFileIC
 from src.modules.KoMPoST import KoMPoST
+from src.modules.KoMPoST3D import KoMPoST3D
 from src.modules.MUSIC import MUSIC
 from src.modules.SMASH import SMASH
 from src.modules.iSS import iSS
@@ -148,6 +150,47 @@ class TestFromFileIC(TestPhysicsModuleBase):
         assert os.path.exists(result_file)
         assert not os.path.exists(from_file_dir)  # Directory should be removed
 
+    @pytest.mark.parametrize(
+        "boost_invariant, modules, expected",
+        [
+            (1, ["from_file_IC", "KoMPoST", "MUSIC"], False),
+            (0, ["from_file_IC", "MUSIC"], True),
+            (0, ["from_file_IC", "KoMPoST3D", "MUSIC"], False),
+        ],
+    )
+    def test_convert_to_music(self, boost_invariant, modules, expected):
+        """Only 3D input that goes directly into MUSIC is converted."""
+        config = Configuration({"boost_invariant": boost_invariant})
+        full_config = Configuration({"general": {"modules": modules}})
+
+        module = FromFileIC(config, full_config, self.project_root, "event_0")
+
+        assert module._convert_to_music() == expected
+
+    def test_fetch_output_passes_kompost3d_input_through(self):
+        """3D input for KoMPoST3D is moved to results without conversion."""
+        from_file_dir = os.path.join(self.event_dir, "from_file_IC")
+        os.makedirs(from_file_dir)
+        test_file = os.path.join(from_file_dir, "Tmunu1_AverageState3D.dat")
+        with open(test_file, "w") as f:
+            f.write("KoMPoST-3D input")
+
+        config = Configuration({"boost_invariant": 0})
+        full_config = Configuration(
+            {"general": {"modules": ["from_file_IC", "KoMPoST3D", "MUSIC"]}}
+        )
+
+        module = FromFileIC(config, full_config, self.project_root, "event_0")
+
+        module.prepare_environment(self.event_dir)
+        module.run(self.event_dir)
+        module.fetch_output(self.event_dir)
+
+        result_file = os.path.join(self.event_dir, "results", "output_0.dat")
+        with open(result_file) as f:
+            assert f.read() == "KoMPoST-3D input"
+        assert not os.path.exists(from_file_dir)
+
 
 class TestKoMPoST(TestPhysicsModuleBase):
     """Test KoMPoST module functionality."""
@@ -215,27 +258,15 @@ class TestKoMPoST(TestPhysicsModuleBase):
         """Test prepare_input creates proper parameter file."""
         config = Configuration(
             {
-                "shear_viscosity": 0.08,
-                "tau0": 0.2,
-                "tauf": 1.0,
-                "dTau": 0.01,
-                "nx": 200,
-                "ny": 200,
-                "dx": 0.1,
-                "dy": 0.1,
-                # Required KoMPoST parameters
                 "tIn": 0.2,
                 "tOut": 1.0,
-                "InputFile": "input.dat",
-                "OutputFileTag": "output",
                 "EtaOverS": 0.08,
                 "EtaOverSTemperatureScale": 0.154,
                 "NuEffective": 47.5,
                 "EVOLUTION_MODE": 1,
                 "ENERGY_PERTURBATIONS": 0,
                 "MOMENTUM_PERTURBATIONS": 0,
-                "DECOMPOSITION_METHOD": 1,
-                "Regulator": 0.5,
+                "Regulator": "KoMPoSTAddition",
                 # EventInput parameters
                 "normFactor": 1.0,
                 "afm": 0.1,
@@ -273,9 +304,17 @@ class TestKoMPoST(TestPhysicsModuleBase):
         # Check parameter file content
         with open(param_file, "r") as f:
             content = f.read()
-            assert "0.08" in content  # shear viscosity
-            assert "0.2" in content  # tau0
-            assert "WriteTmunuBackup = 0" in content
+        for line in [
+            "[KoMPoSTInputs]\ntIn = 0.2\ntOut = 1.0\n",
+            "InputFile = output_0.dat\n",
+            "OutputFileTag = output_1\n",
+            "WriteTmunuBackup = 0\n",
+            "[KoMPoSTParameters]\nEtaOverS = 0.08\n",
+            "Regulator = KoMPoSTAddition\n",
+            "[EventInput]\nnormFactor = 1.0\n",
+            "yEND = 199\n",
+        ]:
+            assert line in content
 
     @patch.object(sys.modules["src.modules.KoMPoST"], "run_external_command")
     def test_run_method(self, mock_run_command):
@@ -307,6 +346,175 @@ class TestKoMPoST(TestPhysicsModuleBase):
         assert "./KoMPoST.exe" in call_args[0] or "KoMPoST.exe" in str(
             call_args[0]
         )
+
+
+class TestKoMPoST3D(TestPhysicsModuleBase):
+    """Test KoMPoST3D module functionality."""
+
+    def _config(self):
+        return Configuration(
+            {
+                "tIn": 0.2,
+                "tOut": 0.8,
+                "EtaOverS": 0.16,
+                "EtaOverSTemperatureScale": 0.0,
+                "NuEffective": 40.0,
+                "EVOLUTION_MODE": 1,
+                "ENERGY_PERTURBATIONS": 1,
+                "MOMENTUM_PERTURBATIONS": 0,
+                "Regulator": "TwoPass",
+                "normFactor": 1.0,
+                "afm": 0.21,
+                "deta": 0.25,
+                "Ns": 128,
+                "Neta": 65,
+                "xSTART": 0,
+                "xEND": 127,
+                "ySTART": 0,
+                "yEND": 127,
+                "etaSTART": 0,
+                "etaEND": 64,
+            }
+        )
+
+    def test_prepare_environment_executable_exists(self):
+        """Test prepare_environment links the executable and RTA tables."""
+        kompost_dir = os.path.join(
+            self.project_root, "external_codes", "KoMPoST-3D"
+        )
+        os.makedirs(os.path.join(kompost_dir, "RTA"))
+        executable = os.path.join(kompost_dir, "KoMPoST.exe")
+        with open(executable, "w") as f:
+            f.write("#!/bin/bash\necho 'KoMPoST-3D executable'")
+        os.chmod(executable, 0o755)
+        os.makedirs(os.path.join(self.event_dir, "KoMPoST3D"))
+
+        full_config = Configuration({"general": {"modules": ["KoMPoST3D"]}})
+        module = KoMPoST3D(
+            self._config(), full_config, self.project_root, "event_0"
+        )
+
+        module.prepare_environment(self.event_dir)
+
+        assert os.path.exists(
+            os.path.join(self.event_dir, "KoMPoST3D", "KoMPoST.exe")
+        )
+        assert os.path.exists(os.path.join(self.event_dir, "KoMPoST3D", "RTA"))
+
+    def test_prepare_environment_executable_missing(self):
+        """Test prepare_environment when KoMPoST-3D is not installed."""
+        full_config = Configuration({"general": {"modules": ["KoMPoST3D"]}})
+        module = KoMPoST3D(
+            self._config(), full_config, self.project_root, "event_0"
+        )
+
+        with pytest.raises(FileNotFoundError):
+            module.prepare_environment(self.event_dir)
+
+    def test_prepare_input_creates_parameter_file(self):
+        """Test prepare_input writes the 3D grid and links the input."""
+        full_config = Configuration(
+            {"general": {"modules": ["from_file_IC", "KoMPoST3D", "MUSIC"]}}
+        )
+        with open(
+            os.path.join(self.event_dir, "results", "output_0.dat"), "w"
+        ) as f:
+            f.write("mock initial conditions")
+        os.makedirs(os.path.join(self.event_dir, "KoMPoST3D"))
+
+        module = KoMPoST3D(
+            self._config(), full_config, self.project_root, "event_0"
+        )
+        module.prepare_input(self.event_dir)
+
+        param_file = os.path.join(
+            self.event_dir, "KoMPoST3D", "parameters_KoMPoST3D.ini"
+        )
+        with open(param_file) as f:
+            content = f.read()
+        for line in [
+            "InputFile = output_0.dat\n",
+            "OutputFileTag = output_1\n",
+            "WriteTmunuBackup = 0\n",
+            "NuEffective = 40.0\n",
+            "normFactor = 1.0\n",
+            "deta = 0.25\n",
+            "Neta = 65\n",
+            "etaEND = 64\n",
+        ]:
+            assert line in content
+        assert os.path.islink(
+            os.path.join(self.event_dir, "KoMPoST3D", "output_0.dat")
+        )
+
+    @patch.object(sys.modules["src.modules.KoMPoST3D"], "run_external_command")
+    def test_run_method(self, mock_run_command):
+        """Test KoMPoST3D runs the executable with its parameter file."""
+        full_config = Configuration(
+            {
+                "general": {
+                    "modules": ["KoMPoST3D"],
+                    "memory_threshold_mb": 1000,
+                    "module_terminal_output": False,
+                }
+            }
+        )
+        os.makedirs(os.path.join(self.event_dir, "KoMPoST3D"))
+        module = KoMPoST3D(
+            self._config(), full_config, self.project_root, "event_0"
+        )
+
+        module.run(self.event_dir)
+
+        mock_run_command.assert_called_once()
+        assert mock_run_command.call_args[0][0] == [
+            "./KoMPoST.exe",
+            "parameters_KoMPoST3D.ini",
+        ]
+
+    @patch.object(sys.modules["src.modules.KoMPoST3D"], "run_external_command")
+    def test_run_raises_when_kompost3d_fails(self, mock_run_command):
+        """A failed run (e.g. out of memory) is not passed on silently."""
+        mock_run_command.side_effect = subprocess.CalledProcessError(
+            137, ["./KoMPoST.exe"]
+        )
+        full_config = Configuration(
+            {
+                "general": {
+                    "modules": ["KoMPoST3D"],
+                    "memory_threshold_mb": 1000,
+                    "module_terminal_output": False,
+                }
+            }
+        )
+        os.makedirs(os.path.join(self.event_dir, "KoMPoST3D"))
+        module = KoMPoST3D(
+            self._config(), full_config, self.project_root, "event_0"
+        )
+
+        with pytest.raises(subprocess.CalledProcessError):
+            module.run(self.event_dir)
+
+    def test_fetch_output(self):
+        """Test fetch_output moves the pimunuNS output to results."""
+        kompost_dir = os.path.join(self.event_dir, "KoMPoST3D")
+        os.makedirs(kompost_dir)
+        with open(os.path.join(kompost_dir, "output_1_pimunuNS.dat"), "w") as f:
+            f.write("pimunuNS")
+        with open(os.path.join(kompost_dir, "output_1_hydro.dat"), "w") as f:
+            f.write("hydro")
+        full_config = Configuration(
+            {"general": {"modules": ["from_file_IC", "KoMPoST3D", "MUSIC"]}}
+        )
+        module = KoMPoST3D(
+            self._config(), full_config, self.project_root, "event_0"
+        )
+
+        module.fetch_output(self.event_dir)
+
+        with open(os.path.join(self.event_dir, "results", "output_1.dat")) as f:
+            assert f.read() == "pimunuNS"
+        assert not os.path.exists(kompost_dir)
 
 
 class TestMUSIC:
@@ -992,6 +1200,32 @@ class TestModuleFailuresPropagate(TestPhysicsModuleBase):
         with pytest.raises(subprocess.CalledProcessError):
             module.run(self.event_dir)
 
+    @pytest.mark.parametrize(
+        "music, table",
+        [
+            ({"EOS_to_use": 9}, "hrg_hotqcd_eos_binary.dat"),
+            ({"EOS_to_use": 91}, "hrg_hotqcd_eos_SMASH_binary.dat"),
+            (None, "hrg_hotqcd_eos_SMASH_binary.dat"),
+        ],
+    )
+    def test_entropy_matching_uses_the_music_eos_table(self, music, table):
+        os.makedirs(os.path.join(self.event_dir, "entropy_matching"))
+        full_config = {
+            "general": general_config(["KoMPoST", "entropy_matching", "MUSIC"])
+        }
+        if music is not None:
+            full_config["MUSIC"] = music
+        config = Configuration({"matching_type": 0, "nu_eff": 40.0})
+        module = EntropyMatching(
+            config, Configuration(full_config), self.project_root, "0"
+        )
+        with patch.object(
+            sys.modules["src.modules.entropy_matching"], "run_external_command"
+        ) as mock_run_command:
+            module.run(self.event_dir)
+        cmd = mock_run_command.call_args[0][0]
+        assert cmd[4] == os.path.join("EOS", "hotQCD", table)
+
     @patch.object(sys.modules["src.modules.iSS"], "run_external_command", side_effect=failing_command)
     def test_iss_run(self, mock_run_command):
         os.makedirs(os.path.join(self.event_dir, "iSS"))
@@ -1010,27 +1244,55 @@ class TestModuleFailuresPropagate(TestPhysicsModuleBase):
         with pytest.raises(subprocess.CalledProcessError):
             module.run(self.event_dir)
 
-    @patch.object(
-        sys.modules["src.modules.SMASH"], "run_external_command", side_effect=failing_command
-    )
-    def test_smash_converter(self, mock_run_command):
+    def test_smash_rejects_input_that_is_not_oscar2013(self):
         os.makedirs(os.path.join(self.event_dir, "SMASH"))
-        open(os.path.join(self.event_dir, "results", "output_0.dat"), "w")
+        with open(os.path.join(self.event_dir, "results", "output_0.dat"), "w") as f:
+            f.write("OSC1997A\nfinal_id_p_x\n")
         full_config = Configuration(
             {"general": general_config(["iSS", "SMASH"])}
         )
         module = SMASH(Configuration({}), full_config, self.project_root, "0")
-        with pytest.raises(subprocess.CalledProcessError):
+        with pytest.raises(ValueError, match="not an OSCAR 2013"):
             module.prepare_input(self.event_dir)
         assert not os.path.exists(
             os.path.join(self.event_dir, "SMASH", "parameters_SMASH.yaml")
         )
 
-    def make_afterburner(self, modules):
+    def make_afterburner(self, modules, smash_format="Oscar2013"):
         os.makedirs(os.path.join(self.event_dir, "afterburner_toolkit"))
-        full_config = Configuration({"general": general_config(modules)})
+        full_config = Configuration(
+            {
+                "general": general_config(modules),
+                "SMASH": {"Particles_Format": smash_format},
+            }
+        )
         config = Configuration({"input_filename": "output_1.dat"})
         return afterburner_toolkit(config, full_config, self.project_root, "0")
+
+    @pytest.mark.parametrize(
+        "modules, smash_format, read_in_mode, staged_file",
+        [
+            (["SMASH", "afterburner_toolkit"], "Oscar2013_bin", 8, "particles_binary.bin"),
+            (["iSS", "afterburner_toolkit"], "Oscar2013_bin", 9, "particle_list.bin"),
+        ],
+    )
+    def test_afterburner_reads_binary_lists_directly(
+        self, modules, smash_format, read_in_mode, staged_file
+    ):
+        module = self.make_afterburner(modules, smash_format)
+        assert module.read_in_mode() == read_in_mode
+        toolkit_dir = os.path.join(self.event_dir, "afterburner_toolkit")
+        with open(os.path.join(toolkit_dir, "output_1.dat"), "w") as f:
+            f.write("particles")
+        with patch.object(
+            sys.modules["src.modules.afterburner_toolkit"], "run_external_command"
+        ) as mock_run_command:
+            module.run(self.event_dir)
+        # only the analysis runs, no converter
+        mock_run_command.assert_called_once()
+        assert "hadronic_afterburner_tools" in mock_run_command.call_args[0][0][0]
+        with open(os.path.join(toolkit_dir, "results", staged_file)) as f:
+            assert f.read() == "particles"
 
     @patch.object(
         sys.modules["src.modules.afterburner_toolkit"], "run_external_command",
@@ -1112,7 +1374,12 @@ class TestModuleResume(TestPhysicsModuleBase):
         full_config = Configuration(
             {"general": general_config(["iSS", "SMASH"])}
         )
-        module = SMASH(Configuration({}), full_config, self.project_root, "0")
+        module = SMASH(
+            Configuration({"Particles_Format": "Oscar2013"}),
+            full_config,
+            self.project_root,
+            "0",
+        )
         with patch.object(
             sys.modules["src.modules.SMASH"], "run_external_command", side_effect=run_smash
         ):
@@ -1121,9 +1388,22 @@ class TestModuleResume(TestPhysicsModuleBase):
         with open(os.path.join(self.event_dir, "results", "output_1.dat")) as f:
             assert f.read() == "particles"
 
-    def test_smash_event_count_is_not_kept_in_the_config(self):
+    def test_smash_reads_the_iss_oscar2013_output(self):
         os.makedirs(os.path.join(self.event_dir, "SMASH"))
-        open(os.path.join(self.event_dir, "results", "output_0.dat"), "w")
+        lines = [
+            "#!OSCAR2013 particle_lists t x y z mass p0 px py pz pdg ID charge",
+            "# Units: fm fm fm fm GeV GeV GeV GeV GeV none none e",
+        ]
+        # iSS skips empty events, so the event numbers can have gaps
+        for event in [1, 2, 4, 5, 6, 7, 9]:
+            lines += [
+                f"# event {event} out 1",
+                "1.0 0.1 0.2 0.3 0.138 0.5 0.1 0.2 0.3 211 1 1",
+                f"# event {event} end 0 impact 0.000",
+            ]
+        input_file = os.path.join(self.event_dir, "results", "output_0.dat")
+        with open(input_file, "w") as f:
+            f.write("\n".join(lines) + "\n")
         full_config = Configuration(
             {"general": general_config(["iSS", "SMASH"])}
         )
@@ -1131,15 +1411,17 @@ class TestModuleResume(TestPhysicsModuleBase):
             {"Delta_Time": 0.1, "End_Time": 100.0, "No_Collisions": 1}
         )
         module = SMASH(config, full_config, self.project_root, "0")
-        with patch.object(
-            sys.modules["src.modules.SMASH"], "run_external_command",
-            return_value={"return_code": 0, "stdout": "7\n"},
-        ):
-            module.prepare_input(self.event_dir)
-        with open(
-            os.path.join(self.event_dir, "SMASH", "parameters_SMASH.yaml")
-        ) as f:
-            assert "Nevents:       7\n" in f.read()
+
+        module.prepare_input(self.event_dir)
+
+        smash_dir = os.path.join(self.event_dir, "SMASH")
+        with open(os.path.join(smash_dir, "parameters_SMASH.yaml")) as f:
+            parameters = f.read()
+        assert "Nevents:       7\n" in parameters
+        assert 'File_Prefix: "OSCAR"' in parameters
+        assert os.path.realpath(os.path.join(smash_dir, "OSCAR0")) == (
+            os.path.realpath(input_file)
+        )
         assert "Nevents" not in config.to_dict()
 
 

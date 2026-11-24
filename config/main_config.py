@@ -13,7 +13,7 @@ general = {
     # Memory monitoring settings
     "memory_threshold_mb": 4096,  # Memory threshold in MB for warnings (default: 4GB)
     # List of modules to connect/load.
-    # Possible modules: from_file_IC, KoMPoST, entropy_matching, MUSIC, iSS, SMASH, afterburner_toolkit
+    # Possible modules: from_file_IC, IPGlasma, KoMPoST, KoMPoST3D, entropy_matching, MUSIC, iSS, SMASH, afterburner_toolkit
     "modules": [],
     "number_of_jobs": 1,
     "number_events_per_job": 1,
@@ -156,7 +156,6 @@ KoMPoST = {
     "EVOLUTION_MODE": 1,  # 0 for free-streaming, 1: for "KoMPoST" EKT evolution
     "ENERGY_PERTURBATIONS": 1,
     "MOMENTUM_PERTURBATIONS": 0,
-    "DECOMPOSITION_METHOD": 1,
     "Regulator": "TwoPass",
     "normFactor": 1.0,  # scaling of the input Tmunu
     "afm": 0.1,  # lattice spacing in fm
@@ -165,6 +164,32 @@ KoMPoST = {
     "xEND": 511,  # The last grid point to include in the x direction
     "ySTART": 0,  # The first grid point to include in the y direction
     "yEND": 511,  # The last grid point to include in the y direction
+}
+
+# KoMPoST-3D for 3D (non boost-invariant) initial conditions. The input file
+# (from from_file_IC with boost_invariant 0) must already be in the KoMPoST-3D
+# T^munu format. One event needs ~9 GB of memory (response tables).
+KoMPoST3D = {
+    "tIn": 0.2,
+    "tOut": 0.8,
+    "EtaOverS": 0.16,  # specific shear viscosity
+    "EtaOverSTemperatureScale": 0.0,
+    "NuEffective": 40.0,
+    "EVOLUTION_MODE": 1,  # only 1 (kinetic theory, RTA) is supported
+    "ENERGY_PERTURBATIONS": 1,
+    "MOMENTUM_PERTURBATIONS": 0,  # only 0 is supported
+    "Regulator": "TwoPass",
+    "normFactor": 1.0,  # scaling of the input tau*Tmunu
+    "afm": 0.21,  # transverse lattice spacing in fm
+    "deta": 0.25,  # lattice spacing in spatial rapidity
+    "Ns": 128,  # number of grid points in x and y
+    "Neta": 65,  # number of grid points in spatial rapidity
+    "xSTART": 0,  # The first grid point to include in the x direction
+    "xEND": 127,  # The last grid point to include in the x direction
+    "ySTART": 0,  # The first grid point to include in the y direction
+    "yEND": 127,  # The last grid point to include in the y direction
+    "etaSTART": 0,  # The first grid point to include in the eta direction
+    "etaEND": 64,  # The last grid point to include in the eta direction
 }
 
 entropy_matching = {
@@ -200,21 +225,11 @@ MUSIC = {
     "Grid_size_in_x": 201,  # number of the grid points in x direction
     "gridPadding": 3,  # grid padding size in the transverse plane (fm)
     "EOS_to_use": 91,  # type of the equation of state
-    # 0: ideal gas
-    # 1: EOS-Q from azhydro
-    # 2: lattice EOS s95p-v1
-    #    (from Huovinen and Petreczky)
-    # 3: lattice EOS s95p with partial
-    #    chemical equilibrium (PCE) at 150 MeV
-    #    (see https://wiki.bnl.gov/TECHQM
-    #         /index.php/QCD_Equation_of_State)
-    # 4: lattice EOS s95p PCE at 155 MeV
-    # 5: lattice EOS s95p PCE at 160 MeV
-    # 6: lattice EOS s95p PCE at 165 MeV
-    # 7: lattice EOS s95p-v1.2 for UrQMD
-    # 9: lattice EOS hotQCD with UrQMD
-    # 91: lattice EOS hotQCD with SMASH
-    # 14: lattice EOS hotQCD at finite muB
+    # 9: lattice EOS hotQCD with UrQMD (use with iSS decays, without SMASH)
+    # 91: lattice EOS hotQCD with SMASH (use with SMASH)
+    # Only these two are supported (checked by check_settings):
+    # GetModulesFromGit.sh downloads only their tables, and iSS needs a hadron
+    # list that matches the EoS.
     # transport coefficients
     "quest_revert_strength": 1.0,
     "FlagResumTransportCoeff": 0,  # switch to use resummed transport coeff.
@@ -253,8 +268,7 @@ MUSIC = {
     "output_evolution_ideal_only": 0,
     "outputBinaryEvolution": 1,  # output evolution file in binary format
     "output_evolution_every_N_eta": 1,  # output evolution file every Neta steps
-    "output_evolution_every_N_y": 1,  # output evolution file every Ny steps
-    "output_evolution_every_N_x": 1,  # output evolution file every Nx steps
+    "output_evolution_every_N_x": 1,  # output evolution file every Nx (and Ny) steps
     "output_evolution_every_N_timesteps": 10,  # output evolution every Ntime steps
     # parameters for freeze out and Cooper-Frye
     "Do_FreezeOut_Yes_1_No_0": 1,  # flag to find freeze-out surface
@@ -263,8 +277,7 @@ MUSIC = {
     "freeze_out_method": 4,  # method for hyper-surface finder, 4 Cornelius
     "freeze_surface_in_binary": 1,  # switch to output surface file in binary format
     "average_surface_over_this_many_time_steps": 10,  # the step skipped in the tau
-    "freeze_Ncell_x_step": 1,
-    "freeze_Ncell_y_step": 1,
+    "freeze_Ncell_x_step": 1,  # MUSIC uses this step in x and y
     "freeze_Ncell_eta_step": 1,
     "use_eps_for_freeze_out": 0,  # flag to use energy density as criteria to
     # find freeze-out surface
@@ -279,6 +292,8 @@ MUSIC = {
 }
 
 iSS = {
+    # CRONOS sets randomSeed and the output for the next module (OSCAR 2013
+    # for SMASH, binary with resonance decays otherwise), see src/modules/iSS.py
     "hydro_mode": 1,  # mode for reading in freeze out information
     # 1: reads outputs from MUSIC assuming boost-invariant
     # 2: reads outputs from MUSIC full (3+1)-d
@@ -289,7 +304,6 @@ iSS = {
     "turn_on_bulk": 0,  # read in bulk viscous pressure
     "turn_on_rhob": 0,  # read in net baryon chemical potential
     "turn_on_diff": 0,  # read in baryon diffusion current
-    "regulateEOS": 1,  # flag to regulate T and mu with pure HRG EOS
     "include_deltaf_shear": 1,  # include delta f contribution from shear
     "include_deltaf_bulk": 1,  # include delta f contribution from bulk
     "include_deltaf_diffusion": 0,  # include delta f contribution from diffusion
@@ -297,8 +311,6 @@ iSS = {
     "restrict_deltaf": 0,  # flag to apply restriction on the size of delta f
     "deltaf_max_ratio": 1.0,  # the maximum allowed size of delta f w.r.t f0
     "quantum_statistics": 1,  # include quantum statistics (1: yes, 0: no)
-    "calculate_polarization": 0,  # switch to compute Lambda's polarization
-    "polarizationRapType": 1,  # 0: rapidity; 1: pseudorapidity; 2: both
     "calculate_vn": 0,  # 1/0: whether to calculate the
     "MC_sampling": 4,  # 0/1/2/3: whether to perform Monte-Carlo sampling
     # (not required for spectra calculation).
@@ -319,19 +331,13 @@ iSS = {
     #      whole dN_dy.
     "dN_dy_sampling_para1": 0.16,  # Additional parameters for dN/dy sampling.
     # -- For dN_dy_sampling_model==10 or 20,
-    "perform_decays": 0,  # flag to perform resonance decay
     "perform_checks": 0,  # flag to perform tests for the sampler
     "include_spectators": 0,  # flag to include spectators
     "local_charge_conservation": 0,  # flag to impose local charge conservation
-    "global_momentum_conservation": 0,  # flag to impose GMC
     "y_LB": -5.0,  # lower bound for y-sampling;
     "y_RB": 5.0,  # upper bound for y-sampling;
     "output_samples_into_files": 0,  # output particle samples into individual files
     "store_samples_in_memory": 1,  # flag to store particle samples in memory
-    "use_OSCAR_format": 1,  # output results in OSCAR format
-    "use_gzip_format": 0,  # output results in gzip format (only works with
-    # store_samples_in_memory = 1)
-    "use_binary_format": 0,
     "calculate_vn_to_order": 9,  # v_n's are calculated up to this order
     "use_pos_dN_only": 0,  # 1: all negative emission functions will be skipped.
     "grouping_particles": 1,  # 0/1: Particles will be re-order according to
@@ -349,21 +355,6 @@ iSS = {
     # be smaller than this value, then it
     # is replaced by this value.
     "use_historic_flow_output_format": 0,
-    "eta_s_LB": -0.5,  # lower bound for eta_s sampling; used only when
-    # sampling using total energy flux
-    "eta_s_RB": 0.5,  # upper bound for eta_s sampling.
-    "use_dynamic_maximum": 0,  # 0/1: Whether to automatically reduce the
-    # guessed maximum after some calculations.
-    # Work only when MC_sampling is set to 2.
-    "adjust_maximum_after": 100000,  # Used only when use_dynamic_maximum=1.
-    # After the number of sampling given by
-    # this parameter the guessed maximum is
-    # adjusted.
-    "adjust_maximum_to": 1.2,  # [1,inf]: When guessed maximum is adjusted,
-    # it is adjusted to the "observed maximum"
-    # multiplied by this value. Note that the
-    # "observed maximum" is measured relative to
-    # the guessed maximum. See code for details.
     "calculate_dN_dtau": 0,  # Output dN_dtau table. Only applicable
     # if MC_sampling parameter is set to 1.
     "bin_tau0": 0.6,  # used to generate bins for
@@ -394,22 +385,17 @@ SMASH = {
     "Delta_Time": 0.1,
     "End_Time": 2000.0,
     "No_Collisions": 0,  # 1: disable collisions, decays only
+    "Particles_Format": "Oscar2013_bin",  # final particle list:
+    # "Oscar2013_bin": binary OSCAR 2013 list, which afterburner_toolkit
+    #   reads directly
+    # "Oscar2013": human-readable OSCAR 2013 text, which afterburner_toolkit
+    #   converts first
 }
 
 afterburner_toolkit = {
+    # CRONOS sets read_in_mode for the particle list of the previous module
+    # (SMASH binary or text output, or the iSS binary list without SMASH)
     "echo_level": 9,  # control the amount of print messages
-    "read_in_mode": 7,  # mode for reading in particle information
-    # 0: reads outputs from OSCAR outputs
-    # 1: reads outputs from UrQMD outputs
-    # 2: reads outputs from zipped UrQMD outputs
-    # 21: reads outputs from binary UrQMD outputs
-    # 3: reads outputs from Sangwook's UrQMD outputs
-    #    (without header lines)
-    # 4: reads outputs from UrQMD 3.3p2 outputs
-    # 7: reads outputs from gzipped SMASH outputs
-    # 8: read outputs from SMASH binary format
-    # 9: reads outputs from binary outputs (iSS)
-    # 10: reads outputs from gzip outputs (iSS)
     "ecoOutput": 1,  # 1: only save Qn without errors
     "analyze_flow": 4,  # 0/1: flag to perform flow analysis
     "analyze_HBT": 0,  # 0/1: flag to perform HBT analysis

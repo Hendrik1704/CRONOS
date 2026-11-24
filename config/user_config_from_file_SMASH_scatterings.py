@@ -35,7 +35,6 @@ KoMPoST = {
     "EVOLUTION_MODE": 1,  # 0 for free-streaming, 1: for "KoMPoST" EKT evolution
     "ENERGY_PERTURBATIONS": 1,
     "MOMENTUM_PERTURBATIONS": 0,
-    "DECOMPOSITION_METHOD": 1,
     "normFactor": 1.0,  # scaling of the input Tmunu
     "afm": 0.1,  # lattice spacing in fm
     "Ns": 301,  # number of grid points on a square lattice

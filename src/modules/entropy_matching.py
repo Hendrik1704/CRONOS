@@ -5,6 +5,14 @@ import subprocess
 import shutil
 
 
+# MUSIC hotQCD EOS table for each supported EOS_to_use (MUSIC eos_hotQCD.cpp)
+MUSIC_EOS_TABLES = {
+    9: "hrg_hotqcd_eos_binary.dat",  # HRG matched to UrQMD hadrons
+    91: "hrg_hotqcd_eos_SMASH_binary.dat",  # HRG matched to SMASH hadrons
+}
+DEFAULT_MUSIC_EOS = 91
+
+
 class EntropyMatching(BaseModule):
     """Entropy matching module for smooth KoMPoST to MUSIC transition.
 
@@ -38,6 +46,12 @@ class EntropyMatching(BaseModule):
         >>> entropy.run(event_dir)  # Entropy density matching
         >>> entropy.fetch_output(event_dir)  # MUSIC initial conditions
     """
+
+    def eos_table(self):
+        """Return the EOS table MUSIC uses, for the matching to MUSIC."""
+        music_config = getattr(self.full_config, "MUSIC", None)
+        eos = getattr(music_config, "EOS_to_use", DEFAULT_MUSIC_EOS)
+        return MUSIC_EOS_TABLES.get(eos, MUSIC_EOS_TABLES[DEFAULT_MUSIC_EOS])
 
     def prepare_environment(self, event_dir):
         """Set up entropy matching environment with EOS tables and conversion script.
@@ -180,7 +194,7 @@ class EntropyMatching(BaseModule):
                     s_matching_script,
                     str(self.config.matching_type),
                     str(self.config.nu_eff),
-                    "./EOS/hotQCD/hrg_hotqcd_eos_SMASH_binary.dat",
+                    os.path.join("EOS", "hotQCD", self.eos_table()),
                     f"output_{current_module_index-1}.dat",
                     f"output_{current_module_index}.dat",
                 ],

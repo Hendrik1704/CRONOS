@@ -6,6 +6,7 @@ from .check_settings import check_settings
 from .modules.from_file_IC import FromFileIC
 from .modules.IPGlasma import IPGlasma
 from .modules.KoMPoST import KoMPoST
+from .modules.KoMPoST3D import KoMPoST3D
 from .modules.entropy_matching import EntropyMatching
 from .modules.MUSIC import MUSIC
 from .modules.iSS import iSS
@@ -24,6 +25,7 @@ __all__ = [
     "FromFileIC",
     "IPGlasma",
     "KoMPoST",
+    "KoMPoST3D",
     "EntropyMatching",
     "MUSIC",
     "iSS",
